@@ -21,5 +21,6 @@ dependencies {
 tasks.test {
     // Engine data is baked from spektrafilm into the app assets.
     systemProperty("spektra.assets", rootProject.file("app/src/main/assets/spektra").absolutePath)
+    systemProperty("spektra.gldump", System.getProperty("spektra.gldump") ?: "")
     testLogging { events("passed", "failed"); showStandardStreams = true }
 }

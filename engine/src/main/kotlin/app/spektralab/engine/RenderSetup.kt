@@ -10,7 +10,7 @@ import kotlin.math.pow
  * resolution. Building it runs the spektrafilm print stage over a 3D grid of
  * film densities (tens of milliseconds), so callers cache it per look.
  */
-class LookSetup(val look: Look, val params: RuntimeParams, global: GlobalData, lutSize: Int = 40) {
+class LookSetup(val look: Look, val params: RuntimeParams, global: GlobalData, lutSize: Int = 40, reuseLut: Lut3? = null) {
     val pipeline = PixelPipeline(params, global)
     private val filming = pipeline.filming
     val film get() = params.film
@@ -34,7 +34,7 @@ class LookSetup(val look: Look, val params: RuntimeParams, global: GlobalData, l
     val positive = film.isPositive
     val densityMax = FloatArray(3) { film.densityMaxNormalized[it].toFloat() }
 
-    val outputLut: Lut3 = pipeline.buildOutputLut(lutSize)
+    val outputLut: Lut3 = reuseLut?.takeIf { it.n == lutSize } ?: pipeline.buildOutputLut(lutSize)
     /** Print glare in linear output units (fraction of the viewing white). */
     val glare = if (params.scanFilm) 0f else (params.glarePercent / 100.0).toFloat()
 
@@ -50,8 +50,13 @@ class LookSetup(val look: Look, val params: RuntimeParams, global: GlobalData, l
     fun pixelSizeUm(longEdgePx: Int): Double = params.filmFormatMm * 1000.0 / max(longEdgePx, 1)
 
     companion object {
-        fun create(look: Look, data: EngineData, lutSize: Int = 40): LookSetup =
-            LookSetup(look, LookMapper.toRuntime(look, data), data.global, lutSize)
+        fun create(look: Look, data: EngineData, lutSize: Int = 40, reuseLut: Lut3? = null): LookSetup =
+            LookSetup(look, LookMapper.toRuntime(look, data), data.global, lutSize, reuseLut)
+
+        /** Only these settings change the film-density -> output LUT. */
+        fun lutKey(look: Look, lutSize: Int): String =
+            listOf(look.film, look.paper, look.printEv, look.glare, look.filmEv, look.push, look.yFilter, look.mFilter, lutSize)
+                .joinToString("|")
 
         private fun flatten(a: Array<DoubleArray>) = FloatArray(a.size * 3) { a[it / 3][it % 3].toFloat() }
     }

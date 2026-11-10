@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">SpektraLab</string>
+    <string name="export_channel">冲印</string>
+    <string name="export_running">正在冲印…</string>
+</resources>

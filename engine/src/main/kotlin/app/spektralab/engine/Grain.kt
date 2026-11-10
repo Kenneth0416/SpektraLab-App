@@ -19,7 +19,7 @@ class GrainSetup(params: RuntimeParams) {
     val densityMin = params.grain.densityMin.copyOf()
     val uniformity = params.grain.uniformity.copyOf()
 
-    /** Layer-density lookup: [TABLE][3 sublayers][3 channels], channel density on [0, tableHi[c]]. */
+    /** Layer-density lookup: [3 sublayers][TABLE][3 channels] (one texture row per sublayer), channel density on [0, tableHi[c]]. */
     val tableSize = 128
     val tableHi = DoubleArray(3)
     val layerTable: FloatArray
@@ -58,7 +58,7 @@ class GrainSetup(params: RuntimeParams) {
                 for (i in 0 until tableSize) {
                     val d = tableHi[c] * i / (tableSize - 1)
                     val v = Interp.interp(if (positive) -d else d, xs, fp)
-                    layerTable[(i * 3 + s) * 3 + c] = v.toFloat()
+                    layerTable[(s * tableSize + i) * 3 + c] = v.toFloat()
                 }
             }
         }
@@ -77,8 +77,8 @@ class GrainSetup(params: RuntimeParams) {
             val i0 = t.toInt().coerceAtMost(tableSize - 2)
             val f = t - i0
             for (s in 0..2) {
-                val v0 = layerTable[(i0 * 3 + s) * 3 + c]
-                val v1 = layerTable[((i0 + 1) * 3 + s) * 3 + c]
+                val v0 = layerTable[(s * tableSize + i0) * 3 + c]
+                val v1 = layerTable[(s * tableSize + i0 + 1) * 3 + c]
                 val dl = v0 + f * (v1 - v0) + layerDensityMin[s][c]
                 val dmax = layerDensityMax[s][c]
                 val n = area * particlesPerUm2[s][c]

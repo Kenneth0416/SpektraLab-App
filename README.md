@@ -1,70 +1,86 @@
 # SpektraLab App
 
-手机端胶片模拟工具的交互原型：照片、视频、相机取景共用一套「胶片 × 相纸」参数。
-
-画面与质感以 [spektrafilm](https://github.com/andreavolpato/spektrafilm) 和 [SpektraLab](https://github.com/JamesQiu2005/SpektraLab) 为参考，本仓库目前只包含交互设计，不含渲染引擎。
+安卓原生的胶片模拟工具：照片、视频共用一套「胶片 × 相纸」参数。成像引擎是 [spektrafilm](https://github.com/andreavolpato/spektrafilm)（光谱胶片模拟）的 Kotlin + OpenGL ES 移植。
 
 ## 当前状态
 
-- 这是一份交互原型，不是可安装的应用。
-- 预览里的光晕、颗粒、柔焦是用 CSS 近似的占位效果。
-- 取景画面和素材是四张插画，没有接真实摄像头和系统相册。
-- 导入候选、导出进度、移除都是模拟的。
+| 部分 | 状态 |
+|---|---|
+| 导入照片（相册多选 / 文件，含系统能解码的 RAW/DNG） | ✅ |
+| 编辑：实时预览、按住看原图、撤销/重做、复制/粘贴设置、配方 | ✅ |
+| 导出照片（JPEG / PNG，长边 2048 / 3400 / 全尺寸，全尺寸上限 5000 px），存相册或分享 | ✅ |
+| 视频：导入、实时预览播放、逐帧重新生成颗粒导出（1080p / 4K，音轨原样保留） | ✅ |
+| 相机 | 暂未开放（入口保留，点了会提示） |
 
-## 流程
+没有在真机上跑过：构建环境里没有模拟器。引擎和着色器做了离线验证（见下）。
 
-图库 → 编辑 → 导出，相机是图库的一个入口。
+## 构建
 
-- **图库**：网格浏览，按照片 / 视频筛选；「选择」后可批量粘贴设置、套用配方、导出、移除。
-- **导入**：相册（照片和视频，可多选）或文件（RAW）；只选一项时直接进入编辑。
-- **编辑**：按住画面看原图，撤销 / 重做，复制 / 粘贴设置，配方。
-- **相机**：照片或视频，拍完带着当前设置进图库，原片保留。
-- **导出**：照片选 JPEG / HEIF / TIFF 与三档尺寸，视频选 1080p / 4K；存到相册或交给系统分享，可放到后台继续。
+```bash
+./gradlew :app:assembleDebug        # app/build/outputs/apk/debug/app-debug.apk
+./gradlew :engine:test              # 引擎对照 spektrafilm 的测试
+```
 
-## 视觉方向：灯箱与暗房
+需要 JDK 17+、Android SDK 35。最低 Android 10（API 29），GPU 需支持 OpenGL ES 3.0 和半精度浮点渲染目标。
 
-- **灯箱（图库、导入）**：乳白色发光的底，打开时像灯管一样闪亮。照片三张一条排在带齿孔和片边字的底片条上；导入候选是白色幻灯片夹。
-- **红蜡笔**：多选是手绘红圈加手写序号，改过的照片有红勾，当前筛选项下有一笔红线。
-- **暗房（编辑、相机）**：进入时亮底淡出成近黑，安全灯红点呼吸；画面四角是红色裁切角标，照片本身不染色。
-- **刻度尺**：滑杆是带刻度的尺加指针，读数用等宽数字；黄滤和品红滤的刻度带颜色，表示画面偏去的方向。
-- **强调色跟着胶卷走**：读数、选中项、导出按钮使用当前胶卷的颜色。
-- **配方**：米色索引卡，手写名字。
+## 结构
 
-字体：Long Cang（手写）、Martian Mono（等宽数字）、Noto Sans SC（正文），均来自 Google Fonts。
+```
+engine/        纯 Kotlin（JVM）模块：spektrafilm 运行时的移植 + GLSL 着色器源码
+app/           Android 应用（Jetpack Compose + GLES 3.0 + MediaCodec）
+  assets/spektra/   由 spektrafilm 烘焙出的胶片 / 相纸数据（*.spk）
+tools/bake/    运行 spektrafilm（Python）导出数据和参考向量的脚本
+tools/glcheck/ 在 WebGL2 里跑 app 着色器、对照 Kotlin 引擎的检查脚本
+prototype/     早先的交互原型（Claude Design 画布格式）
+```
 
-## 可调参数
+## 引擎：怎么用 spektrafilm
+
+spektrafilm 的流程是 线性 RGB → 胶片曝光 → 显影（DIR 耦合剂、颗粒）→ 放大机印相 → 相纸显影 → 扫描。移植方式：
+
+- **固定不变、依赖 colour-science 的部分由 spektrafilm 自己算好**（`tools/bake/bake_spektrafilm.py`）：每款胶片的 Hanatos 2025 光谱上采样表（含感光度适配和输入色域压缩）、CAT16 矩阵、每款相纸 / 反转片的扫描表（观看光源、CMF、CAM16-UCS 输出色域压缩）、放大机光源、分色滤镜和中性滤色数据库。
+- **所有可调的部分在手机上按 spektrafilm 的公式实时计算**（`engine/`）：胶片曝光、显影曲线与 gamma、DIR 耦合剂（含扩散）、放大机滤色与印相曝光的光谱积分、中灰归一化、相纸曲线、子层泊松-二项颗粒、乳剂散射 + 片基反射光晕、四种柔焦镜 PSF、眩光。
+- GPU 上每帧：曝光 → 高斯金字塔模糊（光晕 / 柔焦 / 耦合剂扩散拟合为若干倍频高斯）→ 显影 + 颗粒 → 「胶片密度 → 印相 → 扫描」三维表 → sRGB。印相那一段在设置变化时在 CPU 上重新算成三维表（预览 36³，导出 48³）。
+
+### 验证
+
+- `ReferenceTest`：8 组胶片 × 相纸 × 参数，逐级对照 spektrafilm 的中间结果。胶片密度误差 < 0.001，输出平均误差 0.04%（sRGB），GPU 用的折叠三维表平均 0.1%。
+- `SpatialTest`：光晕、四种柔焦镜的冲激响应（能量环曲线误差 < 1.6%）和颗粒均值 / 标准差都对照 spektrafilm 自己的空间代码。
+- `tools/glcheck`：所有着色器在严格的 WebGL2 下编译；GPU 逐像素结果和 Kotlin 引擎相差 < 1/255；GPU 颗粒的标准差与 CPU 模型一致；金字塔模糊的 σ 和能量守恒。
+
+### 和 spektrafilm 的差异
+
+- 光晕 / 柔焦 / 耦合剂扩散用倍频高斯混合近似（拟合误差见上），亚像素的散射核心并入恒等项。
+- 颗粒在 λ > 12 时用正态近似泊松；微结构团聚（`micro_structure`）在手机分辨率下 spektrafilm 本身也不触发，未实现。
+- 眩光取均值（spektrafilm 是随机对数正态场再模糊）。
+- 未实现：预闪、扫描锐化、曲线形变（developer exhaustion 等）、黑白校正、相机 UV/IR 滤镜、Hanatos 2025 之外的上采样方法。
+- 迫冲：Portra 800 用 spektrafilm 实测的迫冲档案；其他胶片按「少曝光 N 档 + gamma ×(1+0.15N)」近似。
+
+## 交互
+
+图库 → 编辑 → 导出，沿用原型的「灯箱与暗房」：
+
+- **灯箱（图库）**：乳白发光底，三张一条排在带齿孔和片边字的底片条上，按日期分组；「选择」后红蜡笔圈选、手写序号，可批量粘贴设置、套用配方、导出、移除（只移出图库，相册原片不动）。改过的照片有红勾。
+- **暗房（编辑）**：近黑背景、安全灯红点呼吸、红色裁切角标；刻度尺滑杆（双击复位），黄 / 品红滤色刻度带颜色表示画面偏去的方向；强调色跟着胶卷走。
+- **导出**：在后台冲印，可以「后台继续」回去修图，顶部有进度胶囊。
 
 | 工具 | 选项 |
 |---|---|
-| 胶片 | 六款胶卷（名称为示例，以引擎自带档案为准） |
-| 相纸 | 自动 / Endura / 2383 / 不印相，印相曝光，眩光 |
-| 曝光 | 胶片曝光，减冲到迫冲 +2 |
-| 光晕 | 强度、范围 |
-| 颗粒 | 强度、粗细 |
+| 胶片 | spektrafilm 自带的 18 款：Portra 160/400/800、Ektar 100、Gold 200、UltraMax 400、C200、Pro 400H、X-TRA 400、Vision3 50D/250D/200T/500T、Verita 200D、Velvia 100、Provia 100F、Ektachrome 100、Kodachrome 64 |
+| 相纸 | 自动 / Portra / Supra / Ultra Endura / Endura Premier / Ektacolor Edge / Crystal Archive / 2383 / 2393 / 不印相；印相曝光、眩光。反转片直接扫描 |
+| 曝光 | 胶片曝光（亮度由印相补回）；减冲 −1 到迫冲 +2 |
+| 光晕 | 强度、范围（1.0 = 该胶片片基与防光晕层的原生值） |
+| 颗粒 | 强度、颗粒粗细（随画幅物理缩放） |
 | 柔焦 | Black Pro-Mist / Pro-Mist / Glimmerglass / CineBloom，强度 |
-| 滤色 | 黄 / 品红滤色（CC） |
-| 画幅 | 半格、135、XPan、6×6、6×7，片边，日期后背 |
+| 滤色 | 放大机黄 / 品红滤色（Kodak CC） |
+| 画幅 | 半格、135、XPan、6×6、6×7；片边、日期后背 |
 
-暂未放入：DIR 耦合剂、分层 gamma、显影液耗尽、预闪、扫描锐化、光谱上采样。
+亮度按 spektrafilm 的中央重点测光自动定（导入时测一次）。
 
-## 文件
+## 许可
 
-- `prototype/Main.dc.html`：原型源文件（界面标记 + 交互逻辑）。
-- `prototype/canvas.json`：画布索引。
-- `prototype/assets/`：四张场景插画与颗粒纹理。
+- 代码：GPLv3（`LICENSE`）。引擎是 spektrafilm（GPLv3）的移植。
+- `app/src/main/assets/spektra/` 下的胶片 / 相纸数据和由其生成的表：CC BY-SA 4.0，见 `SPEKTRAFILM_LICENSE.txt`。
+- 字体 Long Cang（子集）、Martian Mono：SIL OFL，见 `app/src/main/assets/licenses/`。
 
-`Main.dc.html` 是 Claude Design 画布的组件格式，依赖画布运行时（`support.js`），图片以 `/_blob/<id>` 引用画布里已上传的素材。直接用浏览器打开这个文件不会运行；把它当作交互规格和实现参考来读。素材与 blob 的对应关系：
-
-| 文件 | 画布内引用 |
-|---|---|
-| `scene-dusk.svg` | `/_blob/7110bff8c10e1d558b9258aa40dbaeca` |
-| `scene-window.svg` | `/_blob/14c0013cb8d226803fe222b1e3be5e23` |
-| `scene-beach.svg` | `/_blob/7b48ac6a6c161f2d37cb4ec2781c9e06` |
-| `scene-neon.svg` | `/_blob/5f39396bed078cf8ec7644d6b94352e8` |
-| `grain.svg` | `/_blob/bdbee43f1d4a21ddbdfc3d615f2302c1` |
-
-## 待解决
-
-- 视频实时性：倾向「LUT 实时预览 + 导出时逐帧补颗粒和光晕」。
-- 是否改成免导入（直接读系统相册）。
-- 导出面板的水印、元数据、色彩空间。
+Film modeling powered by [spektrafilm](https://github.com/andreavolpato/spektrafilm) by Andrea Volpato.

@@ -2,87 +2,133 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<title>胶片工具</title>
+<title>胶片工具：灯箱与暗房</title>
 <script src="./support.js"></script>
 </head>
 <body>
 <x-dc>
 <helmet>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&amp;family=Noto+Sans+SC:wght@400;500;700&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Long+Cang&amp;family=Martian+Mono:wght@400;600&amp;family=Noto+Sans+SC:wght@400;500;700&amp;display=swap">
 <style>
 body{margin:0}
-a{color:#F2A33A}a:hover{color:#FFC46B}
+a{color:#D4281C}a:hover{color:#A81E14}
 button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer}
-button:focus-visible,input:focus-visible{outline:2px solid #F2A33A;outline-offset:2px}
+button:focus-visible,input:focus-visible{outline:2px solid #D4281C;outline-offset:2px}
 input[type=range]{-webkit-appearance:none;appearance:none;background:transparent;margin:0;height:44px;width:100%;display:block}
-input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:#3A3832}
-input[type=range]::-moz-range-track{height:6px;border-radius:3px;background:#3A3832}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;border-radius:50%;background:#EDE8DC;margin-top:-11px;border:0}
-input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;background:#EDE8DC;border:0}
-.scroll{overflow-y:auto;scrollbar-width:none}
+input[type=range]::-webkit-slider-runnable-track{height:14px;box-sizing:border-box;background:repeating-linear-gradient(90deg,#8A4234 0 1px,transparent 1px 10%);border-right:1px solid #8A4234;border-bottom:1px solid #5A2A21}
+input[type=range]::-moz-range-track{height:14px;box-sizing:border-box;background:repeating-linear-gradient(90deg,#8A4234 0 1px,transparent 1px 10%);border-right:1px solid #8A4234;border-bottom:1px solid #5A2A21}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:34px;margin-top:-10px;border:0;border-radius:0;background:linear-gradient(90deg,transparent 0 7px,#F5DDD2 7px 11px,transparent 11px)}
+input[type=range]::-moz-range-thumb{width:18px;height:34px;border:0;border-radius:0;background:linear-gradient(90deg,transparent 0 7px,#F5DDD2 7px 11px,transparent 11px)}
+input.trk-y::-webkit-slider-runnable-track{background:repeating-linear-gradient(90deg,#8A4234 0 1px,transparent 1px 10%),linear-gradient(90deg,rgba(236,200,60,.6),rgba(80,60,50,.15) 50%,rgba(70,110,255,.6))}
+input.trk-y::-moz-range-track{background:repeating-linear-gradient(90deg,#8A4234 0 1px,transparent 1px 10%),linear-gradient(90deg,rgba(236,200,60,.6),rgba(80,60,50,.15) 50%,rgba(70,110,255,.6))}
+input.trk-m::-webkit-slider-runnable-track{background:repeating-linear-gradient(90deg,#8A4234 0 1px,transparent 1px 10%),linear-gradient(90deg,rgba(230,60,180,.6),rgba(80,60,50,.15) 50%,rgba(60,200,100,.6))}
+input.trk-m::-moz-range-track{background:repeating-linear-gradient(90deg,#8A4234 0 1px,transparent 1px 10%),linear-gradient(90deg,rgba(230,60,180,.6),rgba(80,60,50,.15) 50%,rgba(60,200,100,.6))}
+.scroll{overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
 .scroll::-webkit-scrollbar{display:none}
 .hold{touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.holes{background:repeating-linear-gradient(90deg,#EFEDE5 0 9px,transparent 9px 19px)}
 .grain{background-image:url('/_blob/bdbee43f1d4a21ddbdfc3d615f2302c1');background-repeat:repeat}
 @keyframes grainmove{0%{background-position:0 0}25%{background-position:37px 61px}50%{background-position:83px 19px}75%{background-position:11px 97px}100%{background-position:59px 43px}}
 @keyframes weave{0%{transform:translate(0,0)}25%{transform:translate(.6px,-1.3px)}50%{transform:translate(-.5px,.9px)}75%{transform:translate(.4px,1.2px)}100%{transform:translate(0,0)}}
 @keyframes recdot{50%{opacity:.25}}
+@keyframes tubeon{0%{opacity:1}12%{opacity:.25}20%{opacity:.9}34%{opacity:.15}48%{opacity:.7}62%{opacity:0}100%{opacity:0}}
+@keyframes lightsoff{0%{opacity:1}100%{opacity:0}}
+@keyframes lamp{0%,100%{box-shadow:0 0 10px 3px rgba(255,74,43,.55)}50%{box-shadow:0 0 16px 6px rgba(255,74,43,.8)}}
+@keyframes drawin{0%{stroke-dashoffset:420}100%{stroke-dashoffset:0}}
 .grainplay{animation:grainmove .17s steps(4) infinite}
 .weave{animation:weave .22s steps(4) infinite}
 .recdot{animation:recdot 1s steps(2) infinite}
-@media (prefers-reduced-motion: reduce){.weave,.grainplay,.recdot{animation:none}}
+.tubeon{animation:tubeon .75s linear forwards}
+.lightsoff{animation:lightsoff .5s ease-out forwards}
+.lamp{animation:lamp 3.2s ease-in-out infinite}
+.drawin{stroke-dasharray:420;animation:drawin .35s ease-out forwards}
+@media (prefers-reduced-motion: reduce){.weave,.grainplay,.recdot,.lamp{animation:none}.tubeon,.lightsoff{animation:none;opacity:0}.drawin{animation:none;stroke-dasharray:none}}
 </style>
 </helmet>
-<div style="position: relative; width: 390px; height: 844px; box-sizing: border-box; overflow: hidden; background: #0E0E0C; color: #EDE8DC; font-family: 'Noto Sans SC', system-ui, sans-serif; font-size: 15px; line-height: 1.4; display: flex; flex-direction: column">
+<div style="position: relative; width: 390px; height: 844px; box-sizing: border-box; overflow: hidden; background: #0B0606; color: #1B1A17; font-family: 'Noto Sans SC', system-ui, sans-serif; font-size: 15px; line-height: 1.4; display: flex; flex-direction: column">
 
+<!-- 灯箱 -->
 <sc-if value="{{ vLib }}" hint-placeholder-val="{{ true }}">
-<div style="flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 8px 16px 0; gap: 8px">
-  <div style="flex: none; display: flex; align-items: center; justify-content: space-between; height: 48px">
-    <h1 style="margin: 0; font-size: 22px; font-weight: 700">{{ libTitle }} <span style="font-size: 14px; font-weight: 400; color: #A8A294">{{ libCount }}</span></h1>
-    <button onClick="{{ toggleSelect }}" style="height: 44px; padding: 0 14px; border-radius: 22px; background: #1A1915; border: 1px solid #2E2C26; font-weight: 700">{{ selectLabel }}</button>
+<div style="position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; background: radial-gradient(120% 70% at 50% 32%, #FFFFFF 0%, #F5F3EB 55%, #E3DFD2 100%); color: #1B1A17">
+  <div style="flex: none; display: flex; align-items: flex-end; justify-content: space-between; padding: 14px 18px 0">
+    <div>
+      <div aria-hidden="true" style="font-family: 'Martian Mono', monospace; font-size: 9px; letter-spacing: 2px; color: #6B675E">SPEKTRALAB · CONTACT SHEET</div>
+      <h1 style="margin: 2px 0 0; font-family: {{ titleFont }}; font-size: {{ titleSize }}px; font-weight: 700; line-height: 1.15; color: {{ titleColor }}">{{ libTitle }} <span style="font-family: 'Martian Mono', monospace; font-size: 12px; font-weight: 400; color: #6B675E">{{ libCount }}</span></h1>
+    </div>
+    <button onClick="{{ toggleSelect }}" style="height: 44px; padding: 0 16px; border-radius: 6px; border: 1.5px solid #1B1A17; font-weight: 700">{{ selectLabel }}</button>
   </div>
-  <div style="flex: none; display: flex; gap: 6px">
+  <div style="flex: none; display: flex; gap: 4px; padding: 6px 12px 0">
     <sc-for list="{{ filters }}" as="k" hint-placeholder-count="3">
-      <button onClick="{{ k.pick }}" style="height: 44px; padding: 0 16px; border-radius: 22px; font-size: 14px; font-weight: 700; background: {{ k.bg }}; color: {{ k.fg }}; border: 1px solid {{ k.line }}">{{ k.label }}</button>
+      <button aria-pressed="{{ k.on }}" onClick="{{ k.pick }}" style="position: relative; height: 44px; padding: 0 10px; font-weight: 700; color: {{ k.color }}">
+        <span>{{ k.label }}</span>
+        <sc-if value="{{ k.on }}" hint-placeholder-val="{{ false }}">
+          <svg aria-hidden="true" width="40" height="9" viewBox="0 0 64 9" preserveAspectRatio="none" style="position: absolute; left: 50%; bottom: 5px; margin-left: -20px"><path d="M2 5 C12 1, 22 8, 34 4 S52 2, 62 5" fill="none" stroke="#D4281C" stroke-width="3" stroke-linecap="round"></path></svg>
+        </sc-if>
+      </button>
     </sc-for>
   </div>
-  <div class="scroll" style="flex: 1; min-height: 0">
-    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px">
-      <sc-for list="{{ grid }}" as="g" hint-placeholder-count="6">
-        <button aria-label="{{ g.aria }}" onClick="{{ g.tap }}" style="position: relative; height: 116px; overflow: hidden; border-radius: 4px; background: #000; border: 3px solid {{ g.ring }}; box-sizing: border-box">
-          <img src="{{ g.src }}" alt="" style="width: 100%; height: 100%; object-fit: cover; display: block; filter: {{ g.filter }}">
-          <sc-if value="{{ g.raw }}" hint-placeholder-val="{{ false }}">
-            <span style="position: absolute; left: 4px; top: 4px; padding: 0 5px; border-radius: 4px; background: rgba(0,0,0,.7); font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700">RAW</span>
-          </sc-if>
-          <span aria-hidden="true" style="position: absolute; right: 6px; top: 6px; width: 9px; height: 9px; border-radius: 50%; background: {{ g.dot }}"></span>
-          <span style="position: absolute; right: 4px; bottom: 4px; padding: 0 5px; border-radius: 4px; background: {{ g.tagBg }}; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700">{{ g.tag }}</span>
-          <sc-if value="{{ g.checkOn }}" hint-placeholder-val="{{ false }}">
-            <span aria-hidden="true" style="position: absolute; left: 6px; bottom: 6px; width: 24px; height: 24px; box-sizing: border-box; border-radius: 50%; border: 2px solid #EDE8DC; background: {{ g.checkBg }}; color: #16130C; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; line-height: 20px; text-align: center">{{ g.checkText }}</span>
-          </sc-if>
-        </button>
+
+  <div class="scroll" style="flex: 1; min-height: 0; padding: 6px 0 20px">
+    <div style="display: flex; flex-direction: column; gap: 18px">
+      <sc-for list="{{ strips }}" as="st" hint-placeholder-count="2">
+        <div style="display: flex; flex-direction: column; gap: 3px">
+          <div style="padding: 0 20px; font-family: 'Long Cang', 'Noto Sans SC', cursive; font-size: 21px; line-height: 1.1; color: #1B1A17; transform: rotate(-1.4deg); transform-origin: left center">{{ st.label }}</div>
+          <div style="position: relative; width: 414px; height: 128px; margin-left: -12px; background: #0D0B09; transform: rotate({{ st.rot }}deg); box-shadow: 0 1px 0 rgba(0,0,0,.3), 0 8px 16px rgba(70,58,30,.22)">
+            <div class="holes" aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 3px; height: 6px"></div>
+            <div class="holes" aria-hidden="true" style="position: absolute; left: 0; right: 0; bottom: 3px; height: 6px"></div>
+            <div style="position: absolute; left: 21px; top: 0; display: flex; gap: 6px">
+              <sc-for list="{{ st.frames }}" as="g" hint-placeholder-count="3">
+                <div style="position: relative; width: 120px; height: 128px">
+                  <span aria-hidden="true" style="position: absolute; left: 2px; top: 11px; font-family: 'Martian Mono', monospace; font-size: 7.5px; line-height: 10px; letter-spacing: .5px; color: #D9A441; white-space: nowrap">{{ g.edge }}</span>
+                  <button aria-label="{{ g.aria }}" onClick="{{ g.tap }}" style="position: absolute; left: 0; top: 24px; width: 120px; height: 80px; background: #000">
+                    <img src="{{ g.src }}" alt="" style="width: 100%; height: 100%; object-fit: cover; display: block; filter: {{ g.filter }}">
+                    <span style="position: absolute; right: 3px; bottom: 3px; padding: 0 4px; background: {{ g.tagBg }}; color: #F3EDE2; font-family: 'Martian Mono', monospace; font-size: 11px; line-height: 16px">{{ g.tag }}</span>
+                    <sc-if value="{{ g.edited }}" hint-placeholder-val="{{ false }}">
+                      <svg aria-hidden="true" width="22" height="18" viewBox="0 0 22 18" style="position: absolute; left: -5px; bottom: -8px; overflow: visible"><path d="M2 9 L8 15 L20 2" fill="none" stroke="#D4281C" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                    </sc-if>
+                    <sc-if value="{{ g.picked }}" hint-placeholder-val="{{ false }}">
+                      <svg aria-hidden="true" viewBox="0 0 124 84" preserveAspectRatio="none" style="position: absolute; left: -8px; top: -9px; width: 136px; height: 98px; overflow: visible; pointer-events: none"><path class="drawin" d="M10 44 C6 14, 50 3, 90 7 C120 11, 122 62, 88 75 C52 86, 4 78, 10 38 C13 22, 30 11, 48 8" fill="none" stroke="#D4281C" stroke-width="3.5" stroke-linecap="round"></path></svg>
+                      <span aria-hidden="true" style="position: absolute; right: -4px; top: -22px; font-family: 'Long Cang', cursive; font-size: 24px; line-height: 1; color: #D4281C; text-shadow: 0 0 2px #0D0B09">{{ g.order }}</span>
+                    </sc-if>
+                  </button>
+                  <span aria-hidden="true" style="position: absolute; left: 2px; top: 107px; font-family: 'Martian Mono', monospace; font-size: 7.5px; line-height: 10px; letter-spacing: .5px; color: #D9A441; white-space: nowrap">{{ g.num }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
       </sc-for>
     </div>
   </div>
+
   <sc-if value="{{ barNormal }}" hint-placeholder-val="{{ true }}">
-    <div style="flex: none; display: flex; gap: 10px; padding: 8px 0 16px">
-      <button onClick="{{ openImport }}" style="flex: 1; height: 52px; border-radius: 14px; border: 1px solid #F2A33A; color: #F2A33A; font-weight: 700; font-size: 16px">＋ 导入</button>
-      <button onClick="{{ openCam }}" style="flex: 1; height: 52px; border-radius: 14px; background: #F2A33A; color: #16130C; font-weight: 700; font-size: 16px">相机</button>
+    <div style="flex: none; display: flex; gap: 10px; padding: 10px 18px 18px">
+      <button onClick="{{ openImport }}" style="flex: 1; height: 54px; border-radius: 6px; border: 1.5px solid #1B1A17; font-weight: 700; font-size: 16px">＋ 导入</button>
+      <button onClick="{{ openCam }}" style="flex: 1; height: 54px; border-radius: 6px; background: #1B1A17; color: #F5F3EB; font-weight: 700; font-size: 16px">相机</button>
     </div>
   </sc-if>
   <sc-if value="{{ barSelect }}" hint-placeholder-val="{{ false }}">
-    <div style="flex: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 8px 0 16px">
-      <button onClick="{{ pasteToPicked }}" style="height: 52px; border-radius: 12px; background: #1A1915; border: 1px solid #2E2C26; font-size: 14px; font-weight: 700; color: {{ pasteFg }}">粘贴设置</button>
-      <button onClick="{{ openRecipes }}" style="height: 52px; border-radius: 12px; background: #1A1915; border: 1px solid #2E2C26; font-size: 14px; font-weight: 700">配方</button>
-      <button onClick="{{ exportPicked }}" style="height: 52px; border-radius: 12px; background: #F2A33A; color: #16130C; font-size: 14px; font-weight: 700">导出</button>
-      <button onClick="{{ removePicked }}" style="height: 52px; border-radius: 12px; background: #1A1915; border: 1px solid #2E2C26; font-size: 14px; font-weight: 700">移除</button>
+    <div style="flex: none; padding: 10px 14px 18px">
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; height: 56px; border-radius: 8px; background: #1B1A17; color: #F5F3EB; overflow: hidden">
+        <button onClick="{{ pasteToPicked }}" style="font-size: 14px; font-weight: 700; color: {{ pasteFgL }}">粘贴设置</button>
+        <button onClick="{{ openRecipes }}" style="font-size: 14px; font-weight: 700">配方</button>
+        <button onClick="{{ exportPicked }}" style="font-size: 14px; font-weight: 700; background: #D4281C; color: #FFFFFF">导出</button>
+        <button onClick="{{ removePicked }}" style="font-size: 14px; font-weight: 700">移除</button>
+      </div>
     </div>
   </sc-if>
+  <div class="tubeon" aria-hidden="true" style="position: absolute; inset: 0; background: #0B0606; pointer-events: none"></div>
 </div>
 </sc-if>
 
+<!-- 暗房 -->
 <sc-if value="{{ vWork }}" hint-placeholder-val="{{ false }}">
-<div style="flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 8px 16px 0; gap: 10px">
+<div style="position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 8px 16px 0; gap: 10px; background: #0B0606; color: #F5DDD2">
   <div style="flex: none; display: flex; align-items: center; justify-content: space-between; height: 48px">
-    <button onClick="{{ back }}" style="height: 44px; padding: 0 6px 0 0; color: #F2A33A; font-weight: 700">‹ 图库</button>
+    <div style="display: flex; align-items: center; gap: 12px">
+      <button onClick="{{ back }}" style="height: 44px; color: #F5DDD2; font-weight: 700">‹ 灯箱</button>
+      <span class="lamp" aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: #FF4A2B"></span>
+    </div>
     <div style="display: flex; align-items: center; gap: 6px">
       <sc-if value="{{ vEdit }}" hint-placeholder-val="{{ false }}">
         <button aria-label="撤销" onClick="{{ undo }}" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: {{ undoFg }}">
@@ -92,15 +138,19 @@ input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;bac
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 14l5-5-5-5"></path><path d="M20 9H10a6 6 0 0 0 0 12h3"></path></svg>
         </button>
       </sc-if>
-      <button onClick="{{ openRecipes }}" style="height: 44px; padding: 0 16px; border-radius: 22px; background: #1A1915; border: 1px solid #2E2C26; font-weight: 700">配方</button>
+      <button onClick="{{ openRecipes }}" style="height: 44px; padding: 0 14px; border-radius: 6px; border: 1px solid #5A2A21; font-weight: 700">配方</button>
       <sc-if value="{{ vEdit }}" hint-placeholder-val="{{ false }}">
-        <button onClick="{{ exportOne }}" style="height: 44px; padding: 0 16px; border-radius: 22px; background: #F2A33A; color: #16130C; font-weight: 700">导出</button>
+        <button onClick="{{ exportOne }}" style="height: 44px; padding: 0 16px; border-radius: 6px; background: {{ acc }}; color: #140807; font-weight: 700">导出</button>
       </sc-if>
     </div>
   </div>
 
-  <div style="flex: none; position: relative; height: 300px; border-radius: 14px; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center">
-    <button class="{{ frameClass }}" aria-label="按住看原图" onPointerDown="{{ holdOn }}" onPointerUp="{{ holdOff }}" onPointerLeave="{{ holdOff }}" onPointerCancel="{{ holdOff }}" style="position: relative; display: block; width: {{ fw }}px; height: {{ fh }}px; box-sizing: border-box; padding: {{ edgePad }}; background: #0C0A08; cursor: default">
+  <div style="flex: none; position: relative; height: 300px; background: radial-gradient(90% 70% at 50% 0%, rgba(255,74,43,.2), rgba(255,74,43,0) 70%), #050303; overflow: hidden; display: flex; align-items: center; justify-content: center">
+    <span aria-hidden="true" style="position: absolute; left: 0; top: 0; width: 14px; height: 14px; border-left: 1.5px solid #FF4A2B; border-top: 1.5px solid #FF4A2B"></span>
+    <span aria-hidden="true" style="position: absolute; right: 0; top: 0; width: 14px; height: 14px; border-right: 1.5px solid #FF4A2B; border-top: 1.5px solid #FF4A2B"></span>
+    <span aria-hidden="true" style="position: absolute; left: 0; bottom: 0; width: 14px; height: 14px; border-left: 1.5px solid #FF4A2B; border-bottom: 1.5px solid #FF4A2B"></span>
+    <span aria-hidden="true" style="position: absolute; right: 0; bottom: 0; width: 14px; height: 14px; border-right: 1.5px solid #FF4A2B; border-bottom: 1.5px solid #FF4A2B"></span>
+    <button class="{{ frameClass }}" aria-label="按住看原图" onPointerDown="{{ holdOn }}" onPointerUp="{{ holdOff }}" onPointerLeave="{{ holdOff }}" onPointerCancel="{{ holdOff }}" style="position: relative; display: block; width: {{ fw }}px; height: {{ fh }}px; box-sizing: border-box; padding: {{ edgePad }}; background: #0C0A08; cursor: default; box-shadow: 0 10px 30px rgba(0,0,0,.7)">
       <span style="position: relative; display: block; width: 100%; height: 100%; overflow: hidden">
         <img src="{{ pSrc }}" alt="{{ pAlt }}" draggable="false" style="width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; filter: {{ imgFilter }}">
         <img src="{{ pSrc }}" alt="" aria-hidden="true" draggable="false" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; mix-blend-mode: screen; pointer-events: none; filter: {{ halFilter }}; opacity: {{ halO }}">
@@ -110,175 +160,179 @@ input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;bac
         <span aria-hidden="true" style="position: absolute; inset: 0; pointer-events: none; background: #fff; opacity: {{ glareO }}"></span>
         <span class="{{ grainClass }}" aria-hidden="true" style="position: absolute; inset: 0; pointer-events: none; mix-blend-mode: overlay; background-size: {{ grainSize }}px; opacity: {{ grainO }}"></span>
         <sc-if value="{{ dateOn }}" hint-placeholder-val="{{ false }}">
-          <span aria-hidden="true" style="position: absolute; right: 10px; bottom: 8px; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 13px; color: #FF9A3A; text-shadow: 0 0 6px #FF5A1A">'26 11 10</span>
+          <span aria-hidden="true" style="position: absolute; right: 10px; bottom: 8px; font-family: 'Martian Mono', monospace; font-weight: 600; font-size: 12px; color: #FF9A3A; text-shadow: 0 0 6px #FF5A1A">'26 11 10</span>
         </sc-if>
       </span>
       <sc-if value="{{ edgeOn }}" hint-placeholder-val="{{ false }}">
-        <span aria-hidden="true" style="position: absolute; left: 10px; right: 10px; top: 2px; display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; color: #E8A23A; letter-spacing: 1px"><span>{{ edgeText }}</span><span>12</span></span>
-        <span aria-hidden="true" style="position: absolute; left: 10px; right: 10px; bottom: 2px; display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; color: #E8A23A; letter-spacing: 1px"><span>12A</span><span>▮▮ ▮ ▮▮▮</span></span>
+        <span aria-hidden="true" style="position: absolute; left: 10px; right: 10px; top: 2px; display: flex; justify-content: space-between; font-family: 'Martian Mono', monospace; font-size: 8px; color: #D9A441; letter-spacing: 1px"><span>{{ edgeText }}</span><span>▸ 12</span></span>
+        <span aria-hidden="true" style="position: absolute; left: 10px; right: 10px; bottom: 2px; display: flex; justify-content: space-between; font-family: 'Martian Mono', monospace; font-size: 8px; color: #D9A441; letter-spacing: 1px"><span>12A</span><span>▮▮ ▮ ▮▮▮</span></span>
       </sc-if>
     </button>
-    <div style="position: absolute; left: 10px; top: 10px; padding: 4px 10px; border-radius: 8px; background: rgba(0,0,0,.65); font-size: 13px; font-weight: 500; pointer-events: none">{{ badge }}</div>
+    <div style="position: absolute; left: 12px; top: 10px; font-family: 'Martian Mono', 'Noto Sans SC', monospace; font-size: 11px; letter-spacing: .5px; color: {{ acc }}; text-shadow: 0 0 6px #000, 0 0 2px #000; pointer-events: none">{{ badge }}</div>
     <sc-if value="{{ rec }}" hint-placeholder-val="{{ false }}">
-      <div style="position: absolute; right: 10px; top: 10px; display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 8px; background: rgba(0,0,0,.65); font-family: 'JetBrains Mono', monospace; font-weight: 700">
-        <span class="recdot" aria-hidden="true" style="width: 10px; height: 10px; border-radius: 50%; background: #FF5A45"></span><span>{{ recTime }}</span>
+      <div style="position: absolute; right: 12px; top: 8px; display: flex; align-items: center; gap: 8px; padding: 3px 8px; background: rgba(0,0,0,.7); font-family: 'Martian Mono', monospace; font-size: 12px; font-weight: 600">
+        <span class="recdot" aria-hidden="true" style="width: 9px; height: 9px; border-radius: 50%; background: #FF4A2B"></span><span>{{ recTime }}</span>
       </div>
     </sc-if>
     <sc-if value="{{ showPlay }}" hint-placeholder-val="{{ false }}">
-      <button onClick="{{ togglePlay }}" style="position: absolute; left: 10px; bottom: 10px; height: 44px; padding: 0 16px; border-radius: 22px; background: rgba(0,0,0,.7); border: 1px solid #EDE8DC; font-weight: 700">{{ playLabel }}</button>
+      <button onClick="{{ togglePlay }}" style="position: absolute; left: 10px; bottom: 10px; height: 44px; padding: 0 14px; border-radius: 6px; background: rgba(0,0,0,.75); border: 1px solid #F5DDD2; font-family: 'Martian Mono', 'Noto Sans SC', monospace; font-size: 13px; font-weight: 600">{{ playLabel }}</button>
     </sc-if>
     <div aria-hidden="true" style="position: absolute; inset: 0; background: #000; pointer-events: none; opacity: {{ blinkO }}"></div>
   </div>
 
   <sc-if value="{{ vEdit }}" hint-placeholder-val="{{ false }}">
-    <div style="flex: none; height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 8px">
-      <span style="font-size: 13px; color: #A8A294">按住画面看原图</span>
+    <div style="flex: none; height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 8px">
+      <span style="font-size: 13px; color: #B8776A">按住画面看原图</span>
       <div style="display: flex; gap: 6px">
-        <button onClick="{{ copyLook }}" style="height: 44px; padding: 0 14px; border-radius: 12px; background: #1A1915; border: 1px solid #2E2C26; font-size: 14px; font-weight: 700">复制设置</button>
-        <button onClick="{{ pasteLook }}" style="height: 44px; padding: 0 14px; border-radius: 12px; background: #1A1915; border: 1px solid #2E2C26; font-size: 14px; font-weight: 700; color: {{ pasteFg }}">粘贴设置</button>
+        <button onClick="{{ copyLook }}" style="height: 44px; padding: 0 12px; border-radius: 6px; border: 1px solid #5A2A21; font-size: 14px; font-weight: 700">复制设置</button>
+        <button onClick="{{ pasteLook }}" style="height: 44px; padding: 0 12px; border-radius: 6px; border: 1px solid #5A2A21; font-size: 14px; font-weight: 700; color: {{ pasteFgD }}">粘贴设置</button>
       </div>
     </div>
   </sc-if>
   <sc-if value="{{ vCam }}" hint-placeholder-val="{{ false }}">
     <div style="flex: none; height: 56px; display: grid; grid-template-columns: minmax(0, 1fr) 56px minmax(0, 1fr); align-items: center; gap: 12px">
-      <div style="display: flex; width: 124px; height: 44px; padding: 3px; box-sizing: border-box; border-radius: 12px; background: #1A1915; border: 1px solid #2E2C26">
-        <button onClick="{{ toPhoto }}" style="flex: 1; border-radius: 9px; font-weight: 700; background: {{ photoBg }}; color: {{ photoFg }}">照片</button>
-        <button onClick="{{ toVideo }}" style="flex: 1; border-radius: 9px; font-weight: 700; background: {{ videoBg }}; color: {{ videoFg }}">视频</button>
+      <div style="display: flex; width: 124px; height: 44px; border-radius: 6px; border: 1px solid #5A2A21; overflow: hidden">
+        <button onClick="{{ toPhoto }}" style="flex: 1; font-weight: 700; background: {{ photoBg }}; color: {{ photoFg }}">照片</button>
+        <button onClick="{{ toVideo }}" style="flex: 1; font-weight: 700; background: {{ videoBg }}; color: {{ videoFg }}">视频</button>
       </div>
-      <button aria-label="{{ shutterAria }}" onClick="{{ shutter }}" style="width: 56px; height: 56px; border-radius: 50%; border: 3px solid #EDE8DC; box-sizing: border-box; display: flex; align-items: center; justify-content: center">
+      <button aria-label="{{ shutterAria }}" onClick="{{ shutter }}" style="width: 56px; height: 56px; border-radius: 50%; border: 3px solid #F5DDD2; box-sizing: border-box; display: flex; align-items: center; justify-content: center">
         <span aria-hidden="true" style="display: block; width: {{ shutterSize }}px; height: {{ shutterSize }}px; border-radius: {{ shutterRadius }}; background: {{ shutterBg }}"></span>
       </button>
       <div style="display: flex; justify-content: flex-end">
-        <button aria-label="查看刚拍的" onClick="{{ openLast }}" style="width: 48px; height: 48px; border-radius: 10px; overflow: hidden; border: 2px solid #EDE8DC; box-sizing: border-box; background: #000">
+        <button aria-label="查看刚拍的" onClick="{{ openLast }}" style="width: 60px; height: 44px; padding: 5px 4px; box-sizing: border-box; background: #0D0B09; border: 1px solid #5A2A21">
           <img src="{{ lastSrc }}" alt="" style="width: 100%; height: 100%; object-fit: cover; display: block; filter: {{ lastFilter }}">
         </button>
       </div>
     </div>
   </sc-if>
 
-  <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 16px; background: #1A1915; border: 1px solid #2E2C26">
+  <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 8px; background: #130908; border: 1px solid #3D1A14">
     <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 10px">
       <div style="min-width: 0">
         <div style="font-weight: 700">{{ toolTitle }}</div>
-        <div style="font-size: 12px; color: #A8A294">{{ toolDesc }}</div>
+        <div style="font-size: 12px; color: #B8776A">{{ toolDesc }}</div>
       </div>
-      <button onClick="{{ resetTool }}" style="flex: none; height: 44px; padding: 0 10px; margin: -8px -6px 0 0; color: #F2A33A; font-size: 14px; font-weight: 700">重置</button>
+      <button onClick="{{ resetTool }}" style="flex: none; height: 44px; padding: 0 10px; margin: -8px -6px 0 0; color: {{ acc }}; font-size: 14px; font-weight: 700">重置</button>
     </div>
 
     <sc-if value="{{ tFilm }}" hint-placeholder-val="{{ true }}">
       <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
         <sc-for list="{{ films }}" as="k" hint-placeholder-count="6">
-          <button onClick="{{ k.pick }}" style="display: flex; flex-direction: column; gap: 4px; padding: 8px; height: 64px; box-sizing: border-box; border-radius: 12px; background: #0E0E0C; border: 2px solid {{ k.ring }}; text-align: left">
-            <span style="display: flex; align-items: center; gap: 6px"><span aria-hidden="true" style="width: 10px; height: 10px; border-radius: 50%; background: {{ k.dot }}"></span><span style="font-size: 13px; font-weight: 700; white-space: nowrap">{{ k.name }}</span></span>
-            <span style="font-size: 11px; color: #A8A294; white-space: nowrap">{{ k.type }}</span>
+          <button aria-pressed="{{ k.on }}" onClick="{{ k.pick }}" style="position: relative; display: flex; flex-direction: column; justify-content: space-between; padding: 6px 8px 6px 14px; height: 66px; box-sizing: border-box; border-radius: 4px; background: {{ k.bg }}; border: 1.5px solid {{ k.ring }}; text-align: left; overflow: hidden">
+            <span aria-hidden="true" style="position: absolute; left: 0; top: 0; bottom: 0; width: 7px; background: {{ k.dot }}"></span>
+            <span style="font-family: 'Martian Mono', monospace; font-size: 19px; font-weight: 600; line-height: 1; color: {{ k.dot }}">{{ k.iso }}</span>
+            <span style="display: flex; flex-direction: column">
+              <span style="font-size: 12px; font-weight: 700; white-space: nowrap">{{ k.name }}</span>
+              <span style="font-size: 11px; color: #B8776A; white-space: nowrap">{{ k.type }}</span>
+            </span>
           </button>
         </sc-for>
       </div>
-      <p style="margin: 0; font-size: 13px; color: #A8A294">{{ filmNote }}</p>
+      <p style="margin: 0; font-size: 13px; color: #B8776A">{{ filmNote }}</p>
     </sc-if>
 
     <sc-if value="{{ tPaper }}" hint-placeholder-val="{{ false }}">
       <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px">
         <sc-for list="{{ papers }}" as="k" hint-placeholder-count="4">
-          <button onClick="{{ k.pick }}" style="height: 44px; border-radius: 10px; font-size: 13px; font-weight: 700; background: {{ k.bg }}; color: {{ k.fg }}; border: 1px solid {{ k.line }}">{{ k.label }}</button>
+          <button onClick="{{ k.pick }}" style="height: 44px; border-radius: 4px; font-size: 13px; font-weight: 700; background: {{ k.bg }}; color: {{ k.fg }}; border: 1px solid {{ k.line }}">{{ k.label }}</button>
         </sc-for>
       </div>
-      <p style="margin: 0; font-size: 13px; color: #A8A294">{{ paperNote }}</p>
-      <label style="display: grid; grid-template-columns: 76px minmax(0, 1fr) 56px; align-items: center; gap: 8px">
-        <span style="font-size: 14px">印相曝光</span>
+      <p style="margin: 0; font-size: 13px; color: #B8776A">{{ paperNote }}</p>
+      <label style="display: grid; grid-template-columns: 68px minmax(0, 1fr) 70px; align-items: center; gap: 8px">
+        <span style="font-size: 13px; color: #B8776A">印相曝光</span>
         <input type="range" min="-2" max="2" step="0.25" value="{{ vPexp }}" onChange="{{ onPexp }}">
-        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #F2A33A; text-align: right">{{ lPexp }}</span>
+        <span style="font-family: 'Martian Mono', monospace; font-size: 14px; font-weight: 600; color: {{ acc }}; text-align: right">{{ lPexp }}</span>
       </label>
-      <label style="display: grid; grid-template-columns: 76px minmax(0, 1fr) 56px; align-items: center; gap: 8px">
-        <span style="font-size: 14px">眩光</span>
+      <label style="display: grid; grid-template-columns: 68px minmax(0, 1fr) 70px; align-items: center; gap: 8px">
+        <span style="font-size: 13px; color: #B8776A">眩光</span>
         <input type="range" min="0" max="1" step="0.05" value="{{ vGlare }}" onChange="{{ onGlare }}">
-        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #F2A33A; text-align: right">{{ lGlare }}</span>
+        <span style="font-family: 'Martian Mono', monospace; font-size: 14px; font-weight: 600; color: {{ acc }}; text-align: right">{{ lGlare }}</span>
       </label>
     </sc-if>
 
     <sc-if value="{{ tExp }}" hint-placeholder-val="{{ false }}">
-      <label style="display: grid; grid-template-columns: 76px minmax(0, 1fr) 56px; align-items: center; gap: 8px">
-        <span style="font-size: 14px">胶片曝光</span>
+      <label style="display: grid; grid-template-columns: 68px minmax(0, 1fr) 70px; align-items: center; gap: 8px">
+        <span style="font-size: 13px; color: #B8776A">胶片曝光</span>
         <input type="range" min="-3" max="3" step="0.5" value="{{ vEv }}" onChange="{{ onEv }}">
-        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #F2A33A; text-align: right">{{ lEv }}</span>
+        <span style="font-family: 'Martian Mono', monospace; font-size: 14px; font-weight: 600; color: {{ acc }}; text-align: right">{{ lEv }}</span>
       </label>
-      <div style="font-size: 14px">冲洗</div>
+      <div style="font-size: 13px; color: #B8776A">冲洗</div>
       <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px">
         <sc-for list="{{ pushes }}" as="k" hint-placeholder-count="4">
-          <button onClick="{{ k.pick }}" style="height: 44px; border-radius: 10px; font-size: 13px; font-weight: 700; background: {{ k.bg }}; color: {{ k.fg }}; border: 1px solid {{ k.line }}">{{ k.label }}</button>
+          <button onClick="{{ k.pick }}" style="height: 44px; border-radius: 4px; font-size: 13px; font-weight: 700; background: {{ k.bg }}; color: {{ k.fg }}; border: 1px solid {{ k.line }}">{{ k.label }}</button>
         </sc-for>
       </div>
-      <p style="margin: 0; font-size: 13px; color: #A8A294">每迫冲一档，反差约增加 15%，颗粒更明显。</p>
+      <p style="margin: 0; font-size: 13px; color: #B8776A">每迫冲一档，反差约增加 15%，颗粒更明显。</p>
     </sc-if>
 
     <sc-if value="{{ tHal }}" hint-placeholder-val="{{ false }}">
-      <label style="display: grid; grid-template-columns: 76px minmax(0, 1fr) 56px; align-items: center; gap: 8px">
-        <span style="font-size: 14px">强度</span>
+      <label style="display: grid; grid-template-columns: 68px minmax(0, 1fr) 70px; align-items: center; gap: 8px">
+        <span style="font-size: 13px; color: #B8776A">强度</span>
         <input type="range" min="0" max="2" step="0.1" value="{{ vHal }}" onChange="{{ onHal }}">
-        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #F2A33A; text-align: right">{{ lHal }}</span>
+        <span style="font-family: 'Martian Mono', monospace; font-size: 14px; font-weight: 600; color: {{ acc }}; text-align: right">{{ lHal }}</span>
       </label>
-      <label style="display: grid; grid-template-columns: 76px minmax(0, 1fr) 56px; align-items: center; gap: 8px">
-        <span style="font-size: 14px">范围</span>
+      <label style="display: grid; grid-template-columns: 68px minmax(0, 1fr) 70px; align-items: center; gap: 8px">
+        <span style="font-size: 13px; color: #B8776A">范围</span>
         <input type="range" min="0.5" max="2" step="0.1" value="{{ vHalSize }}" onChange="{{ onHalSize }}">
-        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #F2A33A; text-align: right">{{ lHalSize }}</span>
+        <span style="font-family: 'Martian Mono', monospace; font-size: 14px; font-weight: 600; color: {{ acc }}; text-align: right">{{ lHalSize }}</span>
       </label>
-      <p style="margin: 0; font-size: 13px; color: #A8A294">夜景灯光、逆光发丝最明显。</p>
+      <p style="margin: 0; font-size: 13px; color: #B8776A">夜景灯光、逆光发丝最明显。</p>
     </sc-if>
 
     <sc-if value="{{ tGrain }}" hint-placeholder-val="{{ false }}">
-      <label style="display: grid; grid-template-columns: 76px minmax(0, 1fr) 56px; align-items: center; gap: 8px">
-        <span style="font-size: 14px">强度</span>
+      <label style="display: grid; grid-template-columns: 68px minmax(0, 1fr) 70px; align-items: center; gap: 8px">
+        <span style="font-size: 13px; color: #B8776A">强度</span>
         <input type="range" min="0" max="2" step="0.1" value="{{ vGrain }}" onChange="{{ onGrain }}">
-        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #F2A33A; text-align: right">{{ lGrain }}</span>
+        <span style="font-family: 'Martian Mono', monospace; font-size: 14px; font-weight: 600; color: {{ acc }}; text-align: right">{{ lGrain }}</span>
       </label>
-      <label style="display: grid; grid-template-columns: 76px minmax(0, 1fr) 56px; align-items: center; gap: 8px">
-        <span style="font-size: 14px">颗粒粗细</span>
+      <label style="display: grid; grid-template-columns: 68px minmax(0, 1fr) 70px; align-items: center; gap: 8px">
+        <span style="font-size: 13px; color: #B8776A">颗粒粗细</span>
         <input type="range" min="0.5" max="2" step="0.1" value="{{ vGran }}" onChange="{{ onGran }}">
-        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #F2A33A; text-align: right">{{ lGran }}</span>
+        <span style="font-family: 'Martian Mono', monospace; font-size: 14px; font-weight: 600; color: {{ acc }}; text-align: right">{{ lGran }}</span>
       </label>
-      <p style="margin: 0; font-size: 13px; color: #A8A294">{{ grainNote }}</p>
+      <p style="margin: 0; font-size: 13px; color: #B8776A">{{ grainNote }}</p>
     </sc-if>
 
     <sc-if value="{{ tDiff }}" hint-placeholder-val="{{ false }}">
       <div style="display: flex; flex-wrap: wrap; gap: 6px">
         <sc-for list="{{ diffs }}" as="k" hint-placeholder-count="5">
-          <button onClick="{{ k.pick }}" style="height: 44px; padding: 0 12px; border-radius: 10px; font-size: 13px; font-weight: 700; background: {{ k.bg }}; color: {{ k.fg }}; border: 1px solid {{ k.line }}">{{ k.label }}</button>
+          <button onClick="{{ k.pick }}" style="height: 44px; padding: 0 12px; border-radius: 4px; font-size: 13px; font-weight: 700; background: {{ k.bg }}; color: {{ k.fg }}; border: 1px solid {{ k.line }}">{{ k.label }}</button>
         </sc-for>
       </div>
-      <p style="margin: 0; font-size: 13px; color: #A8A294">{{ diffNote }}</p>
+      <p style="margin: 0; font-size: 13px; color: #B8776A">{{ diffNote }}</p>
       <sc-if value="{{ diffOn }}" hint-placeholder-val="{{ false }}">
-        <label style="display: grid; grid-template-columns: 76px minmax(0, 1fr) 56px; align-items: center; gap: 8px">
-          <span style="font-size: 14px">强度</span>
+        <label style="display: grid; grid-template-columns: 68px minmax(0, 1fr) 70px; align-items: center; gap: 8px">
+          <span style="font-size: 13px; color: #B8776A">强度</span>
           <input type="range" min="0.1" max="1" step="0.1" value="{{ vDiffAmt }}" onChange="{{ onDiffAmt }}">
-          <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #F2A33A; text-align: right">{{ lDiffAmt }}</span>
+          <span style="font-family: 'Martian Mono', monospace; font-size: 14px; font-weight: 600; color: {{ acc }}; text-align: right">{{ lDiffAmt }}</span>
         </label>
       </sc-if>
     </sc-if>
 
     <sc-if value="{{ tColor }}" hint-placeholder-val="{{ false }}">
-      <label style="display: grid; grid-template-columns: 76px minmax(0, 1fr) 56px; align-items: center; gap: 8px">
-        <span style="font-size: 14px">黄滤 Y</span>
-        <input type="range" min="-30" max="30" step="5" value="{{ vY }}" onChange="{{ onY }}">
-        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #F2A33A; text-align: right">{{ lY }}</span>
+      <label style="display: grid; grid-template-columns: 68px minmax(0, 1fr) 70px; align-items: center; gap: 8px">
+        <span style="font-size: 13px; color: #B8776A">黄滤 Y</span>
+        <input class="trk-y" type="range" min="-30" max="30" step="5" value="{{ vY }}" onChange="{{ onY }}">
+        <span style="font-family: 'Martian Mono', monospace; font-size: 14px; font-weight: 600; color: {{ acc }}; text-align: right">{{ lY }}</span>
       </label>
-      <label style="display: grid; grid-template-columns: 76px minmax(0, 1fr) 56px; align-items: center; gap: 8px">
-        <span style="font-size: 14px">品红滤 M</span>
-        <input type="range" min="-30" max="30" step="5" value="{{ vM }}" onChange="{{ onM }}">
-        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #F2A33A; text-align: right">{{ lM }}</span>
+      <label style="display: grid; grid-template-columns: 68px minmax(0, 1fr) 70px; align-items: center; gap: 8px">
+        <span style="font-size: 13px; color: #B8776A">品红滤 M</span>
+        <input class="trk-m" type="range" min="-30" max="30" step="5" value="{{ vM }}" onChange="{{ onM }}">
+        <span style="font-family: 'Martian Mono', monospace; font-size: 14px; font-weight: 600; color: {{ acc }}; text-align: right">{{ lM }}</span>
       </label>
-      <p style="margin: 0; font-size: 13px; color: #A8A294">单位是 CC，方向和暗房一致：加黄滤画面减黄、偏蓝；加品红画面偏绿。</p>
+      <p style="margin: 0; font-size: 13px; color: #B8776A">刻度上的颜色就是画面会偏去的方向。单位 CC，和暗房一致：加黄滤，画面减黄偏蓝。</p>
     </sc-if>
 
     <sc-if value="{{ tFmt }}" hint-placeholder-val="{{ false }}">
       <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px">
         <sc-for list="{{ fmts }}" as="k" hint-placeholder-count="5">
-          <button onClick="{{ k.pick }}" style="height: 44px; border-radius: 10px; font-size: 13px; font-weight: 700; background: {{ k.bg }}; color: {{ k.fg }}; border: 1px solid {{ k.line }}">{{ k.label }}</button>
+          <button onClick="{{ k.pick }}" style="height: 44px; border-radius: 4px; font-size: 13px; font-weight: 700; background: {{ k.bg }}; color: {{ k.fg }}; border: 1px solid {{ k.line }}">{{ k.label }}</button>
         </sc-for>
       </div>
-      <button aria-pressed="{{ edgeOn0 }}" onClick="{{ toggleEdge }}" style="display: flex; align-items: center; justify-content: space-between; height: 48px; padding: 0 12px; border-radius: 10px; background: #0E0E0C; border: 1px solid #2E2C26">
+      <button aria-pressed="{{ edgeOn0 }}" onClick="{{ toggleEdge }}" style="display: flex; align-items: center; justify-content: space-between; height: 48px; padding: 0 12px; border-radius: 4px; border: 1px solid #3D1A14">
         <span>片边（胶片名与格号）</span><span style="font-weight: 700; color: {{ edgeFg }}">{{ edgeLabel }}</span>
       </button>
-      <button aria-pressed="{{ dateOn0 }}" onClick="{{ toggleDate }}" style="display: flex; align-items: center; justify-content: space-between; height: 48px; padding: 0 12px; border-radius: 10px; background: #0E0E0C; border: 1px solid #2E2C26">
+      <button aria-pressed="{{ dateOn0 }}" onClick="{{ toggleDate }}" style="display: flex; align-items: center; justify-content: space-between; height: 48px; padding: 0 12px; border-radius: 4px; border: 1px solid #3D1A14">
         <span>日期后背</span><span style="font-weight: 700; color: {{ dateFg }}">{{ dateLabel }}</span>
       </button>
     </sc-if>
@@ -287,33 +341,38 @@ input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;bac
   <nav style="flex: none; display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); height: 60px; margin: 0 -8px">
     <sc-for list="{{ tools }}" as="t" hint-placeholder-count="8">
       <button aria-pressed="{{ t.active }}" onClick="{{ t.go }}" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; font-size: 14px; font-weight: 700; color: {{ t.color }}">
-        <span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 50%; background: {{ t.dot }}"></span>
+        <span aria-hidden="true" style="width: 5px; height: 5px; border-radius: 50%; background: {{ t.dot }}"></span>
         <span>{{ t.label }}</span>
-        <span aria-hidden="true" style="width: 20px; height: 3px; border-radius: 2px; background: {{ t.bar }}"></span>
+        <span aria-hidden="true" style="width: 22px; height: 2px; background: {{ t.bar }}"></span>
       </button>
     </sc-for>
   </nav>
+  <div class="lightsoff" aria-hidden="true" style="position: absolute; inset: 0; background: #F5F3EB; pointer-events: none"></div>
 </div>
 </sc-if>
 
+<!-- 导入：灯箱上的幻灯片夹 -->
 <sc-if value="{{ importSheet }}" hint-placeholder-val="{{ false }}">
-<div style="position: absolute; inset: 0; display: flex; flex-direction: column; background: #0E0E0C; padding: 8px 16px 16px; box-sizing: border-box; gap: 10px">
+<div style="position: absolute; inset: 0; display: flex; flex-direction: column; background: radial-gradient(120% 70% at 50% 32%, #FFFFFF 0%, #F5F3EB 55%, #E3DFD2 100%); color: #1B1A17; padding: 8px 16px 16px; box-sizing: border-box; gap: 8px">
   <div style="flex: none; display: flex; align-items: center; justify-content: space-between; height: 48px">
-    <button onClick="{{ closeSheet }}" style="height: 44px; padding: 0 6px 0 0; color: #A8A294; font-weight: 700">取消</button>
-    <div style="display: flex; height: 44px; padding: 3px; box-sizing: border-box; border-radius: 22px; background: #1A1915; border: 1px solid #2E2C26">
-      <button onClick="{{ srcPhotos }}" style="width: 64px; border-radius: 19px; font-weight: 700; background: {{ srcPBg }}; color: {{ srcPFg }}">相册</button>
-      <button onClick="{{ srcFiles }}" style="width: 64px; border-radius: 19px; font-weight: 700; background: {{ srcFBg }}; color: {{ srcFFg }}">文件</button>
+    <button onClick="{{ closeSheet }}" style="height: 44px; padding: 0 6px 0 0; color: #6B675E; font-weight: 700">取消</button>
+    <div style="display: flex; height: 44px; border-radius: 6px; border: 1.5px solid #1B1A17; overflow: hidden">
+      <button onClick="{{ srcPhotos }}" style="width: 64px; font-weight: 700; background: {{ srcPBg }}; color: {{ srcPFg }}">相册</button>
+      <button onClick="{{ srcFiles }}" style="width: 64px; font-weight: 700; background: {{ srcFBg }}; color: {{ srcFFg }}">文件</button>
     </div>
-    <button onClick="{{ doImport }}" style="height: 44px; padding: 0 16px; border-radius: 22px; font-weight: 700; background: {{ impBtnBg }}; color: {{ impBtnFg }}">{{ impBtnLabel }}</button>
+    <button onClick="{{ doImport }}" style="height: 44px; padding: 0 16px; border-radius: 6px; font-weight: 700; background: {{ impBtnBg }}; color: {{ impBtnFg }}">{{ impBtnLabel }}</button>
   </div>
-  <p style="flex: none; margin: 0; font-size: 13px; color: #A8A294">{{ impNote }}</p>
-  <div class="scroll" style="flex: 1; min-height: 0">
-    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px">
+  <p style="flex: none; margin: 0; font-size: 13px; color: #6B675E">{{ impNote }}</p>
+  <div class="scroll" style="flex: 1; min-height: 0; padding: 12px 2px">
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 10px">
       <sc-for list="{{ cands }}" as="g" hint-placeholder-count="9">
-        <button aria-label="{{ g.aria }}" aria-pressed="{{ g.on }}" onClick="{{ g.tap }}" style="position: relative; height: 116px; overflow: hidden; border-radius: 4px; background: #000; border: 3px solid {{ g.ring }}; box-sizing: border-box">
-          <img src="{{ g.src }}" alt="" style="width: 100%; height: 100%; object-fit: cover; display: block">
-          <span style="position: absolute; right: 4px; bottom: 4px; padding: 0 5px; border-radius: 4px; background: {{ g.tagBg }}; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700">{{ g.tag }}</span>
-          <span aria-hidden="true" style="position: absolute; left: 6px; bottom: 6px; width: 24px; height: 24px; box-sizing: border-box; border-radius: 50%; border: 2px solid #EDE8DC; background: {{ g.checkBg }}; color: #16130C; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; line-height: 20px; text-align: center">{{ g.checkText }}</span>
+        <button aria-label="{{ g.aria }}" aria-pressed="{{ g.on }}" onClick="{{ g.tap }}" style="position: relative; height: 112px; padding: 16px 12px 22px; box-sizing: border-box; border-radius: 4px; background: #FFFFFF; box-shadow: 0 1px 0 rgba(0,0,0,.12), 0 5px 12px rgba(70,58,30,.22)">
+          <img src="{{ g.src }}" alt="" style="width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 2px">
+          <span style="position: absolute; left: 12px; bottom: 4px; font-family: 'Martian Mono', monospace; font-size: 11px; color: #6B675E">{{ g.tag }}</span>
+          <sc-if value="{{ g.on }}" hint-placeholder-val="{{ false }}">
+            <svg aria-hidden="true" viewBox="0 0 124 84" preserveAspectRatio="none" style="position: absolute; left: -4px; top: 2px; width: 116px; height: 104px; overflow: visible; pointer-events: none"><path class="drawin" d="M10 44 C6 14, 50 3, 90 7 C120 11, 122 62, 88 75 C52 86, 4 78, 10 38 C13 22, 30 11, 48 8" fill="none" stroke="#D4281C" stroke-width="3.5" stroke-linecap="round"></path></svg>
+            <span aria-hidden="true" style="position: absolute; right: 8px; bottom: -2px; font-family: 'Long Cang', cursive; font-size: 24px; line-height: 1; color: #D4281C">{{ g.order }}</span>
+          </sc-if>
         </button>
       </sc-for>
     </div>
@@ -321,67 +380,72 @@ input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;bac
 </div>
 </sc-if>
 
+<!-- 配方：索引卡 -->
 <sc-if value="{{ recipeSheet }}" hint-placeholder-val="{{ false }}">
 <div style="position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end">
   <button aria-label="关闭" onClick="{{ closeSheet }}" style="position: absolute; inset: 0; background: rgba(0,0,0,.6)"></button>
-  <div style="position: relative; display: flex; flex-direction: column; gap: 10px; padding: 16px 16px 20px; border-radius: 22px 22px 0 0; background: #1A1915; border-top: 1px solid #2E2C26">
+  <div style="position: relative; display: flex; flex-direction: column; gap: 10px; padding: 16px 16px 20px; border-radius: 12px 12px 0 0; background: #1B1A17; color: #F5F3EB">
     <div style="display: flex; align-items: center; justify-content: space-between">
       <h2 style="margin: 0; font-size: 20px; font-weight: 700">{{ recipeTitle }}</h2>
-      <button onClick="{{ closeSheet }}" style="height: 44px; padding: 0 6px; color: #A8A294">关闭</button>
+      <button onClick="{{ closeSheet }}" style="height: 44px; padding: 0 6px; color: #B5B0A4">关闭</button>
     </div>
     <sc-for list="{{ recipes }}" as="r" hint-placeholder-count="4">
-      <button onClick="{{ r.apply }}" style="display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 12px; background: #0E0E0C; border: 1px solid #2E2C26; text-align: left">
-        <span style="font-weight: 700">{{ r.name }}</span>
-        <span style="font-size: 13px; color: #A8A294">{{ r.sum }}</span>
+      <button onClick="{{ r.apply }}" style="position: relative; display: flex; align-items: center; gap: 12px; padding: 8px 14px 8px 12px; border-radius: 3px; background: #F6F0DF; color: #1B1A17; border-top: 3px solid #D4281C; text-align: left; transform: rotate({{ r.rot }}deg)">
+        <span aria-hidden="true" style="flex: none; width: 8px; height: 40px; background: {{ r.dot }}"></span>
+        <span style="display: flex; flex-direction: column; min-width: 0">
+          <span style="font-family: 'Long Cang', 'Noto Sans SC', cursive; font-size: 24px; line-height: 1.1">{{ r.name }}</span>
+          <span style="font-family: 'Martian Mono', 'Noto Sans SC', monospace; font-size: 11px; color: #5A554A">{{ r.sum }}</span>
+        </span>
       </button>
     </sc-for>
     <sc-if value="{{ canSaveRecipe }}" hint-placeholder-val="{{ false }}">
-      <button onClick="{{ saveRecipe }}" style="height: 50px; border-radius: 14px; border: 1px solid #F2A33A; color: #F2A33A; font-weight: 700">把当前设置存为配方</button>
+      <button onClick="{{ saveRecipe }}" style="height: 50px; border-radius: 6px; border: 1.5px dashed #B5B0A4; font-weight: 700">＋ 把当前设置写成一张配方卡</button>
     </sc-if>
   </div>
 </div>
 </sc-if>
 
+<!-- 导出 -->
 <sc-if value="{{ exportSheet }}" hint-placeholder-val="{{ false }}">
 <div style="position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end">
   <button aria-label="关闭" onClick="{{ closeSheet }}" style="position: absolute; inset: 0; background: rgba(0,0,0,.6)"></button>
-  <div style="position: relative; display: flex; flex-direction: column; gap: 12px; padding: 16px 16px 20px; border-radius: 22px 22px 0 0; background: #1A1915; border-top: 1px solid #2E2C26">
+  <div style="position: relative; display: flex; flex-direction: column; gap: 12px; padding: 16px 16px 20px; border-radius: 12px 12px 0 0; background: #1B1A17; color: #F5F3EB">
     <div style="display: flex; align-items: center; justify-content: space-between">
       <h2 style="margin: 0; font-size: 20px; font-weight: 700">{{ exportTitle }}</h2>
-      <button onClick="{{ closeSheet }}" style="height: 44px; padding: 0 6px; color: #A8A294">取消</button>
+      <button onClick="{{ closeSheet }}" style="height: 44px; padding: 0 6px; color: #B5B0A4">取消</button>
     </div>
     <sc-if value="{{ xHasPhoto }}" hint-placeholder-val="{{ true }}">
-      <div style="display: grid; grid-template-columns: 56px minmax(0, 1fr); align-items: center; gap: 8px">
-        <span style="font-size: 14px; color: #A8A294">格式</span>
+      <div style="display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: 8px">
+        <span style="font-size: 13px; color: #B5B0A4">格式</span>
         <div style="display: flex; gap: 6px">
           <sc-for list="{{ xFmts }}" as="k" hint-placeholder-count="3">
-            <button onClick="{{ k.pick }}" style="flex: 1; height: 44px; border-radius: 10px; font-size: 14px; font-weight: 700; background: {{ k.bg }}; color: {{ k.fg }}; border: 1px solid {{ k.line }}">{{ k.label }}</button>
+            <button onClick="{{ k.pick }}" style="flex: 1; height: 44px; border-radius: 4px; font-family: 'Martian Mono', monospace; font-size: 13px; font-weight: 600; background: {{ k.bg }}; color: {{ k.fg }}; border: 1px solid {{ k.line }}">{{ k.label }}</button>
           </sc-for>
         </div>
       </div>
-      <div style="display: grid; grid-template-columns: 56px minmax(0, 1fr); align-items: center; gap: 8px">
-        <span style="font-size: 14px; color: #A8A294">尺寸</span>
+      <div style="display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: 8px">
+        <span style="font-size: 13px; color: #B5B0A4">尺寸</span>
         <div style="display: flex; gap: 6px">
           <sc-for list="{{ xSizes }}" as="k" hint-placeholder-count="3">
-            <button onClick="{{ k.pick }}" style="flex: 1; height: 44px; border-radius: 10px; font-size: 14px; font-weight: 700; background: {{ k.bg }}; color: {{ k.fg }}; border: 1px solid {{ k.line }}">{{ k.label }}</button>
+            <button onClick="{{ k.pick }}" style="flex: 1; height: 44px; border-radius: 4px; font-size: 13px; font-weight: 700; background: {{ k.bg }}; color: {{ k.fg }}; border: 1px solid {{ k.line }}">{{ k.label }}</button>
           </sc-for>
         </div>
       </div>
     </sc-if>
     <sc-if value="{{ xHasVideo }}" hint-placeholder-val="{{ false }}">
-      <div style="display: grid; grid-template-columns: 56px minmax(0, 1fr); align-items: center; gap: 8px">
-        <span style="font-size: 14px; color: #A8A294">视频</span>
+      <div style="display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: 8px">
+        <span style="font-size: 13px; color: #B5B0A4">视频</span>
         <div style="display: flex; gap: 6px">
           <sc-for list="{{ xVids }}" as="k" hint-placeholder-count="2">
-            <button onClick="{{ k.pick }}" style="flex: 1; height: 44px; border-radius: 10px; font-size: 14px; font-weight: 700; background: {{ k.bg }}; color: {{ k.fg }}; border: 1px solid {{ k.line }}">{{ k.label }}</button>
+            <button onClick="{{ k.pick }}" style="flex: 1; height: 44px; border-radius: 4px; font-family: 'Martian Mono', monospace; font-size: 13px; font-weight: 600; background: {{ k.bg }}; color: {{ k.fg }}; border: 1px solid {{ k.line }}">{{ k.label }}</button>
           </sc-for>
         </div>
       </div>
     </sc-if>
-    <p style="margin: 0; font-size: 13px; color: #A8A294">导出的是一份新文件，原片不动。颗粒和光晕按输出尺寸重新计算。</p>
+    <p style="margin: 0; font-size: 13px; color: #B5B0A4">导出的是一份新文件，原片不动。颗粒和光晕按输出尺寸重新计算。</p>
     <div style="display: flex; gap: 10px">
-      <button onClick="{{ doShare }}" style="flex: 1; height: 52px; border-radius: 14px; border: 1px solid #3A3832; font-weight: 700">分享…</button>
-      <button onClick="{{ doSave }}" style="flex: 1; height: 52px; border-radius: 14px; background: #F2A33A; color: #16130C; font-weight: 700">存到相册</button>
+      <button onClick="{{ doShare }}" style="flex: 1; height: 52px; border-radius: 6px; border: 1px solid #6B675E; font-weight: 700">分享…</button>
+      <button onClick="{{ doSave }}" style="flex: 1; height: 52px; border-radius: 6px; background: {{ xAcc }}; color: {{ xAccInk }}; font-weight: 700">存到相册</button>
     </div>
   </div>
 </div>
@@ -389,22 +453,25 @@ input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;bac
 
 <sc-if value="{{ progSheet }}" hint-placeholder-val="{{ false }}">
 <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.7); padding: 24px; box-sizing: border-box">
-  <div role="status" style="width: 100%; display: flex; flex-direction: column; gap: 14px; padding: 20px; border-radius: 18px; background: #1A1915; border: 1px solid #2E2C26">
-    <div style="font-size: 18px; font-weight: 700">{{ progTitle }}</div>
-    <div style="height: 8px; border-radius: 4px; background: #2E2C26; overflow: hidden">
-      <div style="height: 100%; width: {{ progPct }}%; background: #F2A33A; transition: width .6s linear"></div>
+  <div role="status" style="width: 100%; display: flex; flex-direction: column; gap: 14px; padding: 20px; border-radius: 8px; background: #1B1A17; color: #F5F3EB">
+    <div style="display: flex; align-items: baseline; justify-content: space-between">
+      <span style="font-size: 18px; font-weight: 700">正在冲印</span>
+      <span style="font-family: 'Martian Mono', monospace; font-size: 15px; font-weight: 600; color: #F5F3EB">{{ progCount }}</span>
     </div>
-    <p style="margin: 0; font-size: 13px; color: #A8A294">每一项都要完整算一遍，全尺寸需要几秒。可以先回去继续修图。</p>
-    <button onClick="{{ closeSheet }}" style="height: 48px; border-radius: 14px; border: 1px solid #3A3832; font-weight: 700">后台继续</button>
+    <div style="height: 6px; background: #3A3832; overflow: hidden">
+      <div style="height: 100%; width: {{ progPct }}%; background: #D4281C; transition: width .6s linear"></div>
+    </div>
+    <p style="margin: 0; font-size: 13px; color: #B5B0A4">每一项都要完整算一遍，全尺寸需要几秒。可以先回去继续修图。</p>
+    <button onClick="{{ closeSheet }}" style="height: 48px; border-radius: 6px; border: 1px solid #6B675E; font-weight: 700">后台继续</button>
   </div>
 </div>
 </sc-if>
 
 <sc-if value="{{ progPill }}" hint-placeholder-val="{{ false }}">
-  <div role="status" style="position: absolute; left: 50%; top: 10px; transform: translateX(-50%); padding: 6px 14px; border-radius: 16px; background: #F2A33A; color: #16130C; font-size: 13px; font-weight: 700; white-space: nowrap">{{ progTitle }}</div>
+  <div role="status" style="position: absolute; left: 50%; top: 10px; transform: translateX(-50%); padding: 5px 12px; border-radius: 4px; background: #D4281C; color: #FFFFFF; font-family: 'Martian Mono', 'Noto Sans SC', monospace; font-size: 12px; font-weight: 600; white-space: nowrap">冲印中 {{ progCount }}</div>
 </sc-if>
 <sc-if value="{{ hintOn }}" hint-placeholder-val="{{ false }}">
-  <div role="status" style="position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); padding: 8px 14px; border-radius: 12px; background: rgba(14,14,12,.94); border: 1px solid #F2A33A; font-size: 14px; white-space: nowrap">{{ hint }}</div>
+  <div role="status" style="position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); padding: 9px 14px; border-radius: 6px; background: #1B1A17; color: #F5F3EB; box-shadow: 0 6px 18px rgba(0,0,0,.35); font-size: 14px; white-space: nowrap">{{ hint }}</div>
 </sc-if>
 
 </div>
@@ -418,7 +485,10 @@ class Component extends DCLogic {
       { id: 2, scene: 1, video: false, secs: 0, raw: true, look: this.def() },
       { id: 3, scene: 2, video: false, secs: 0, raw: false, look: { ...this.def(), film: 'gold', date: true } },
       { id: 4, scene: 0, video: false, secs: 0, raw: false, look: this.def() },
-      { id: 5, scene: 0, video: true, secs: 22, raw: false, look: this.def() }
+      { id: 5, scene: 0, video: true, secs: 22, raw: false, look: this.def() },
+      { id: 6, scene: 3, video: false, secs: 0, raw: false, look: { ...this.def(), film: 'dxx', push: 1, grain: 1.5 } },
+      { id: 7, scene: 2, video: false, secs: 0, raw: true, look: this.def() },
+      { id: 8, scene: 1, video: false, secs: 0, raw: false, look: { ...this.def(), film: 'ektar' } }
     ],
     editId: null, camLook: this.def(), scene: 1, seq: 20,
     selecting: false, picked: [], clip: null, hist: [], redo: [],
@@ -431,12 +501,12 @@ class Component extends DCLogic {
 
   films() {
     return [
-      { id: 'portra', name: 'Portra 400', type: '彩色负片', note: '肤色柔和，宽容度高，过曝也好看。', dot: '#E9C48A', bw: false, base: 'saturate(0.92) contrast(0.96) sepia(0.10)' },
-      { id: 'ektar', name: 'Ektar 100', type: '彩色负片', note: '颗粒极细，颜色浓、反差高，适合风光。', dot: '#E5503A', bw: false, base: 'saturate(1.35) contrast(1.12)' },
-      { id: 'gold', name: 'Gold 200', type: '彩色负片', note: '暖黄怀旧，晴天最合适。', dot: '#F2B63A', bw: false, base: 'saturate(1.15) contrast(1.03) sepia(0.24)' },
-      { id: 'ultramax', name: 'UltraMax 400', type: '彩色负片', note: '日常卷，饱和偏高，颗粒比 Portra 明显。', dot: '#4FA8E0', bw: false, base: 'saturate(1.25) contrast(1.08) sepia(0.12)' },
-      { id: 'v3', name: 'Vision3 500T', type: '电影负片', note: '灯光型电影卷，夜景和霓虹的首选，日光下偏蓝。', dot: '#5E8FD6', bw: false, base: 'saturate(0.9) contrast(0.95) hue-rotate(-10deg)' },
-      { id: 'dxx', name: 'Double-X', type: '黑白电影负片', note: '经典黑白电影卷，颗粒明显，反差硬朗。', dot: '#B9B6AE', bw: true, base: 'grayscale(1) contrast(1.2)' }
+      { id: 'portra', name: 'Portra 400', iso: '400', type: '彩色负片', note: '肤色柔和，宽容度高，过曝也好看。', dot: '#E9C48A', bw: false, base: 'saturate(0.92) contrast(0.96) sepia(0.10)' },
+      { id: 'ektar', name: 'Ektar 100', iso: '100', type: '彩色负片', note: '颗粒极细，颜色浓、反差高，适合风光。', dot: '#F0624A', bw: false, base: 'saturate(1.35) contrast(1.12)' },
+      { id: 'gold', name: 'Gold 200', iso: '200', type: '彩色负片', note: '暖黄怀旧，晴天最合适。', dot: '#F2B63A', bw: false, base: 'saturate(1.15) contrast(1.03) sepia(0.24)' },
+      { id: 'ultramax', name: 'UltraMax 400', iso: '400', type: '彩色负片', note: '日常卷，饱和偏高，颗粒比 Portra 明显。', dot: '#5CB4EA', bw: false, base: 'saturate(1.25) contrast(1.08) sepia(0.12)' },
+      { id: 'v3', name: 'Vision3 500T', iso: '500T', type: '电影负片', note: '灯光型电影卷，夜景和霓虹的首选，日光下偏蓝。', dot: '#7FA6E6', bw: false, base: 'saturate(0.9) contrast(0.95) hue-rotate(-10deg)' },
+      { id: 'dxx', name: 'Double-X', iso: '250', type: '黑白电影负片', note: '经典黑白电影卷，颗粒明显，反差硬朗。', dot: '#CFCBC2', bw: true, base: 'grayscale(1) contrast(1.2)' }
     ];
   }
   papers() {
@@ -449,11 +519,11 @@ class Component extends DCLogic {
   }
   fmtsDef() {
     return [
-      { id: 'half', label: '半格', w: 225, h: 300, k: 1.4 },
-      { id: '135', label: '135', w: 358, h: 239, k: 1 },
-      { id: 'xpan', label: 'XPan', w: 358, h: 132, k: 1 },
-      { id: '66', label: '6×6', w: 300, h: 300, k: 0.6 },
-      { id: '67', label: '6×7', w: 350, h: 300, k: 0.55 }
+      { id: 'half', label: '半格', w: 216, h: 288, k: 1.4 },
+      { id: '135', label: '135', w: 346, h: 231, k: 1 },
+      { id: 'xpan', label: 'XPan', w: 346, h: 128, k: 1 },
+      { id: '66', label: '6×6', w: 284, h: 284, k: 0.6 },
+      { id: '67', label: '6×7', w: 332, h: 284, k: 0.55 }
     ];
   }
   diffsDef() {
@@ -554,7 +624,7 @@ class Component extends DCLogic {
       this.setState({ blink: true, scene: (s.scene + 1) % 4, seq: s.seq + 1, items: [{ id: s.seq, scene: s.scene, video: false, secs: 0, raw: false, look: { ...s.camLook } }, ...s.items] });
       clearTimeout(this.blinkT);
       this.blinkT = setTimeout(() => this.setState({ blink: false }), 150);
-      return this.say('已存入图库，原片保留');
+      return this.say('已放上灯箱，原片保留');
     }
     if (!s.rec) {
       this.setState({ rec: true, recSecs: 0, hint: '' });
@@ -564,13 +634,13 @@ class Component extends DCLogic {
     clearInterval(this.recT);
     const secs = Math.max(1, s.recSecs);
     this.setState({ rec: false, scene: (s.scene + 1) % 4, seq: s.seq + 1, items: [{ id: s.seq, scene: s.scene, video: true, secs, raw: false, look: { ...s.camLook } }, ...s.items] });
-    this.say('视频已存入图库 · ' + this.mmss(secs));
+    this.say('视频已放上灯箱 · ' + this.mmss(secs));
   }
   guard() { if (this.state.rec) { this.say('先停止录制'); return true; } return false; }
 
   doImport() {
     const s = this.state;
-    if (!s.impPick.length) return this.say('先点选要导入的项目');
+    if (!s.impPick.length) return this.say('先圈出要导入的项目');
     const C = this.cands(s.impSrc);
     const fresh = s.impPick.map((i, n) => ({ id: s.seq + n, scene: C[i].scene, video: C[i].video, secs: C[i].video ? C[i].secs : 0, raw: C[i].raw, look: this.def() }));
     const next = { items: [...fresh, ...s.items], seq: s.seq + fresh.length, impPick: [], sheet: null, filter: 'all' };
@@ -578,7 +648,7 @@ class Component extends DCLogic {
     else { this.setState(next); this.say('已导入 ' + fresh.length + ' 项'); }
   }
   openExport(ids) {
-    if (!ids.length) return this.say('先选择要导出的项目');
+    if (!ids.length) return this.say('先圈出要导出的项目');
     this.setState({ sheet: 'export', xTargets: ids });
   }
   doExport(mode) {
@@ -599,12 +669,16 @@ class Component extends DCLogic {
   renderVals() {
     const s = this.state, d = this.def();
     const F = this.films(), P = this.papers(), FM = this.fmtsDef(), DF = this.diffsDef(), SC = this.scenes();
-    const on = '#F2A33A', ink = '#16130C', text = '#EDE8DC', mute = '#A8A294', line = '#2E2C26', off = '#5C594F';
-    const chip = (active) => ({ bg: active ? on : '#0E0E0C', fg: active ? ink : text, line: active ? on : line });
-    const isCam = s.view === 'cam', isEdit = s.view === 'edit';
+    const red = '#D4281C', ink = '#1B1A17', paperC = '#F5F3EB', grey = '#6B675E';
+    const text = '#F5DDD2', dim = '#B8776A', line = '#3D1A14', off = '#6E3A31', dink = '#140807';
+    const isCam = s.view === 'cam', isEdit = s.view === 'edit', isLib = s.view === 'lib';
     const item = s.items.find((x) => x.id === s.editId) || null;
     const l = isCam ? s.camLook : (isEdit && item ? item.look : d);
     const film = F.find((x) => x.id === l.film), paper = P.find((x) => x.id === l.paper);
+    const acc = film.dot;
+    const chip = (active) => ({ bg: active ? acc : 'transparent', fg: active ? dink : text, line: active ? acc : '#5A2A21' });
+    const xAcc = isLib ? red : acc, xAccInk = isLib ? '#FFFFFF' : dink;
+    const xchip = (active) => ({ bg: active ? paperC : 'transparent', fg: active ? ink : paperC, line: active ? paperC : grey });
     const fmt = FM.find((x) => x.id === l.fmt), dif = DF.find((x) => x.id === l.diff);
     const scene = SC[isCam ? s.scene : (item ? item.scene : 0)];
     const isVideo = isCam ? s.kind === 'video' : !!(item && item.video);
@@ -629,43 +703,49 @@ class Component extends DCLogic {
     const sl = (k) => (e) => this.setLook(k, Number(e.target.value));
 
     const shown = s.items.filter((x) => s.filter === 'all' || (s.filter === 'video') === x.video);
+    const labels = ['11月10日 · 今天', '11月8日 · 周末', '11月3日 · 夜里', '更早的'];
+    const rots = [-0.7, 0.5, -0.4, 0.8];
+    const strips = [];
+    shown.forEach((x, i) => {
+      if (i % 3 === 0) strips.push({ label: labels[Math.min(strips.length, 3)], rot: rots[strips.length % 4], frames: [] });
+      const idx = s.picked.indexOf(x.id), f = F.find((k) => k.id === x.look.film);
+      strips[strips.length - 1].frames.push({
+        src: SC[x.scene].src, filter: this.imgFilter(x.look),
+        edge: f.name.toUpperCase(), num: '▸ ' + (Math.floor(i / 2) + 1) + (i % 2 ? 'A' : ''),
+        tag: x.video ? this.mmss(x.secs) : (x.raw ? 'RAW' : ''), tagBg: x.video || x.raw ? 'rgba(13,11,9,.8)' : 'transparent',
+        edited: !this.same(x.look, d), picked: idx >= 0, order: idx >= 0 ? String(idx + 1) : '',
+        aria: (x.video ? '视频：' : '照片：') + SC[x.scene].name + (idx >= 0 ? '，已圈选' : ''),
+        tap: () => s.selecting ? this.setState({ picked: idx >= 0 ? s.picked.filter((p) => p !== x.id) : [...s.picked, x.id] }) : this.openEdit(x.id)
+      });
+    });
     const C = this.cands(s.impSrc);
     const targets = s.items.filter((x) => s.xTargets.includes(x.id));
     const last = s.items[0] || null;
     const prog = s.prog;
 
     return {
-      vLib: s.view === 'lib', vWork: isCam || (isEdit && !!item), vEdit: isEdit, vCam: isCam,
+      vLib: isLib, vWork: isCam || (isEdit && !!item), vEdit: isEdit, vCam: isCam, acc,
 
-      libTitle: s.selecting ? '已选 ' + s.picked.length + ' 项' : '图库',
-      libCount: s.selecting ? '' : s.items.length + ' 项',
+      libTitle: s.selecting ? '圈出 ' + s.picked.length + ' 张' : '图库',
+      libCount: s.selecting ? '' : s.items.length + ' FRAMES',
+      titleFont: s.selecting ? "'Long Cang', 'Noto Sans SC', cursive" : "'Noto Sans SC', sans-serif",
+      titleSize: s.selecting ? 34 : 28, titleColor: s.selecting ? red : ink,
       selectLabel: s.selecting ? '完成' : '选择',
       toggleSelect: () => this.setState({ selecting: !s.selecting, picked: [] }),
-      filters: [['all', '全部'], ['photo', '照片'], ['video', '视频']].map((f) => ({ label: f[1], ...chip(s.filter === f[0]), pick: () => this.setState({ filter: f[0] }) })),
-      grid: shown.map((x) => {
-        const idx = s.picked.indexOf(x.id);
-        return {
-          src: SC[x.scene].src, filter: this.imgFilter(x.look), raw: x.raw,
-          dot: this.same(x.look, d) ? 'transparent' : on,
-          tag: x.video ? this.mmss(x.secs) : '', tagBg: x.video ? 'rgba(0,0,0,.7)' : 'transparent',
-          checkOn: s.selecting, checkBg: idx >= 0 ? on : 'rgba(0,0,0,.4)', checkText: idx >= 0 ? String(idx + 1) : '',
-          ring: s.selecting && idx >= 0 ? on : 'transparent',
-          aria: (x.video ? '视频：' : '照片：') + SC[x.scene].name + (idx >= 0 ? '，已选' : ''),
-          tap: () => s.selecting ? this.setState({ picked: idx >= 0 ? s.picked.filter((p) => p !== x.id) : [...s.picked, x.id] }) : this.openEdit(x.id)
-        };
-      }),
+      filters: [['all', '全部'], ['photo', '照片'], ['video', '视频']].map((f) => ({ label: f[1], on: s.filter === f[0], color: s.filter === f[0] ? ink : grey, pick: () => this.setState({ filter: f[0] }) })),
+      strips,
       barNormal: !s.selecting, barSelect: s.selecting,
       openImport: () => this.setState({ sheet: 'import', impPick: [] }),
       openCam: () => this.setState({ view: 'cam', sheet: null }),
-      pasteFg: s.clip ? text : off,
+      pasteFgL: s.clip ? paperC : '#8F8A7E', pasteFgD: s.clip ? text : off,
       pasteToPicked: () => {
         if (!s.clip) return this.say('先打开一张，点「复制设置」');
-        if (!s.picked.length) return this.say('先选择要套用的项目');
+        if (!s.picked.length) return this.say('先圈出要套用的项目');
         this.applyLook(s.clip); this.say('已粘贴到 ' + s.picked.length + ' 项');
       },
       exportPicked: () => this.openExport(s.picked),
       removePicked: () => {
-        if (!s.picked.length) return this.say('先选择要移除的项目');
+        if (!s.picked.length) return this.say('先圈出要移除的项目');
         const n = s.picked.length;
         this.setState({ items: s.items.filter((x) => !s.picked.includes(x.id)), picked: [], selecting: false });
         this.say('已移除 ' + n + ' 项，相册原片不受影响');
@@ -676,7 +756,7 @@ class Component extends DCLogic {
       undoFg: s.hist.length ? text : off, redoFg: s.redo.length ? text : off,
       openRecipes: () => {
         if (this.guard()) return;
-        if (s.view === 'lib' && !s.picked.length) return this.say('先选择要套用的项目');
+        if (isLib && !s.picked.length) return this.say('先圈出要套用的项目');
         this.setState({ sheet: 'recipes' });
       },
       exportOne: () => this.openExport(item ? [item.id] : []),
@@ -699,7 +779,7 @@ class Component extends DCLogic {
       grainSize: Math.round(150 * l.gran * fmt.k * (1 + l.push * 0.15)),
       grainO: fx ? Math.min(0.95, l.grain * 0.45 * (1 + Math.max(0, l.push) * 0.2)).toFixed(2) : 0,
       dateOn: l.date && fx, edgeOn: l.edge && fx, edgeText: film.name.toUpperCase(),
-      badge: s.hold ? '原图' : this.summary(l),
+      badge: s.hold ? '原图 ORIGINAL' : this.summary(l).toUpperCase(),
       rec: s.rec, recTime: 'REC ' + this.mmss(s.recSecs),
       showPlay: isEdit && isVideo, playLabel: s.playing ? '暂停' : '播放 ' + this.mmss(item ? item.secs : 0),
       togglePlay: () => this.setState({ playing: !s.playing }),
@@ -707,12 +787,12 @@ class Component extends DCLogic {
 
       toPhoto: () => { if (!this.guard()) this.setState({ kind: 'photo' }); },
       toVideo: () => this.setState({ kind: 'video' }),
-      photoBg: s.kind === 'photo' ? on : 'transparent', photoFg: s.kind === 'photo' ? ink : text,
-      videoBg: s.kind === 'video' ? on : 'transparent', videoFg: s.kind === 'video' ? ink : text,
+      photoBg: s.kind === 'photo' ? text : 'transparent', photoFg: s.kind === 'photo' ? dink : text,
+      videoBg: s.kind === 'video' ? text : 'transparent', videoFg: s.kind === 'video' ? dink : text,
       shutter: () => this.shutter(),
       shutterAria: s.kind === 'photo' ? '拍照' : (s.rec ? '停止录制' : '开始录制'),
-      shutterSize: s.rec ? 20 : 40, shutterRadius: s.rec ? '5px' : '50%',
-      shutterBg: s.kind === 'video' ? '#E5442E' : text,
+      shutterSize: s.rec ? 20 : 40, shutterRadius: s.rec ? '4px' : '50%',
+      shutterBg: s.kind === 'video' ? '#FF4A2B' : text,
       lastSrc: last ? SC[last.scene].src : SC[0].src, lastFilter: last ? this.imgFilter(last.look) : 'none',
       openLast: () => { if (!this.guard() && last) this.openEdit(last.id); },
 
@@ -720,7 +800,7 @@ class Component extends DCLogic {
       resetTool: () => { const n = { ...l }; TK[s.tool].forEach((k) => { n[k] = d[k]; }); this.applyLook(n); },
       tFilm: s.tool === 'film', tPaper: s.tool === 'paper', tExp: s.tool === 'exp', tHal: s.tool === 'hal',
       tGrain: s.tool === 'grain', tDiff: s.tool === 'diff', tColor: s.tool === 'color', tFmt: s.tool === 'fmt',
-      films: F.map((x) => ({ name: x.name, type: x.type, dot: x.dot, ring: x.id === l.film ? on : line, pick: () => this.setLook('film', x.id) })),
+      films: F.map((x) => ({ name: x.name, iso: x.iso, type: x.type, dot: x.dot, on: x.id === l.film, ring: x.id === l.film ? x.dot : line, bg: x.id === l.film ? '#24100D' : 'transparent', pick: () => this.setLook('film', x.id) })),
       filmNote: film.note,
       papers: P.map((x) => ({ label: x.label, ...chip(x.id === l.paper), pick: () => this.setLook('paper', x.id) })),
       paperNote: paper.note,
@@ -739,55 +819,56 @@ class Component extends DCLogic {
       vY: l.y, onY: sl('y'), lY: this.sign(l.y) + ' CC',
       vM: l.m, onM: sl('m'), lM: this.sign(l.m) + ' CC',
       fmts: FM.map((x) => ({ label: x.label, ...chip(x.id === l.fmt), pick: () => this.setLook('fmt', x.id) })),
-      edgeOn0: l.edge, toggleEdge: () => this.setLook('edge', !l.edge), edgeLabel: l.edge ? '开' : '关', edgeFg: l.edge ? on : mute,
-      dateOn0: l.date, toggleDate: () => this.setLook('date', !l.date), dateLabel: l.date ? '开' : '关', dateFg: l.date ? on : mute,
+      edgeOn0: l.edge, toggleEdge: () => this.setLook('edge', !l.edge), edgeLabel: l.edge ? '开' : '关', edgeFg: l.edge ? acc : dim,
+      dateOn0: l.date, toggleDate: () => this.setLook('date', !l.date), dateLabel: l.date ? '开' : '关', dateFg: l.date ? acc : dim,
       tools: toolDefs.map((t) => ({
         label: t.label, active: t.id === s.tool,
-        color: t.id === s.tool ? text : mute, bar: t.id === s.tool ? on : 'transparent',
-        dot: modified(TK[t.id]) ? on : 'transparent',
+        color: t.id === s.tool ? text : dim, bar: t.id === s.tool ? acc : 'transparent',
+        dot: modified(TK[t.id]) ? acc : 'transparent',
         go: () => this.setState({ tool: t.id })
       })),
 
       closeSheet: () => this.setState({ sheet: null }),
       importSheet: s.sheet === 'import',
       srcPhotos: () => this.setState({ impSrc: 'photos', impPick: [] }), srcFiles: () => this.setState({ impSrc: 'files', impPick: [] }),
-      srcPBg: s.impSrc === 'photos' ? on : 'transparent', srcPFg: s.impSrc === 'photos' ? ink : text,
-      srcFBg: s.impSrc === 'files' ? on : 'transparent', srcFFg: s.impSrc === 'files' ? ink : text,
+      srcPBg: s.impSrc === 'photos' ? ink : 'transparent', srcPFg: s.impSrc === 'photos' ? paperC : ink,
+      srcFBg: s.impSrc === 'files' ? ink : 'transparent', srcFFg: s.impSrc === 'files' ? paperC : ink,
       impBtnLabel: s.impPick.length ? '导入 ' + s.impPick.length : '导入',
-      impBtnBg: s.impPick.length ? on : '#1A1915', impBtnFg: s.impPick.length ? ink : mute,
-      impNote: s.impSrc === 'photos' ? '可多选照片和视频。只选一项会直接进入编辑。' : 'RAW 文件从「文件」导入，保留完整高光与宽容度。',
+      impBtnBg: s.impPick.length ? red : 'transparent', impBtnFg: s.impPick.length ? '#FFFFFF' : grey,
+      impNote: s.impSrc === 'photos' ? '圈出要导入的照片和视频。只圈一项会直接进暗房。' : 'RAW 文件从「文件」导入，保留完整高光与宽容度。',
       doImport: () => this.doImport(),
       cands: C.map((x, i) => {
         const idx = s.impPick.indexOf(i);
         return {
-          src: SC[x.scene].src, on: idx >= 0,
-          tag: x.raw ? 'RAW' : (x.video ? this.mmss(x.secs) : ''), tagBg: x.raw || x.video ? 'rgba(0,0,0,.7)' : 'transparent',
-          checkBg: idx >= 0 ? on : 'rgba(0,0,0,.4)', checkText: idx >= 0 ? String(idx + 1) : '',
-          ring: idx >= 0 ? on : 'transparent',
+          src: SC[x.scene].src, on: idx >= 0, order: idx >= 0 ? String(idx + 1) : '',
+          tag: x.raw ? 'RAW' : (x.video ? this.mmss(x.secs) : ''),
           aria: (x.raw ? 'RAW：' : x.video ? '视频：' : '照片：') + SC[x.scene].name,
           tap: () => this.setState({ impPick: idx >= 0 ? s.impPick.filter((p) => p !== i) : [...s.impPick, i] })
         };
       }),
 
       recipeSheet: s.sheet === 'recipes',
-      recipeTitle: s.view === 'lib' ? '配方 · 套用到 ' + s.picked.length + ' 项' : '配方',
-      canSaveRecipe: s.view !== 'lib',
-      recipes: [...s.mine, ...this.builtin()].map((r) => {
+      recipeTitle: isLib ? '配方 · 套用到 ' + s.picked.length + ' 项' : '配方',
+      canSaveRecipe: !isLib,
+      recipes: [...s.mine, ...this.builtin()].map((r, i) => {
         const full = { ...d, ...r.look };
-        return { name: r.name, sum: this.summary(full), apply: () => { this.applyLook(full); this.setState({ sheet: null }); this.say('已套用：' + r.name); } };
+        return {
+          name: r.name, sum: this.summary(full), rot: [-0.6, 0.5, -0.3, 0.7][i % 4], dot: F.find((k) => k.id === full.film).dot,
+          apply: () => { this.applyLook(full); this.setState({ sheet: null }); this.say('已套用：' + r.name); }
+        };
       }),
       saveRecipe: () => { const n = s.mine.length + 1; this.setState({ mine: [{ name: '我的配方 ' + n, look: { ...l } }, ...s.mine] }); },
 
-      exportSheet: s.sheet === 'export',
+      exportSheet: s.sheet === 'export', xAcc, xAccInk,
       exportTitle: '导出 ' + targets.length + ' 项',
       xHasPhoto: targets.some((x) => !x.video), xHasVideo: targets.some((x) => x.video),
-      xFmts: ['JPEG', 'HEIF', 'TIFF'].map((label, i) => ({ label, ...chip(i === s.xFmt), pick: () => this.setState({ xFmt: i }) })),
-      xSizes: ['长边 2048', '长边 3400', '全尺寸'].map((label, i) => ({ label, ...chip(i === s.xSize), pick: () => this.setState({ xSize: i }) })),
-      xVids: ['1080p', '4K'].map((label, i) => ({ label, ...chip(i === s.xVid), pick: () => this.setState({ xVid: i }) })),
+      xFmts: ['JPEG', 'HEIF', 'TIFF'].map((label, i) => ({ label, ...xchip(i === s.xFmt), pick: () => this.setState({ xFmt: i }) })),
+      xSizes: ['长边 2048', '长边 3400', '全尺寸'].map((label, i) => ({ label, ...xchip(i === s.xSize), pick: () => this.setState({ xSize: i }) })),
+      xVids: ['1080p', '4K'].map((label, i) => ({ label, ...xchip(i === s.xVid), pick: () => this.setState({ xVid: i }) })),
       doSave: () => this.doExport('save'), doShare: () => this.doExport('share'),
 
       progSheet: s.sheet === 'progress' && !!prog, progPill: !!prog && s.sheet !== 'progress',
-      progTitle: prog ? '正在导出 ' + Math.min(prog.total, prog.done + 1) + ' / ' + prog.total : '',
+      progCount: prog ? Math.min(prog.total, prog.done + 1) + ' / ' + prog.total : '',
       progPct: prog ? Math.round(((prog.done + 0.5) / prog.total) * 100) : 0,
       hintOn: !!s.hint, hint: s.hint
     };

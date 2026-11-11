@@ -340,9 +340,6 @@ fun CameraScreen(state: AppState) {
                                 .border(1.dp, if (on) accent else Pal.off, CircleShape).padding(horizontal = 8.dp, vertical = 6.dp))
                     }
                 }
-                val autoPrint by state.autoPrint.collectAsState()
-                Text(if (autoPrint) "拍完自动冲印 开" else "拍完自动冲印 关", color = if (autoPrint) accent else Pal.dim, fontSize = 11.sp,
-                    modifier = Modifier.springClick { state.setAutoPrint(!autoPrint) }.padding(top = 6.dp, bottom = 2.dp, start = 6.dp))
             }
         }
         // 3. the same tools as the darkroom, bound to the look loaded in the camera

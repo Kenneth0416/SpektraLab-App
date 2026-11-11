@@ -44,17 +44,10 @@ class AppState(application: Application) : AndroidViewModel(application) {
     val camLook = MutableStateFlow(runCatching {
         LookJson.fromJson(org.json.JSONObject(application.getSharedPreferences("camera", android.content.Context.MODE_PRIVATE).getString("look", "{}")!!))
     }.getOrDefault(Look.DEFAULT))
-    /** Also save a developed film JPEG to the album right after each shot. */
-    val autoPrint = MutableStateFlow(application.getSharedPreferences("camera", android.content.Context.MODE_PRIVATE).getBoolean("autoPrint", true))
 
     fun setCamLook(look: Look) {
         camLook.value = look
         app.getSharedPreferences("camera", android.content.Context.MODE_PRIVATE).edit().putString("look", LookJson.toJson(look).toString()).apply()
-    }
-
-    fun setAutoPrint(on: Boolean) {
-        autoPrint.value = on
-        app.getSharedPreferences("camera", android.content.Context.MODE_PRIVATE).edit().putBoolean("autoPrint", on).apply()
     }
 
     fun openCamera() { sheet.value = Sheet.NONE; selecting.value = false; picked.value = emptyList(); cameraOpen.value = true }
@@ -62,7 +55,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
 
     /**
      * A shot was saved to the album ([uri] is the untouched original, raw when possible):
-     * put it on the lightbox with the camera's look, and print it if asked.
+     * put it on the lightbox with the camera's look and print it.
      */
     fun onCaptured(uri: Uri) {
         val look = camLook.value
@@ -71,7 +64,8 @@ class AppState(application: Application) : AndroidViewModel(application) {
                 ?: return@launch say("拍到了，但读不回原片")
             library.add(listOf(item))
             say(if (item.isRaw) "已放上灯箱 · RAW 原片保留" else "已放上灯箱 · 原片保留")
-            if (autoPrint.value) exports.enqueue(item, exportOptions.value)
+            // every shot is also printed: the film picture goes to the album next to the original
+            exports.enqueue(item, exportOptions.value)
         }
     }
 

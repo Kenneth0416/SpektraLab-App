@@ -75,6 +75,8 @@ import app.spektralab.camera.FilmViewfinder
 import app.spektralab.engine.Catalog
 import app.spektralab.engine.LookMapper
 import app.spektralab.render.Framing
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -116,7 +118,11 @@ fun CameraScreen(state: AppState) {
     // viewfinder pipeline
     val viewfinder = remember { FilmViewfinder { msg -> ContextCompat.getMainExecutor(context).execute { state.say(msg) } } }
     val previewView = remember {
-        PreviewView(context).apply { scaleType = PreviewView.ScaleType.FIT_CENTER }
+        PreviewView(context).apply {
+            scaleType = PreviewView.ScaleType.FIT_CENTER
+            // TextureView lets the shutter wait for a blurred buffer to be latched.
+            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+        }
     }
     val lookState = rememberUpdatedState(look)
     LaunchedEffect(Unit) {
@@ -192,14 +198,22 @@ fun CameraScreen(state: AppState) {
     var autoWind by remember { mutableStateOf(prefs.getBoolean("autoWind", false)) }
     var nudge by remember { mutableIntStateOf(0) }
     var autoStroke by remember { mutableIntStateOf(0) }
+    val blades = remember { Animatable(0f) }
     val clarity = remember { Animatable(if (prefs.getBoolean("cocked", true)) 1f else 0f) }
     LaunchedEffect(Unit) { snapshotFlow { clarity.value }.collect { viewfinder.clarity = it } }
     fun advanceFilm() {
+        if (busy || cocked) return
+        busy = true
         cocked = true
         frame = frame % 36 + 1
         prefs.edit().putBoolean("cocked", true).putInt("frame", frame).apply()
         // the finder snaps back into focus
-        scope.launch { clarity.animateTo(1f, tween(520, easing = LinearOutSlowInEasing)) }
+        scope.launch {
+            clarity.animateTo(1f, tween(520, easing = LinearOutSlowInEasing))
+            // Also recover a curtain held closed because the preview stalled.
+            blades.animateTo(0f, tween(260, easing = LinearOutSlowInEasing))
+            busy = false
+        }
     }
 
     // ------------------------------------------------------------------ orientation
@@ -224,7 +238,6 @@ fun CameraScreen(state: AppState) {
     val iconTurn by animateFloatAsState(turn.toFloat(), Motion.settle, label = "turn")
 
     // focal-plane shutter: two blades close over the frame and open again
-    val blades = remember { Animatable(0f) }
     fun shoot() {
         val s = session ?: return state.say(if (granted) "相机还没准备好" else "需要相机权限")
         if (busy) return
@@ -238,10 +251,32 @@ fun CameraScreen(state: AppState) {
         cocked = false
         prefs.edit().putBoolean("cocked", false).apply()
         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-        scope.launch {
+        val captured = CompletableDeferred<Boolean>()
+        val shutter = scope.launch {
             blades.animateTo(1f, tween(70, easing = FastOutLinearInEasing))
-            blades.animateTo(0f, tween(260, easing = LinearOutSlowInEasing))
-            clarity.animateTo(0f, tween(320))
+            val previousBlur = viewfinder.blurredTimestamp
+            clarity.snapTo(0f)
+            viewfinder.clarity = 0f
+            if (previewView.awaitBlurredPreview(viewfinder, previousBlur)) {
+                blades.animateTo(0f, tween(260, easing = LinearOutSlowInEasing))
+            } else {
+                state.say("取景画面暂未更新，过片后恢复")
+            }
+        }
+        scope.launch {
+            if (captured.await()) {
+                shutter.join()
+                busy = false
+                if (autoWind) autoStroke++
+            } else {
+                // Cancel before restoring clarity so the old shot cannot blur it again.
+                shutter.cancelAndJoin()
+                cocked = true
+                prefs.edit().putBoolean("cocked", true).apply()
+                clarity.animateTo(1f, tween(300))
+                blades.animateTo(0f, tween(260, easing = LinearOutSlowInEasing))
+                busy = false
+            }
         }
         val stamp = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
         val values = ContentValues().apply {
@@ -257,17 +292,12 @@ fun CameraScreen(state: AppState) {
         val options = ImageCapture.OutputFileOptions.Builder(context.contentResolver, MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values).build()
         s.capture.takePicture(options, ContextCompat.getMainExecutor(context), object : ImageCapture.OnImageSavedCallback {
             override fun onImageSaved(result: ImageCapture.OutputFileResults) {
-                busy = false
+                captured.complete(true)
                 result.savedUri?.let { state.onCaptured(it) } ?: state.say("原片没有保存下来")
-                if (autoWind) autoStroke++
             }
 
             override fun onError(e: ImageCaptureException) {
-                busy = false
-                // nothing was exposed: the frame is still fresh
-                cocked = true
-                prefs.edit().putBoolean("cocked", true).apply()
-                scope.launch { clarity.animateTo(1f, tween(300)) }
+                captured.complete(false)
                 state.say("拍摄失败：${e.message ?: e.imageCaptureError}")
             }
         })
@@ -443,7 +473,8 @@ fun CameraScreen(state: AppState) {
                 front = !front; zoom = 1f
                 scope.launch { spin.snapTo(0f); spin.animateTo(180f, Motion.settle) }
             }.border(1.dp, Pal.off, CircleShape), contentAlignment = Alignment.Center) {
-            Text("⟲", color = Pal.text, fontSize = 24.sp, modifier = Modifier.graphicsLayer { rotationZ = iconTurn + spin.value })
+            // Keep the drawing and rotation anchored to the button's center.
+            CameraFlipIcon(Modifier.size(28.dp).graphicsLayer { rotationZ = iconTurn + spin.value }, Pal.text)
         }
     }
     val transportPart: @Composable (Boolean) -> Unit = { vertical ->
@@ -459,7 +490,7 @@ fun CameraScreen(state: AppState) {
                 modifier = Modifier.springClick {
                     autoWind = !autoWind
                     prefs.edit().putBoolean("autoWind", autoWind).apply()
-                    if (autoWind && !cocked) autoStroke++
+                    if (autoWind && !cocked && !busy) autoStroke++
                 }.padding(6.dp))
         }
         val lever: @Composable () -> Unit = { FilmAdvanceLever(cocked, accent, nudge, autoStroke) { advanceFilm() } }

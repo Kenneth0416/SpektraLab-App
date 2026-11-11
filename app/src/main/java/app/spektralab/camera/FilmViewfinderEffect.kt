@@ -61,6 +61,10 @@ class FilmViewfinder(private val onError: (String) -> Unit) : SurfaceProcessor {
      */
     @Volatile var clarity = 1f
 
+    /** Camera timestamp of the latest fully blurred buffer submitted to the preview. */
+    @Volatile var blurredTimestamp = Long.MIN_VALUE
+        private set
+
     /** Tables of the look loaded in the camera. */
     fun setLook(s: LookSetup) = executor.execute { setup = s }
 
@@ -149,7 +153,8 @@ class FilmViewfinder(private val onError: (String) -> Unit) : SurfaceProcessor {
             val h = out.size.height
             if (frame % METER_EVERY == 0) meter(r, input)
             // process at a bounded size: enough for a viewfinder, and keeps 30 fps within reach
-            val longEdge = BLUR_LONG_EDGE * (PROCESS_LONG_EDGE.toFloat() / BLUR_LONG_EDGE).pow(clarity.coerceIn(0f, 1f))
+            val frameClarity = clarity.coerceIn(0f, 1f)
+            val longEdge = BLUR_LONG_EDGE * (PROCESS_LONG_EDGE.toFloat() / BLUR_LONG_EDGE).pow(frameClarity)
             val scale = minOf(1f, longEdge / max(w, h))
             r.render(RenderRequest(
                 input = input,
@@ -158,7 +163,7 @@ class FilmViewfinder(private val onError: (String) -> Unit) : SurfaceProcessor {
                 seed = frame * 7919 + 17, autoEv = autoEv,
             ))
             e.setPresentationTime(outSurface, st.timestamp)
-            e.swap(outSurface)
+            if (e.swap(outSurface) && frameClarity == 0f) blurredTimestamp = st.timestamp
             frame++
         } catch (t: Throwable) {
             Log.e(TAG, "viewfinder frame failed", t)

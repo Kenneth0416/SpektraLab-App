@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.spektralab.SpektraApp
+import app.spektralab.camera.BurstStore
 import app.spektralab.data.LibraryItem
 import app.spektralab.data.Media
 import app.spektralab.data.LookJson
@@ -60,7 +61,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
      * A shot was saved to the album ([uri] is the untouched original, raw when possible):
      * put it on the lightbox with the camera's look and print it.
      */
-    fun onCaptured(uri: Uri, evBias: Float = 0f) {
+    fun onCaptured(uri: Uri, evBias: Float = 0f, framesUsed: Float = 1f) {
         val look = camLook.value
         viewModelScope.launch {
             val item = withContext(Dispatchers.IO) { Media.importItem(app, uri, library.reserveIds(1)) }
@@ -68,9 +69,41 @@ class AppState(application: Application) : AndroidViewModel(application) {
                 ?.let { it.copy(look = look, autoEv = it.autoEv + evBias) }
                 ?: return@launch say("拍到了，但读不回原片")
             library.add(listOf(item))
-            say(if (item.isRaw) "已放上灯箱 · RAW 原片保留" else "已放上灯箱 · 原片保留")
+            say(when {
+                framesUsed >= 1.5f -> "已放上灯箱 · %.1f 帧合成 RAW".format(framesUsed)
+                item.isRaw -> "已放上灯箱 · RAW 原片保留"
+                else -> "已放上灯箱 · 原片保留"
+            })
             // every shot is also printed: the film picture goes to the album next to the original
             exports.enqueue(item, exportOptions.value)
+        }
+    }
+
+    /** Multi-frame capture: each shot is a short raw burst merged into one cleaner original. */
+    val multiFrame = MutableStateFlow(application.getSharedPreferences("camera", android.content.Context.MODE_PRIVATE).getBoolean("multiFrame", false))
+    fun setMultiFrame(on: Boolean) {
+        multiFrame.value = on
+        app.getSharedPreferences("camera", android.content.Context.MODE_PRIVATE).edit().putBoolean("multiFrame", on).apply()
+    }
+
+    /** Progress 0..1 of the burst being merged, null when idle. */
+    val merging = MutableStateFlow<Float?>(null)
+    private val mergeLock = kotlinx.coroutines.sync.Mutex()
+    private var mergesWaiting = 0
+    init { BurstStore.clear(application) }
+
+    /** A burst was captured into [files] (cache): merge it, keep the result as the original. */
+    fun onBurstCaptured(files: List<java.io.File>, evBias: Float) {
+        mergesWaiting++
+        if (merging.value == null) merging.value = 0f
+        viewModelScope.launch {
+            val saved = withContext(Dispatchers.Default) {
+                mergeLock.lock()
+                try { BurstStore.mergeToAlbum(app, files) { merging.value = it } }
+                finally { files.forEach { it.delete() }; mergeLock.unlock() }
+            }
+            if (--mergesWaiting == 0) merging.value = null
+            if (saved != null) onCaptured(saved.uri, evBias, saved.framesUsed) else say("原片没有保存下来")
         }
     }
 

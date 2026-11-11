@@ -71,6 +71,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import app.spektralab.camera.BurstStore
 import app.spektralab.camera.FilmViewfinder
 import app.spektralab.engine.Catalog
 import app.spektralab.engine.LookMapper
@@ -107,6 +108,8 @@ fun CameraScreen(state: AppState) {
     var zoom by rememberSaveable { mutableFloatStateOf(1f) }
     var session by remember { mutableStateOf<CameraSession?>(null) }
     var busy by remember { mutableStateOf(false) }
+    val multiFrame by state.multiFrame.collectAsState()
+    val merging by state.merging.collectAsState()
     // exposure compensation for the film exposure, set by dragging on the finder after a tap
     var evBias by rememberSaveable { mutableFloatStateOf(0f) }
     // focus / metering point: 0 searching, 1 in focus, 2 could not focus; locked = held until tapped again
@@ -288,16 +291,45 @@ fun CameraScreen(state: AppState) {
             }
         }
         val stamp = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
+        s.capture.targetRotation = when (deviceDeg) {
+            90 -> android.view.Surface.ROTATION_270; 180 -> android.view.Surface.ROTATION_180
+            270 -> android.view.Surface.ROTATION_90; else -> android.view.Surface.ROTATION_0
+        }
+        if (multiFrame && s.raw) {
+            // a short raw burst into the cache; merged in the background into the one original
+            s.capture.flashMode = ImageCapture.FLASH_MODE_OFF
+            state.say("多帧拍摄中，请拿稳")
+            val files = ArrayList<java.io.File>()
+            val dir = BurstStore.dir(context)
+            fun finish() { captured.complete(true); state.onBurstCaptured(files, evBias) }
+            fun next(i: Int) {
+                val f = java.io.File(dir, "SPK_${stamp}_$i.dng")
+                s.capture.takePicture(ImageCapture.OutputFileOptions.Builder(f).build(), ContextCompat.getMainExecutor(context),
+                    object : ImageCapture.OnImageSavedCallback {
+                        override fun onImageSaved(result: ImageCapture.OutputFileResults) {
+                            files += f
+                            if (i + 1 < BurstStore.FRAMES) next(i + 1) else finish()
+                        }
+
+                        override fun onError(e: ImageCaptureException) {
+                            f.delete()
+                            // whatever was captured before the failure is still a picture
+                            if (files.isNotEmpty()) finish() else {
+                                captured.complete(false)
+                                state.say("拍摄失败：${e.message ?: e.imageCaptureError}")
+                            }
+                        }
+                    })
+            }
+            next(0)
+            return
+        }
         val values = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, "SPK_$stamp." + if (s.raw) "dng" else "jpg")
             put(MediaStore.Images.Media.MIME_TYPE, if (s.raw) "image/x-adobe-dng" else "image/jpeg")
             put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_DCIM + "/SpektraLab")
         }
         s.capture.flashMode = flash
-        s.capture.targetRotation = when (deviceDeg) {
-            90 -> android.view.Surface.ROTATION_270; 180 -> android.view.Surface.ROTATION_180
-            270 -> android.view.Surface.ROTATION_90; else -> android.view.Surface.ROTATION_0
-        }
         val options = ImageCapture.OutputFileOptions.Builder(context.contentResolver, MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values).build()
         s.capture.takePicture(options, ContextCompat.getMainExecutor(context), object : ImageCapture.OnImageSavedCallback {
             override fun onImageSaved(result: ImageCapture.OutputFileResults) {
@@ -330,10 +362,18 @@ fun CameraScreen(state: AppState) {
         Text("‹ 灯箱", color = Pal.text, fontSize = 15.sp, modifier = Modifier.springClick { state.closeCamera() }.padding(6.dp))
         // what the shutter will keep as the original
         AnimatedContent(session?.raw, label = "format", transitionSpec = { fadeIn() togetherWith fadeOut() }) { raw ->
-            Text(when (raw) { true -> "RAW"; false -> "JPEG"; null -> "…" }, fontFamily = Fonts.mono, fontSize = 10.sp,
+            // tapping the badge switches multi-frame capture (raw only)
+            Text(when (raw) { true -> if (multiFrame) "RAW×${BurstStore.FRAMES}" else "RAW"; false -> "JPEG"; null -> "…" },
+                fontFamily = Fonts.mono, fontSize = 10.sp,
                 color = if (raw == true) accent else Pal.dim,
-                modifier = Modifier.padding(6.dp).border(1.dp, if (raw == true) accent else Pal.off, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp))
+                modifier = Modifier.springClick {
+                    if (raw == true) {
+                        state.setMultiFrame(!multiFrame)
+                        state.say(if (!multiFrame) "多帧合成：每张连拍 ${BurstStore.FRAMES} 帧 RAW，合成更干净的原片" else "单帧 RAW")
+                    }
+                }.padding(6.dp).border(1.dp, if (raw == true) accent else Pal.off, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp))
         }
+        merging?.let { Text("合成 ${(it * 100).toInt()}%", fontFamily = Fonts.mono, fontSize = 10.sp, color = Pal.dim, modifier = Modifier.padding(2.dp)) }
         gap()
         val flashLabel = when (flash) { ImageCapture.FLASH_MODE_ON -> "闪光 开"; ImageCapture.FLASH_MODE_AUTO -> "闪光 自动"; else -> "闪光 关" }
         Text(flashLabel, color = if (flash == ImageCapture.FLASH_MODE_OFF) Pal.dim else Pal.text, fontSize = 13.sp, modifier = Modifier.springClick {

@@ -144,7 +144,9 @@ class BurstTest {
     fun mergingABurstBeatsASingleFrame() {
         val frames = shifts.mapIndexed { i, s -> frame(s.first, s.second, true, 100L + i) }
         val single = psnr(RawDeveloper.develop(frames[0], 4096, options = quiet))
+        val t0 = System.nanoTime()
         val merged = BurstMerge.merge(frames)
+        println("merge of %d frames %dx%d: %d ms".format(frames.size, w, h, (System.nanoTime() - t0) / 1_000_000))
         val burst = psnr(develop(merged, frames[0]))
         println("noisy scene: single frame %.2f dB, %d-frame merge %.2f dB (frames used %.2f)".format(single, frames.size, burst, merged.framesUsed))
         assertTrue(burst > single + 3.0, "expected at least 3 dB from $single, got $burst")

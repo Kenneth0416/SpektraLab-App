@@ -12,25 +12,33 @@ class LinearImage(val width: Int, val height: Int, val halfRgba: ByteBuffer) {
 }
 
 /**
- * Develops a Bayer raw frame to scene-linear sRGB — the input spektrafilm is designed
+ * Develops a Bayer raw frame ([RawImage] with a 2x2 [CfaPattern]) to scene-linear sRGB — the input spektrafilm is designed
  * for: black level, lens shading (gain maps), white balance, highlight clipping,
  * demosaic and the camera colour matrix. No tone curve, sharpening or noise reduction.
  */
 object RawDeveloper {
+    /** True when [develop] can handle this image's CFA (2x2 Bayer). X-Trans and others need their own demosaic. */
+    fun supports(img: RawImage): Boolean = img.cfa.isBayer
+
     /**
      * @param maxLongEdge wanted long edge. When the sensor has at least twice that, 2x2
      *   Bayer cells are binned (fast, and averages noise); otherwise a full-resolution
      *   Malvar-He-Cutler demosaic runs unless [fast] is set.
+     * @throws IllegalArgumentException when [supports] is false for [img].
      */
-    fun develop(img: DngImage, maxLongEdge: Int, fast: Boolean = false): LinearImage {
+    fun develop(img: RawImage, maxLongEdge: Int, fast: Boolean = false): LinearImage {
+        require(supports(img)) { "cannot develop ${img.cfa}: only 2x2 Bayer patterns are supported" }
         val long = maxOf(img.cropWidth, img.cropHeight)
         return if (fast || long / 2 >= maxLongEdge) binned(img, maxOf(1, long / 2 / maxOf(maxLongEdge, 1)))
         else malvar(img)
     }
 
     // ------------------------------------------------------------------ shared
-    private class Prep(val img: DngImage) {
-        val scale = FloatArray(4) { 1f / (img.white - img.black[it]).coerceAtLeast(1f) }
+    private class Prep(val img: RawImage) {
+        /** Colour and black level at crop position [(cy & 1) * 2 + (cx & 1)]. */
+        val cfa = IntArray(4) { img.cfa.color(img.cropY + it / 2, img.cropX + it % 2) }
+        val black = FloatArray(4) { img.blackAt(img.cropY + it / 2, img.cropX + it % 2) }
+        val scale = FloatArray(4) { 1f / (img.white - black[it]).coerceAtLeast(1f) }
         /** Gain map index for each CFA position, -1 if none. */
         val mapFor = IntArray(4) { pos ->
             val y = img.cropY + pos / 2; val x = img.cropX + pos % 2
@@ -44,19 +52,19 @@ object RawDeveloper {
             val x = img.cropX + cx; val y = img.cropY + cy
             val pos = (cy and 1) * 2 + (cx and 1)
             val raw = (img.data[y * img.rawWidth + x].toInt() and 0xffff).toFloat()
-            var v = ((raw - img.black[pos]) * scale[pos]).coerceIn(0f, 1f)
+            var v = ((raw - black[pos]) * scale[pos]).coerceIn(0f, 1f)
             // clip after white balance so blown highlights stay neutral
-            v = minOf(v * img.wb[img.cfa[pos]], 1f)
+            v = minOf(v * img.wb[cfa[pos]], 1f)
             val m = mapFor[pos]
             if (m >= 0) v *= img.gainMaps[m].gain(x, y, img.rawWidth, img.rawHeight)
             return v
         }
     }
 
-    private class Writer(img: DngImage, val w: Int, val h: Int) {
+    private class Writer(img: RawImage, val w: Int, val h: Int) {
         private val o = img.orientation
-        val outW = if (o == 6 || o == 8) h else w
-        val outH = if (o == 6 || o == 8) w else h
+        val outW = if (o >= 5) h else w
+        val outH = if (o >= 5) w else h
         val buf: ByteBuffer = ByteBuffer.allocateDirect(outW * outH * 8).order(ByteOrder.nativeOrder())
         private val m = img.camToSrgb
         private val one = Half.fromFloat(1f)
@@ -64,8 +72,12 @@ object RawDeveloper {
         fun put(u: Int, v: Int, r: Float, g: Float, b: Float) {
             val x: Int; val y: Int
             when (o) {
+                2 -> { x = w - 1 - u; y = v }
                 3 -> { x = w - 1 - u; y = h - 1 - v }
+                4 -> { x = u; y = h - 1 - v }
+                5 -> { x = v; y = u }
                 6 -> { x = h - 1 - v; y = u }
+                7 -> { x = h - 1 - v; y = w - 1 - u }
                 8 -> { x = v; y = w - 1 - u }
                 else -> { x = u; y = v }
             }
@@ -80,7 +92,7 @@ object RawDeveloper {
     }
 
     // ------------------------------------------------------------------ binning
-    private fun binned(img: DngImage, k: Int): LinearImage {
+    private fun binned(img: RawImage, k: Int): LinearImage {
         val p = Prep(img)
         val cell = 2 * k
         val w = img.cropWidth / cell
@@ -92,7 +104,7 @@ object RawDeveloper {
             sum.fill(0f); cnt.fill(0)
             for (dy in 0 until cell) for (dx in 0 until cell) {
                 val cx = u * cell + dx; val cy = v * cell + dy
-                val c = img.cfa[(cy and 1) * 2 + (cx and 1)]
+                val c = p.cfa[(cy and 1) * 2 + (cx and 1)]
                 sum[c] += p.sample(cx, cy); cnt[c]++
             }
             out.put(u, v, sum[0] / maxOf(cnt[0], 1), sum[1] / maxOf(cnt[1], 1), sum[2] / maxOf(cnt[2], 1))
@@ -101,7 +113,7 @@ object RawDeveloper {
     }
 
     // ------------------------------------------------------------------ Malvar-He-Cutler
-    private fun malvar(img: DngImage): LinearImage {
+    private fun malvar(img: RawImage): LinearImage {
         val p = Prep(img)
         val w = img.cropWidth
         val h = img.cropHeight
@@ -117,11 +129,11 @@ object RawDeveloper {
             val n = at(x, y - 1); val s = at(x, y + 1); val e = at(x + 1, y); val wv = at(x - 1, y)
             val nn = at(x, y - 2); val ss = at(x, y + 2); val ee = at(x + 2, y); val ww = at(x - 2, y)
             val diag = at(x - 1, y - 1) + at(x + 1, y - 1) + at(x - 1, y + 1) + at(x + 1, y + 1)
-            val color = img.cfa[(y and 1) * 2 + (x and 1)]
+            val color = p.cfa[(y and 1) * 2 + (x and 1)]
             val r: Float; val g: Float; val b: Float
             if (color == 1) {
                 // green site: which colour sits left/right of it?
-                val horiz = img.cfa[(y and 1) * 2 + ((x + 1) and 1)]
+                val horiz = p.cfa[(y and 1) * 2 + ((x + 1) and 1)]
                 val h1 = (5 * c + 4 * (e + wv) - diag - (ee + ww) + 0.5f * (nn + ss)) / 8f
                 val v1 = (5 * c + 4 * (n + s) - diag - (nn + ss) + 0.5f * (ee + ww)) / 8f
                 g = c

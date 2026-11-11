@@ -68,7 +68,7 @@ spektrafilm 的流程是 线性 RGB → 胶片曝光 → 显影（DIR 耦合剂�
 - **快门**：保存的是没有处理过的原片，存到系统相册 `DCIM/SpektraLab`。设备支持时是感光元件的原始数据（Camera2 `RAW_SENSOR`，由系统的 DngCreator 写成 DNG）；不支持、或 RAW 无法和预览同时开流时退回最高质量 JPEG。顶栏的标记显示当前会存哪一种。
 - **进图库**：拍完带着相机当前的胶片设置进灯箱，设置之后随时可改，原片不动。每拍一张都会自动冲印，把胶片成片（JPEG）也存到相册。
 - **RAW 冲洗**（`engine/.../raw/`）：自带 DNG 读取器和线性冲洗——黑电平、镜头阴影增益图（GainMap）、白平衡、高光裁切、去马赛克（预览用 2×2 合并，导出用 Malvar-He-Cutler）、相机色彩矩阵（ForwardMatrix 或 ColorMatrix + Bradford）——输出场景线性 RGB 直接进胶片管线，这正是 spektrafilm 设计的输入。没有降噪、锐化和影调曲线。
-- 只支持未压缩的拜耳 DNG（安卓相机写出的那种）；其他 RAW 和压缩 DNG 走系统解码器（8 位，已做过影调处理）。
+- 支持拜耳 DNG：未压缩（8–16 位，含打包位深）或无损 JPEG 压缩，条带或分块，含 LinearizationTable、重复黑电平、ActiveArea（安卓相机、Adobe DNG Converter 和多数相机写出的 DNG）。其他厂商 RAW、LinearRaw（如 ProRAW）、有损 / JPEG XL DNG 暂时走系统解码器（8 位，已做过影调处理）。读取入口是 `RawReader`，共用 TIFF/EXIF 解析、无损 JPEG 解码和位读取器，各厂商格式在此之上逐个接入。
 - 验证：合成 DNG 还原已知场景误差 < 0.6%（两种色彩矩阵路径、四种旋转、增益图）；与 LibRaw 对照颜色差 0.0002（`tools/rawcheck.py`）。**相机本身（取景方向、RAW 开流、不同机型）没有在真机上测过。**
 - 还没有：录像、手动曝光 / 对焦、曝光补偿、参考线、多摄切换（只有变焦档位）、RAW 降噪。重装应用后，之前拍的原片需要重新从「文件」导入才能再读到。
 

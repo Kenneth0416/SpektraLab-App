@@ -97,4 +97,27 @@ class MotionSnapshotTest {
         rule.mainClock.advanceTimeBy(1500)
         shot("ruler_reset_done")
     }
+
+    @Test fun filmAdvanceLeverStroke() {
+        rule.mainClock.autoAdvance = false
+        var stroke by mutableStateOf(0)
+        var cocked by mutableStateOf(false)
+        var frame by mutableStateOf(12)
+        rule.setContent {
+            Row(Modifier.testTag("stage").background(Pal.dark).padding(12.dp)) {
+                FrameCounter(frame)
+                FilmAdvanceLever(cocked, Color(0xFFE9C48A), 0, stroke) { cocked = true; frame++ }
+            }
+        }
+        rule.mainClock.advanceTimeBy(100)
+        shot("lever_rest")
+        rule.runOnUiThread { stroke = 1 }
+        rule.mainClock.advanceTimeBy(160)
+        shot("lever_mid")
+        rule.mainClock.advanceTimeBy(260)
+        shot("lever_full")
+        rule.mainClock.advanceTimeBy(1500)
+        shot("lever_back")
+        assertTrue("a full stroke advances the film", cocked && frame == 13)
+    }
 }

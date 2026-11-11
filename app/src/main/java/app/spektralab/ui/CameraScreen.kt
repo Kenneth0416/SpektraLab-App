@@ -20,6 +20,12 @@ import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
@@ -176,16 +182,66 @@ fun CameraScreen(state: AppState) {
         onDispose { live?.removeObserver(obs) }
     }
 
+
+    // ------------------------------------------------------------------ film transport
+    // Like a mechanical camera: releasing the shutter leaves the frame exposed and the
+    // finder goes to ground glass until the film is advanced with the lever.
+    val prefs = remember { context.getSharedPreferences("camera", android.content.Context.MODE_PRIVATE) }
+    var cocked by remember { mutableStateOf(prefs.getBoolean("cocked", true)) }
+    var frame by remember { mutableIntStateOf(prefs.getInt("frame", 1)) }
+    var autoWind by remember { mutableStateOf(prefs.getBoolean("autoWind", false)) }
+    var nudge by remember { mutableIntStateOf(0) }
+    var autoStroke by remember { mutableIntStateOf(0) }
+    val clarity = remember { Animatable(if (prefs.getBoolean("cocked", true)) 1f else 0f) }
+    LaunchedEffect(Unit) { snapshotFlow { clarity.value }.collect { viewfinder.clarity = it } }
+    fun advanceFilm() {
+        cocked = true
+        frame = frame % 36 + 1
+        prefs.edit().putBoolean("cocked", true).putInt("frame", frame).apply()
+        // the finder snaps back into focus
+        scope.launch { clarity.animateTo(1f, tween(520, easing = LinearOutSlowInEasing)) }
+    }
+
+    // ------------------------------------------------------------------ orientation
+    // The picture is tagged with the way the phone is actually held, also when screen
+    // rotation is locked; controls then turn in place like on other phone cameras.
+    var deviceDeg by remember { mutableIntStateOf(0) }
+    DisposableEffect(Unit) {
+        val l = object : android.view.OrientationEventListener(context) {
+            override fun onOrientationChanged(o: Int) {
+                if (o == ORIENTATION_UNKNOWN) return
+                val snapped = when (o) { in 45 until 135 -> 90; in 135 until 225 -> 180; in 225 until 315 -> 270; else -> 0 }
+                if (snapped != deviceDeg) deviceDeg = snapped
+            }
+        }
+        if (l.canDetectOrientation()) l.enable()
+        onDispose { l.disable() }
+    }
+    val displayDeg = when (androidx.compose.ui.platform.LocalView.current.display?.rotation) {
+        android.view.Surface.ROTATION_90 -> 90; android.view.Surface.ROTATION_180 -> 180; android.view.Surface.ROTATION_270 -> 270; else -> 0
+    }
+    val turn = (((-(deviceDeg + displayDeg)) % 360 + 540) % 360 - 180).let { if (it == -180) 180 else it }
+    val iconTurn by animateFloatAsState(turn.toFloat(), Motion.settle, label = "turn")
+
     // focal-plane shutter: two blades close over the frame and open again
     val blades = remember { Animatable(0f) }
     fun shoot() {
         val s = session ?: return state.say(if (granted) "相机还没准备好" else "需要相机权限")
         if (busy) return
+        if (!cocked) {
+            // shutter is locked until the film is advanced
+            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            nudge++
+            return state.say("先扳一下过片扳手")
+        }
         busy = true
+        cocked = false
+        prefs.edit().putBoolean("cocked", false).apply()
         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
         scope.launch {
             blades.animateTo(1f, tween(70, easing = FastOutLinearInEasing))
             blades.animateTo(0f, tween(260, easing = LinearOutSlowInEasing))
+            clarity.animateTo(0f, tween(320))
         }
         val stamp = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
         val values = ContentValues().apply {
@@ -194,59 +250,71 @@ fun CameraScreen(state: AppState) {
             put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_DCIM + "/SpektraLab")
         }
         s.capture.flashMode = flash
+        s.capture.targetRotation = when (deviceDeg) {
+            90 -> android.view.Surface.ROTATION_270; 180 -> android.view.Surface.ROTATION_180
+            270 -> android.view.Surface.ROTATION_90; else -> android.view.Surface.ROTATION_0
+        }
         val options = ImageCapture.OutputFileOptions.Builder(context.contentResolver, MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values).build()
         s.capture.takePicture(options, ContextCompat.getMainExecutor(context), object : ImageCapture.OnImageSavedCallback {
             override fun onImageSaved(result: ImageCapture.OutputFileResults) {
                 busy = false
                 result.savedUri?.let { state.onCaptured(it) } ?: state.say("原片没有保存下来")
+                if (autoWind) autoStroke++
             }
 
             override fun onError(e: ImageCaptureException) {
                 busy = false
+                // nothing was exposed: the frame is still fresh
+                cocked = true
+                prefs.edit().putBoolean("cocked", true).apply()
+                scope.launch { clarity.animateTo(1f, tween(300)) }
                 state.say("拍摄失败：${e.message ?: e.imageCaptureError}")
             }
         })
     }
+    val shootNow by rememberUpdatedState(::shoot)
+    LaunchedEffect(Unit) { state.shutterKey.collect { shootNow() } }
 
-    // layout: the same four parts as the darkroom, so foldable postures work the same way
+    val config = LocalConfiguration.current
+    val landscape = config.orientation == Configuration.ORIENTATION_LANDSCAPE
     val fold = LocalFold.current
     var origin by remember { mutableStateOf(Offset.Zero) }
-    val mode = when {
-        fold.posture == Posture.TABLETOP -> EditorMode.TABLETOP
-        fold.posture == Posture.BOOK -> EditorMode.BOOK
-        widthClass() != WidthClass.COMPACT -> EditorMode.SIDE
-        else -> EditorMode.COMPACT
-    }
+    val hinge = fold.hinge?.translate(-origin)
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    var toolsOpen by rememberSaveable { mutableStateOf(false) }
     val items by state.library.items.collectAsState()
     val last = items.firstOrNull()
+    val positive = state.app.engine.film(LookMapper.filmStock(look)).isPositive
 
-    EditorLayout(mode, fold.hinge?.translate(-origin), Modifier.fillMaxSize().background(Pal.dark).statusBarsPadding().navigationBarsPadding()
-        .displayCutoutPadding().onGloballyPositioned { origin = it.positionInWindow() }) {
-        // 0. top bar
-        Row(Modifier.fillMaxWidth().dealIn(0, fromY = -40f).padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("‹ 灯箱", color = Pal.text, fontSize = 15.sp, modifier = Modifier.springClick { state.closeCamera() }.padding(6.dp))
-            Spacer(Modifier.width(8.dp))
-            // what the shutter will keep as the original
-            AnimatedContent(session?.raw, label = "format", transitionSpec = { fadeIn() togetherWith fadeOut() }) { raw ->
-                Text(when (raw) { true -> "RAW · DNG"; false -> "JPEG"; null -> "…" }, fontFamily = Fonts.mono, fontSize = 10.sp,
-                    color = if (raw == true) accent else Pal.dim,
-                    modifier = Modifier.border(1.dp, if (raw == true) accent else Pal.off, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp))
-            }
-            Spacer(Modifier.weight(1f))
-            val flashLabel = when (flash) { ImageCapture.FLASH_MODE_ON -> "闪光 开"; ImageCapture.FLASH_MODE_AUTO -> "闪光 自动"; else -> "闪光 关" }
-            Text(flashLabel, color = if (flash == ImageCapture.FLASH_MODE_OFF) Pal.dim else Pal.text, fontSize = 13.sp, modifier = Modifier.springClick {
-                flash = when (flash) {
-                    ImageCapture.FLASH_MODE_OFF -> ImageCapture.FLASH_MODE_AUTO
-                    ImageCapture.FLASH_MODE_AUTO -> ImageCapture.FLASH_MODE_ON
-                    else -> ImageCapture.FLASH_MODE_OFF
-                }
-            }.padding(8.dp))
-            Text("翻转", color = Pal.text, fontSize = 13.sp, modifier = Modifier.springClick { front = !front; zoom = 1f }.padding(8.dp))
-            Text("配方", color = Pal.text, fontSize = 15.sp, modifier = Modifier.springClick { state.openRecipes() }.padding(8.dp))
+    // ------------------------------------------------------------------ parts
+    val topItems: @Composable (@Composable () -> Unit) -> Unit = { gap ->
+        Text("‹ 灯箱", color = Pal.text, fontSize = 15.sp, modifier = Modifier.springClick { state.closeCamera() }.padding(6.dp))
+        // what the shutter will keep as the original
+        AnimatedContent(session?.raw, label = "format", transitionSpec = { fadeIn() togetherWith fadeOut() }) { raw ->
+            Text(when (raw) { true -> "RAW"; false -> "JPEG"; null -> "…" }, fontFamily = Fonts.mono, fontSize = 10.sp,
+                color = if (raw == true) accent else Pal.dim,
+                modifier = Modifier.padding(6.dp).border(1.dp, if (raw == true) accent else Pal.off, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp))
         }
-        // 1. viewfinder
-        Box(Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 6.dp), contentAlignment = Alignment.Center) {
-            val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+        gap()
+        val flashLabel = when (flash) { ImageCapture.FLASH_MODE_ON -> "闪光 开"; ImageCapture.FLASH_MODE_AUTO -> "闪光 自动"; else -> "闪光 关" }
+        Text(flashLabel, color = if (flash == ImageCapture.FLASH_MODE_OFF) Pal.dim else Pal.text, fontSize = 13.sp, modifier = Modifier.springClick {
+            flash = when (flash) {
+                ImageCapture.FLASH_MODE_OFF -> ImageCapture.FLASH_MODE_AUTO
+                ImageCapture.FLASH_MODE_AUTO -> ImageCapture.FLASH_MODE_ON
+                else -> ImageCapture.FLASH_MODE_OFF
+            }
+        }.padding(8.dp))
+        Text("配方", color = Pal.text, fontSize = 13.sp, modifier = Modifier.springClick { state.openRecipes() }.padding(8.dp))
+        // the film settings stay out of the way until asked for
+        val toolsInk by animateColorAsState(if (toolsOpen) Pal.dink else Pal.text, tween(180), label = "toolsInk")
+        val toolsBg by animateColorAsState(if (toolsOpen) accent else Color.Transparent, tween(180), label = "toolsBg")
+        Text("调整", color = toolsInk, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 2.dp)
+            .springClick { toolsOpen = !toolsOpen }.clip(RoundedCornerShape(14.dp)).background(toolsBg)
+            .border(1.dp, accent, RoundedCornerShape(14.dp)).padding(horizontal = 12.dp, vertical = 5.dp))
+    }
+
+    val viewfinderPart: @Composable (Modifier) -> Unit = { modifier ->
+        Box(modifier.padding(horizontal = 10.dp, vertical = 4.dp), contentAlignment = Alignment.Center) {
             val aspect = if (landscape) 4f / 3f else 3f / 4f
             BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 val boxAspect = if (maxHeight.value > 0f) maxWidth.value / maxHeight.value else 1f
@@ -260,6 +328,15 @@ fun CameraScreen(state: AppState) {
                             runCatching { s.camera.cameraControl.startFocusAndMetering(FocusMeteringAction.Builder(point).build()) }
                             focusAt = p
                             scope.launch { focusRing.snapTo(1f); focusRing.animateTo(0f, tween(900)) }
+                        }
+                    }
+                    .pointerInput(session, zoomRange) {
+                        // pinch to zoom
+                        detectTransformGestures { _, _, change, _ ->
+                            if (change != 1f) {
+                                zoom = (zoom * change).coerceIn(zoomRange.first, zoomRange.second)
+                                session?.camera?.cameraControl?.setZoomRatio(zoom)
+                            }
                         }
                     }) {
                     if (granted) AndroidView({ previewView }, Modifier.fillMaxSize())
@@ -281,6 +358,8 @@ fun CameraScreen(state: AppState) {
                         if (b < size.height) drawRect(mask, Offset(0f, b), Size(size.width, size.height - b))
                         if (l > 0f) drawRect(mask, Offset(0f, t), Size(l, b - t))
                         if (r < size.width) drawRect(mask, Offset(r, t), Size(size.width - r, b - t))
+                        // frame not advanced: the finder is dim ground glass
+                        if (clarity.value < 1f) drawRect(Pal.dark.copy(alpha = 0.5f * (1f - clarity.value)))
                         // shutter blades
                         if (blades.value > 0f) {
                             val hgt = size.height / 2 * blades.value
@@ -296,54 +375,171 @@ fun CameraScreen(state: AppState) {
                     }
                     CropCorners(Modifier.fillMaxSize(), busy)
                     Text(summary(look).uppercase(Locale.ROOT), fontFamily = Fonts.mono, fontSize = 9.sp, color = Pal.text,
-                        modifier = Modifier.align(Alignment.BottomStart).padding(10.dp).background(Color(0x99140807)).padding(horizontal = 6.dp, vertical = 2.dp))
-                }
-            }
-            Safelight(Modifier.align(Alignment.TopEnd).padding(4.dp))
-        }
-        // 2. shutter row
-        Row(Modifier.fillMaxWidth().dealIn(1, fromY = 0f).padding(horizontal = 18.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            // last frame on the lightbox: tap to open it in the darkroom
-            Box(Modifier.size(52.dp).clip(RoundedCornerShape(6.dp)).background(Pal.line)
-                .semantics { contentDescription = "上一张" }
-                .springClick(0.9f) { last?.let { state.openEdit(it.id) } ?: state.say("还没有拍过") }) {
-                if (last != null) {
-                    val thumb by produceState(state.app.thumbs.cached(last), last.id, last.look) { value = state.app.thumbs.get(last) }
-                    thumb?.let { Image(it.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
-                }
-            }
-            Spacer(Modifier.weight(1f))
-            // shutter release: the inner disc sinks while the exposure is being saved
-            val sink by animateFloatAsState(if (busy) 0.72f else 1f, Motion.press, label = "shutter")
-            Box(Modifier.size(72.dp).semantics { contentDescription = "快门" }.springClick(0.9f) { shoot() }
-                .border(3.dp, Pal.text, CircleShape).padding(7.dp), contentAlignment = Alignment.Center) {
-                Box(Modifier.fillMaxSize().graphicsLayer { scaleX = sink; scaleY = sink }.clip(CircleShape).background(if (busy) accent else Pal.text))
-            }
-            Spacer(Modifier.weight(1f))
-            Column(horizontalAlignment = Alignment.End) {
-                val stops = buildList {
-                    val (min, max) = zoomRange
-                    if (min < 0.95f) add(min)
-                    add(1f)
-                    if (max >= 2f) add(2f)
-                    if (max >= 5f) add(5f)
-                }
-                Row {
-                    stops.forEach { z ->
-                        val on = kotlin.math.abs(zoom - z) < 0.05f
-                        Text(if (z < 1f) "%.1f".format(z) else "${z.toInt()}×", fontFamily = Fonts.mono, fontSize = 11.sp,
-                            color = if (on) Pal.dink else Pal.text, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
-                            modifier = Modifier.padding(start = 6.dp).springClick {
-                                zoom = z
-                                session?.camera?.cameraControl?.setZoomRatio(z)
-                            }.clip(CircleShape).background(if (on) accent else Color.Transparent)
-                                .border(1.dp, if (on) accent else Pal.off, CircleShape).padding(horizontal = 8.dp, vertical = 6.dp))
+                        modifier = Modifier.align(Alignment.TopStart).padding(10.dp).background(Color(0x99140807)).padding(horizontal = 6.dp, vertical = 2.dp))
+                    // prompt while the frame is spent
+                    androidx.compose.animation.AnimatedVisibility(!cocked && !busy, Modifier.align(Alignment.Center),
+                        enter = fadeIn(tween(300, delayMillis = 250)), exit = fadeOut(tween(120))) {
+                        Text(if (autoWind) "正在过片…" else "扳动过片扳手，取景才会清晰", color = Pal.text, fontSize = 13.sp,
+                            modifier = Modifier.graphicsLayer { rotationZ = iconTurn }
+                                .background(Color(0xB3140807), RoundedCornerShape(14.dp)).padding(horizontal = 14.dp, vertical = 7.dp))
+                    }
+                    // zoom steps sit on the lower edge of the finder, where thumbs expect them
+                    val stops = buildList {
+                        val (min, max) = zoomRange
+                        if (min < 0.95f) add(min)
+                        add(1f)
+                        if (max >= 2f) add(2f)
+                        if (max >= 5f) add(5f)
+                    }
+                    Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp)
+                        .background(Color(0x80140807), CircleShape).padding(3.dp)) {
+                        val nearest = stops.minByOrNull { kotlin.math.abs(it - zoom) }
+                        stops.forEach { z ->
+                            val on = z == nearest
+                            val label = if (on && kotlin.math.abs(zoom - z) > 0.05f) "%.1f×".format(zoom)
+                                else if (z < 1f) "%.1f".format(z).trimStart('0') else "${z.toInt()}" + if (on) "×" else ""
+                            Text(label, fontFamily = Fonts.mono, fontSize = 11.sp,
+                                color = if (on) Pal.dink else Pal.text, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
+                                modifier = Modifier.padding(horizontal = 2.dp).springClick {
+                                    zoom = z
+                                    session?.camera?.cameraControl?.setZoomRatio(z)
+                                }.graphicsLayer { rotationZ = iconTurn }.clip(CircleShape).background(if (on) accent else Color.Transparent)
+                                    .padding(horizontal = 9.dp, vertical = 7.dp))
+                        }
                     }
                 }
             }
+            Safelight(Modifier.align(Alignment.TopEnd).padding(2.dp))
         }
-        // 3. the same tools as the darkroom, bound to the look loaded in the camera
-        ToolDeck(state, tool, { tool = it }, look, accent, state.app.engine.film(LookMapper.filmStock(look)).isPositive, isVideo = false,
-            onSet = { _, l -> state.setCamLook(l) }, onApply = { state.setCamLook(it) })
+    }
+
+    val thumbPart: @Composable () -> Unit = {
+        // last frame on the lightbox: tap to open it in the darkroom
+        Box(Modifier.size(52.dp).graphicsLayer { rotationZ = iconTurn }.clip(RoundedCornerShape(6.dp)).background(Pal.line)
+            .semantics { contentDescription = "上一张" }
+            .springClick(0.9f) { last?.let { state.openEdit(it.id) } ?: state.say("还没有拍过") }) {
+            if (last != null) {
+                val thumb by produceState(state.app.thumbs.cached(last), last.id, last.look) { value = state.app.thumbs.get(last) }
+                Crossfade(thumb, label = "last") { t ->
+                    if (t != null) Image(t.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                }
+            }
+        }
+    }
+    val shutterPart: @Composable () -> Unit = {
+        // shutter release: locked (hollow, dim) until the film is advanced
+        val sink by animateFloatAsState(if (busy) 0.72f else 1f, Motion.press, label = "shutter")
+        val ready by animateFloatAsState(if (cocked) 1f else 0f, tween(260), label = "ready")
+        Box(Modifier.size(76.dp).semantics { contentDescription = if (cocked) "快门" else "快门，未过片" }.springClick(0.9f) { shoot() }
+            .border(3.dp, Pal.text.copy(alpha = 0.45f + 0.55f * ready), CircleShape).padding(7.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxSize().graphicsLayer { scaleX = sink; scaleY = sink; alpha = 0.18f + 0.82f * ready }
+                .clip(CircleShape).background(if (busy) accent else Pal.text))
+        }
+    }
+    val flipPart: @Composable () -> Unit = {
+        val spin = remember { Animatable(0f) }
+        Box(Modifier.size(52.dp).semantics { contentDescription = "切换前后镜头" }
+            .springClick(0.9f) {
+                front = !front; zoom = 1f
+                scope.launch { spin.snapTo(0f); spin.animateTo(180f, Motion.settle) }
+            }.border(1.dp, Pal.off, CircleShape), contentAlignment = Alignment.Center) {
+            Text("⟲", color = Pal.text, fontSize = 24.sp, modifier = Modifier.graphicsLayer { rotationZ = iconTurn + spin.value })
+        }
+    }
+    val transportPart: @Composable (Boolean) -> Unit = { vertical ->
+        val counter: @Composable () -> Unit = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.graphicsLayer { rotationZ = iconTurn }) {
+                FrameCounter(frame)
+                Text("/ 36", fontFamily = Fonts.mono, fontSize = 8.sp, color = Pal.dim)
+            }
+        }
+        val motor: @Composable () -> Unit = {
+            // motor drive for those who do not want to wind every frame
+            Text(if (autoWind) "自动过片 开" else "自动过片 关", color = if (autoWind) accent else Pal.dim, fontSize = 11.sp,
+                modifier = Modifier.springClick {
+                    autoWind = !autoWind
+                    prefs.edit().putBoolean("autoWind", autoWind).apply()
+                    if (autoWind && !cocked) autoStroke++
+                }.padding(6.dp))
+        }
+        val lever: @Composable () -> Unit = { FilmAdvanceLever(cocked, accent, nudge, autoStroke) { advanceFilm() } }
+        if (vertical) Column(horizontalAlignment = Alignment.CenterHorizontally) { counter(); lever(); motor() }
+        else Row(Modifier.fillMaxWidth().padding(start = 18.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            counter(); Spacer(Modifier.width(10.dp)); motor(); Spacer(Modifier.weight(1f)); lever()
+        }
+    }
+    val toolsPart: @Composable (Modifier) -> Unit = { modifier ->
+        Box(modifier.clip(RoundedCornerShape(14.dp)).background(Pal.darkPanel.copy(alpha = 0.96f))) {
+            ToolDeck(state, tool, { tool = it }, look, accent, positive, isVideo = false,
+                onSet = { _, l -> state.setCamLook(l) }, onApply = { state.setCamLook(it) })
+        }
+    }
+
+    // ------------------------------------------------------------------ layout
+    Box(Modifier.fillMaxSize().background(Pal.dark).statusBarsPadding().navigationBarsPadding()
+        .displayCutoutPadding().onGloballyPositioned { origin = it.positionInWindow() }) {
+        val tabletop = fold.posture == Posture.TABLETOP && hinge != null && hinge.top > 0f
+        val book = fold.posture == Posture.BOOK && hinge != null && hinge.left > 0f
+        when {
+            tabletop -> Column(Modifier.fillMaxSize()) {
+                // half folded on a table: finder on the upright half, everything else on the flat half
+                Column(Modifier.fillMaxWidth().height(with(density) { hinge!!.top.toDp() })) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) { topItems { Spacer(Modifier.weight(1f)) } }
+                    viewfinderPart(Modifier.fillMaxWidth().weight(1f))
+                }
+                Spacer(Modifier.height(with(density) { hinge!!.height.toDp() }))
+                Row(Modifier.fillMaxSize()) {
+                    toolsPart(Modifier.weight(1f).fillMaxHeight().padding(8.dp))
+                    Column(Modifier.fillMaxHeight().padding(end = 12.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.SpaceEvenly) {
+                        transportPart(true); shutterPart(); Row(verticalAlignment = Alignment.CenterVertically) { thumbPart(); Spacer(Modifier.width(14.dp)); flipPart() }
+                    }
+                }
+            }
+            book -> Row(Modifier.fillMaxSize()) {
+                Column(Modifier.fillMaxHeight().width(with(density) { hinge!!.left.toDp() })) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) { topItems { Spacer(Modifier.weight(1f)) } }
+                    viewfinderPart(Modifier.fillMaxWidth().weight(1f))
+                }
+                Spacer(Modifier.width(with(density) { hinge!!.width.toDp() }))
+                Column(Modifier.fillMaxSize()) {
+                    toolsPart(Modifier.fillMaxWidth().weight(1f).padding(8.dp))
+                    transportPart(false)
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 26.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween) { thumbPart(); shutterPart(); flipPart() }
+                }
+            }
+            landscape -> Row(Modifier.fillMaxSize()) {
+                // held sideways: settings on the left edge, shutter and lever under the right thumb
+                Column(Modifier.fillMaxHeight().padding(vertical = 6.dp, horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.SpaceBetween) { topItems { } }
+                Box(Modifier.weight(1f).fillMaxHeight()) {
+                    viewfinderPart(Modifier.fillMaxSize())
+                    androidx.compose.animation.AnimatedVisibility(toolsOpen, Modifier.align(Alignment.CenterEnd),
+                        enter = slideInHorizontally(Motion.glideOffset) { it } + fadeIn(), exit = slideOutHorizontally(tween(200)) { it } + fadeOut()) {
+                        toolsPart(Modifier.width(340.dp).fillMaxHeight().padding(6.dp))
+                    }
+                }
+                Column(Modifier.fillMaxHeight().padding(horizontal = 10.dp, vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.SpaceBetween) {
+                    flipPart(); transportPart(true); shutterPart(); thumbPart()
+                }
+            }
+            else -> Column(Modifier.fillMaxSize()) {
+                Row(Modifier.fillMaxWidth().dealIn(0, fromY = -40f).padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) { topItems { Spacer(Modifier.weight(1f)) } }
+                Box(Modifier.fillMaxWidth().weight(1f)) {
+                    viewfinderPart(Modifier.fillMaxSize())
+                    androidx.compose.animation.AnimatedVisibility(toolsOpen, Modifier.align(Alignment.BottomCenter),
+                        enter = slideInVertically(Motion.glideOffset) { it } + fadeIn(), exit = slideOutVertically(tween(200)) { it } + fadeOut()) {
+                        toolsPart(Modifier.fillMaxWidth().height(300.dp).padding(6.dp))
+                    }
+                }
+                transportPart(false)
+                Row(Modifier.fillMaxWidth().dealIn(1, fromY = 60f).padding(horizontal = 30.dp).padding(bottom = 14.dp, top = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    thumbPart(); shutterPart(); flipPart()
+                }
+            }
+        }
     }
 }

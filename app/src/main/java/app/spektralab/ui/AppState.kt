@@ -50,6 +50,9 @@ class AppState(application: Application) : AndroidViewModel(application) {
         app.getSharedPreferences("camera", android.content.Context.MODE_PRIVATE).edit().putString("look", LookJson.toJson(look).toString()).apply()
     }
 
+    /** Hardware shutter (volume keys) while the camera is open. */
+    val shutterKey = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
     fun openCamera() { sheet.value = Sheet.NONE; selecting.value = false; picked.value = emptyList(); cameraOpen.value = true }
     fun closeCamera() { cameraOpen.value = false; sheet.value = Sheet.NONE }
 

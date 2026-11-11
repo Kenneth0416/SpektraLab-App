@@ -30,6 +30,16 @@ import app.spektralab.ui.Sheets
 class MainActivity : ComponentActivity() {
     private val state: AppState by viewModels()
 
+    /** Volume keys release the shutter in the camera, like on every phone camera. */
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent): Boolean {
+        val isVolume = keyCode == android.view.KeyEvent.KEYCODE_VOLUME_DOWN || keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP
+        if (isVolume && state.cameraOpen.value && state.editId.value == null) {
+            if (event.repeatCount == 0) state.shutterKey.tryEmit(Unit)
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()

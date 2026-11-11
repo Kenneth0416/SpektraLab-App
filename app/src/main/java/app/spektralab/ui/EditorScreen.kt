@@ -17,6 +17,10 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.FloatExponentialDecaySpec
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.animateDecay
+import kotlinx.coroutines.Job
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.graphics.Brush
@@ -32,7 +36,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -54,7 +57,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -163,6 +165,20 @@ fun EditorScreen(state: AppState, id: Long) {
         }
     }
     LaunchedEffect(hold) { preview.setOriginal(hold) }
+    // zoom lives in the renderer (sharp re-developed print, see FilmPreviewView.setZoom)
+    var zoom by remember { mutableStateOf(PreviewZoom.NONE) }
+    var zoomAnim by remember { mutableStateOf<Job?>(null) }
+    val zoomScope = rememberCoroutineScope()
+    LaunchedEffect(Unit) { snapshotFlow { zoom }.collect { preview.setZoom(it.window()) } }
+    fun zoomTo(target: PreviewZoom) {
+        zoomAnim?.cancel()
+        val from = zoom
+        zoomAnim = zoomScope.launch {
+            // critically damped like the rest of the darkroom: an overshoot would uncover the frame
+            animate(0f, 1f, animationSpec = Motion.glide) { t, _ -> zoom = lerp(from, target, t) }
+            zoom = target
+        }
+    }
 
     val fold = LocalFold.current
     val wide = widthClass() != WidthClass.COMPACT
@@ -197,11 +213,28 @@ fun EditorScreen(state: AppState, id: Long) {
                 Framing.compute(item.width.coerceAtLeast(1), item.height.coerceAtLeast(1), look, 2048)
             }
             val aspect = framing.outWidth.toFloat() / framing.outHeight
+            // another photo or another frame shape: start from the whole print again
+            LaunchedEffect(item.id, framing) { zoomAnim?.cancel(); zoom = PreviewZoom.NONE }
             BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 // fit the frame into whatever the pane gives us (portrait or landscape pane)
                 val boxAspect = if (maxHeight.value > 0f) maxWidth.value / maxHeight.value else 1f
                 Box(Modifier.aspectRatio(aspect, matchHeightConstraintsFirst = aspect < boxAspect)
-                    .pointerInput(Unit) { detectTapGestures(onPress = { hold = true; tryAwaitRelease(); hold = false }) }) {
+                    .previewGestures(
+                        zoom = { zoom },
+                        onZoom = { zoomAnim?.cancel(); zoom = it },
+                        onRelease = { anchor, v ->
+                            val rest = zoom.settled(anchor.x, anchor.y)
+                            if (rest != zoom || v.getDistance() < 0.3f) zoomTo(rest)
+                            else zoomAnim = zoomScope.launch {
+                                // fling: glide on and stop at the edges (clamped every frame)
+                                val decay = FloatExponentialDecaySpec(frictionMultiplier = 1.6f, absVelocityThreshold = 0.01f)
+                                launch { animateDecay(zoom.x, v.x, decay) { x, _ -> zoom = zoom.copy(x = x).clamped() } }
+                                launch { animateDecay(zoom.y, v.y, decay) { y, _ -> zoom = zoom.copy(y = y).clamped() } }
+                            }
+                        },
+                        onDoubleTap = { p -> zoomTo(zoom.doubleTapTarget(p.x, p.y)) },
+                        onHold = { hold = it },
+                    )) {
                     AndroidView({ preview }, Modifier.fillMaxSize())
                     // spektrafilm's virtual photo-paper back until the first frame is developed
                     androidx.compose.animation.AnimatedVisibility(!developed, enter = EnterTransition.None, exit = fadeOut(tween(350))) {
@@ -218,6 +251,13 @@ fun EditorScreen(state: AppState, id: Long) {
                                 (slideOutVertically(tween(140)) { -it } + fadeOut(tween(100)))
                         }) { label ->
                         Text(label, fontFamily = Fonts.mono, fontSize = 9.sp, color = Pal.text,
+                            modifier = Modifier.background(Color(0x99140807)).padding(horizontal = 6.dp, vertical = 2.dp))
+                    }
+                    // zoom readout; only its text reads the per-frame zoom, not the whole preview
+                    val showZoom by remember { derivedStateOf { zoom.scale > 1.05f } }
+                    androidx.compose.animation.AnimatedVisibility(showZoom, Modifier.align(Alignment.TopStart).padding(10.dp),
+                        enter = fadeIn(tween(150)), exit = fadeOut(tween(250))) {
+                        Text(String.format(Locale.ROOT, "%.1f×", zoom.scale), fontFamily = Fonts.mono, fontSize = 9.sp, color = Pal.text,
                             modifier = Modifier.background(Color(0x99140807)).padding(horizontal = 6.dp, vertical = 2.dp))
                     }
                 }

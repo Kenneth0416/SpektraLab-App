@@ -52,7 +52,9 @@ fun LibraryScreen(state: AppState) {
     val glow by animateFloatAsState(if (lit) 1f else 0.6f, tween(700, easing = FastOutSlowInEasing), label = "glow")
 
     val shown = items.filter { filter == Filter.ALL || (filter == Filter.VIDEO) == it.isVideo }
-    val strips = remember(shown) { buildStrips(shown) }
+    // three frames per strip on a phone, more on an unfolded inner screen / tablet
+    val perStrip = when (widthClass()) { WidthClass.COMPACT -> 3; WidthClass.MEDIUM -> 4; WidthClass.EXPANDED -> 6 }
+    val strips = remember(shown, perStrip) { buildStrips(shown, perStrip) }
 
     Box(Modifier.fillMaxSize().background(
         Brush.radialGradient(listOf(Pal.glow, Pal.paper.copy(alpha = 0.96f + 0.04f * glow)), radius = 1800f)
@@ -103,7 +105,7 @@ fun LibraryScreen(state: AppState) {
             }
         }
         // bottom bar
-        Row(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(16.dp).fillMaxWidth()
+        Row(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(16.dp).widthIn(max = SheetMaxWidth).fillMaxWidth()
             .clip(RoundedCornerShape(26.dp)).background(Pal.ink).padding(horizontal = 8.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
             val clip by state.clip.collectAsState()
@@ -140,7 +142,7 @@ private fun EmptyLightbox(modifier: Modifier, filter: Filter) {
     }
 }
 
-class Strip(val key: String, val label: String, val rot: Float, val frames: List<LibraryItem>)
+class Strip(val key: String, val label: String, val rot: Float, val frames: List<LibraryItem>, val slots: Int)
 
 private fun dayLabel(t: Long): String {
     val c = Calendar.getInstance().apply { timeInMillis = t }
@@ -156,13 +158,13 @@ private fun dayLabel(t: Long): String {
     }
 }
 
-private fun buildStrips(items: List<LibraryItem>): List<Strip> {
+private fun buildStrips(items: List<LibraryItem>, perStrip: Int): List<Strip> {
     val rots = floatArrayOf(-0.7f, 0.5f, -0.4f, 0.8f)
     val out = ArrayList<Strip>()
     val byDay = items.sortedByDescending { it.dateTaken }.groupBy { dayLabel(it.dateTaken) }
     for ((label, group) in byDay) {
-        group.chunked(3).forEachIndexed { i, frames ->
-            out += Strip("${frames.first().id}", if (i == 0) label else "", rots[out.size % 4], frames)
+        group.chunked(perStrip).forEachIndexed { i, frames ->
+            out += Strip("${frames.first().id}", if (i == 0) label else "", rots[out.size % 4], frames, perStrip)
         }
     }
     return out
@@ -180,7 +182,7 @@ private fun FilmStrip(state: AppState, strip: Strip, selecting: Boolean, picked:
                     strip.frames.forEach { item ->
                         Frame(state, item, selecting, picked.indexOf(item.id), Modifier.weight(1f))
                     }
-                    repeat(3 - strip.frames.size) { Spacer(Modifier.weight(1f)) }
+                    repeat(strip.slots - strip.frames.size) { Spacer(Modifier.weight(1f)) }
                 }
                 Sprockets("")
             }

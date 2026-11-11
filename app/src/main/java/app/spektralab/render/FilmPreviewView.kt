@@ -36,6 +36,7 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
 
     fun setPhoto(bitmap: Bitmap, autoEv: Float, seed: Int) = queueEvent {
         r.pendingBitmap = bitmap
+        r.currentBitmap = bitmap
         r.autoEv = autoEv
         r.seed = seed
         r.video = null
@@ -51,6 +52,7 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
     fun setLook(look: Look, setup: LookSetup) = queueEvent {
         r.look = look
         r.pendingSetup = setup
+        r.currentSetup = setup
         requestRender()
     }
 
@@ -68,13 +70,16 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
         queueEvent { r.releaseGl() }
     }
 
-    class VideoRequest(val uri: Uri, val rotation: Int, val width: Int, val height: Int)
+    class VideoRequest(val uri: Uri, val rotation: Int, val width: Int, val height: Int,
+                       val resumeMs: Int = 0, val resumePlaying: Boolean = false)
 
     private inner class PreviewRenderer : Renderer {
         var renderer: FilmRenderer? = null
         var pendingSetup: LookSetup? = null
         var look: Look = Look.DEFAULT
         var pendingBitmap: Bitmap? = null
+        var currentBitmap: Bitmap? = null
+        var currentSetup: LookSetup? = null
         var photoTex = 0
         var photoW = 0
         var photoH = 0
@@ -94,12 +99,23 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
         private var overlayKey = ""
 
         override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-            renderer?.release()
+            // A new EGL context (first start, or the view was re-attached after a fold /
+            // unfold): every GL object is gone, so re-upload what was on screen.
+            val restore = renderer != null
             renderer = FilmRenderer()
             photoTex = 0
             oesTex = 0
             overlayTex = 0
             overlayKey = ""
+            if (restore) {
+                pendingSetup = currentSetup
+                if (video == null) pendingBitmap = currentBitmap
+                video?.let { v ->
+                    val p = player
+                    videoRequest = VideoRequest(v.uri, v.rotation, v.width, v.height,
+                        p?.currentPosition ?: 0, p?.isPlaying ?: false)
+                }
+            }
         }
 
         override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -194,7 +210,11 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
                 mp.setDataSource(context, req.uri)
                 mp.setSurface(surface)
                 mp.isLooping = true
-                mp.setOnPreparedListener { it.seekTo(0); onVideoState?.invoke(false, 0) }
+                mp.setOnPreparedListener {
+                    it.seekTo(req.resumeMs)
+                    if (req.resumePlaying) it.start()
+                    onVideoState?.invoke(req.resumePlaying, req.resumeMs.toLong())
+                }
                 mp.setOnSeekCompleteListener { requestRender() }
                 mp.prepareAsync()
                 player = mp

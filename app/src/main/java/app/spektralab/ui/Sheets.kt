@@ -31,6 +31,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import app.spektralab.data.Library
 import app.spektralab.engine.Catalog
 import app.spektralab.export.PhotoFormat
@@ -39,7 +41,13 @@ import app.spektralab.export.PhotoFormat
 fun Sheets(state: AppState) {
     val sheet by state.sheet.collectAsState()
     val dark = state.editId.collectAsState().value != null
-    Box(Modifier.fillMaxSize()) {
+    val fold = LocalFold.current
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    var box by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
+    // tabletop: keep sheets on the lower half, below the hinge
+    val maxSheet = fold.hinge?.takeIf { fold.posture == Posture.TABLETOP && box.height > 0f && it.bottom < box.bottom }
+        ?.let { with(density) { (box.bottom - it.bottom).toDp() } } ?: androidx.compose.ui.unit.Dp.Infinity
+    Box(Modifier.fillMaxSize().onGloballyPositioned { box = it.boundsInWindow() }) {
         if (sheet != Sheet.NONE) {
             Box(Modifier.fillMaxSize().background(Color(0x88000000))
                 .clickable(remember { MutableInteractionSource() }, null) {
@@ -49,8 +57,9 @@ fun Sheets(state: AppState) {
         AnimatedVisibility(sheet != Sheet.NONE, Modifier.align(Alignment.BottomCenter),
             enter = slideInVertically { it } + fadeIn(), exit = slideOutVertically { it } + fadeOut()) {
             val bg = if (dark || sheet == Sheet.EXPORT || sheet == Sheet.PROGRESS) Pal.darkPanel else Pal.paper
-            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp)).background(bg)
+            Column(Modifier.widthIn(max = SheetMaxWidth).heightIn(max = maxSheet).fillMaxWidth().clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp)).background(bg)
                 .clickable(remember { MutableInteractionSource() }, null) {}
+                .verticalScroll(rememberScrollState())
                 .navigationBarsPadding().padding(20.dp)) {
                 when (sheet) {
                     Sheet.IMPORT -> ImportSheet(state)

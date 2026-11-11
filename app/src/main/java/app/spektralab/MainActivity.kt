@@ -11,12 +11,15 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import app.spektralab.ui.AppState
 import app.spektralab.ui.EditorScreen
 import app.spektralab.ui.LibraryScreen
+import app.spektralab.ui.LocalFold
+import app.spektralab.ui.rememberFoldState
 import app.spektralab.ui.Sheet
 import app.spektralab.ui.Sheets
 
@@ -27,7 +30,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            MaterialTheme {
+            val fold = rememberFoldState(this)
+            MaterialTheme { CompositionLocalProvider(LocalFold provides fold) {
                 val editId by state.editId.collectAsState()
                 val sheet by state.sheet.collectAsState()
                 val selecting by state.selecting.collectAsState()
@@ -46,7 +50,7 @@ class MainActivity : ComponentActivity() {
                     }
                     Sheets(state)
                 }
-            }
+            } }
         }
     }
 }

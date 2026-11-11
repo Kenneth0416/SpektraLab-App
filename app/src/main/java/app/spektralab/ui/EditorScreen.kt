@@ -13,6 +13,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -75,7 +82,7 @@ fun EditorScreen(state: AppState, id: Long) {
     val accent = Color(Catalog.film(look.film).accent)
     val history by state.history.collectAsState()
     val redo by state.redo.collectAsState()
-    var tool by remember { mutableStateOf("film") }
+    var tool by rememberSaveable { mutableStateOf("film") }
     var playing by remember { mutableStateOf(false) }
     var hold by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -88,7 +95,7 @@ fun EditorScreen(state: AppState, id: Long) {
         playing = false
         if (item.isVideo) preview.setVideo(Uri.parse(item.uri), item.rotation, item.width, item.height, item.autoEv)
         else {
-            val bmp = withContext(Dispatchers.IO) { runCatching { Media.decodeImage(context, Uri.parse(item.uri), 2048) }.getOrNull() }
+            val bmp = withContext(Dispatchers.IO) { runCatching { Media.decodeImage(context, Uri.parse(item.uri), previewDecodeEdge(context)) }.getOrNull() }
             if (bmp != null) preview.setPhoto(bmp, item.autoEv, item.id.toInt()) else state.say("无法读取原片")
         }
     }
@@ -102,8 +109,20 @@ fun EditorScreen(state: AppState, id: Long) {
     }
     LaunchedEffect(hold) { preview.setOriginal(hold) }
 
-    Column(Modifier.fillMaxSize().background(Pal.dark).statusBarsPadding().navigationBarsPadding()) {
-        // top bar
+    val fold = LocalFold.current
+    val wide = widthClass() != WidthClass.COMPACT
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    val mode = when {
+        fold.posture == Posture.TABLETOP -> EditorMode.TABLETOP
+        fold.posture == Posture.BOOK -> EditorMode.BOOK
+        wide -> EditorMode.SIDE
+        else -> EditorMode.COMPACT
+    }
+    val hinge = fold.hinge?.translate(-origin)
+
+    EditorLayout(mode, hinge, Modifier.fillMaxSize().background(Pal.dark).statusBarsPadding().navigationBarsPadding()
+        .displayCutoutPadding().onGloballyPositioned { origin = it.positionInWindow() }) {
+        // 0. top bar
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("‹ 灯箱", color = Pal.text, fontSize = 15.sp, modifier = Modifier.clickable { state.back() }.padding(6.dp))
             Spacer(Modifier.weight(1f))
@@ -117,23 +136,27 @@ fun EditorScreen(state: AppState, id: Long) {
                 modifier = Modifier.clip(RoundedCornerShape(16.dp)).background(accent)
                     .clickable { state.openExport(listOf(item.id)) }.padding(horizontal = 14.dp, vertical = 6.dp))
         }
-        // preview
-        Box(Modifier.fillMaxWidth().weight(1f).padding(horizontal = 14.dp, vertical = 6.dp), contentAlignment = Alignment.Center) {
+        // 1. preview
+        Box(Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 6.dp), contentAlignment = Alignment.Center) {
             val framing = remember(item.width, item.height, look.format, look.filmEdge) {
                 Framing.compute(item.width.coerceAtLeast(1), item.height.coerceAtLeast(1), look, 2048)
             }
             val aspect = framing.outWidth.toFloat() / framing.outHeight
-            Box(Modifier.aspectRatio(aspect, matchHeightConstraintsFirst = aspect < 1f)
-                .pointerInput(Unit) { detectTapGestures(onPress = { hold = true; tryAwaitRelease(); hold = false }) }) {
-                AndroidView({ preview }, Modifier.fillMaxSize())
-                CropCorners(Modifier.fillMaxSize())
-                Text(if (hold) "原图 ORIGINAL" else summary(look).uppercase(Locale.ROOT), fontFamily = Fonts.mono, fontSize = 9.sp,
-                    color = Pal.text, modifier = Modifier.align(Alignment.BottomStart).padding(10.dp)
-                        .background(Color(0x99140807)).padding(horizontal = 6.dp, vertical = 2.dp))
+            BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                // fit the frame into whatever the pane gives us (portrait or landscape pane)
+                val boxAspect = if (maxHeight.value > 0f) maxWidth.value / maxHeight.value else 1f
+                Box(Modifier.aspectRatio(aspect, matchHeightConstraintsFirst = aspect < boxAspect)
+                    .pointerInput(Unit) { detectTapGestures(onPress = { hold = true; tryAwaitRelease(); hold = false }) }) {
+                    AndroidView({ preview }, Modifier.fillMaxSize())
+                    CropCorners(Modifier.fillMaxSize())
+                    Text(if (hold) "原图 ORIGINAL" else summary(look).uppercase(Locale.ROOT), fontFamily = Fonts.mono, fontSize = 9.sp,
+                        color = Pal.text, modifier = Modifier.align(Alignment.BottomStart).padding(10.dp)
+                            .background(Color(0x99140807)).padding(horizontal = 6.dp, vertical = 2.dp))
+                }
             }
             Safelight(Modifier.align(Alignment.TopEnd).padding(4.dp))
         }
-        // actions
+        // 2. actions
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
             if (item.isVideo) {
                 Text(if (playing) "暂停" else "播放 " + mmss(item.durationMs / 1000), color = Pal.dink, fontSize = 13.sp,
@@ -147,22 +170,100 @@ fun EditorScreen(state: AppState, id: Long) {
             Text("粘贴设置", color = if (clip != null) Pal.text else Pal.off, fontSize = 13.sp,
                 modifier = Modifier.clickable { state.pasteLook() }.padding(8.dp))
         }
-        // tool tabs
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp)) {
-            TOOLS.forEach { t ->
-                val modified = t.keys(look) != look
-                Column(Modifier.clickable { tool = t.id }.padding(horizontal = 10.dp, vertical = 6.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(Modifier.size(5.dp).clip(CircleShape).background(if (modified) accent else Color.Transparent))
-                    Text(t.label, color = if (t.id == tool) Pal.text else Pal.dim, fontSize = 14.sp)
-                    Box(Modifier.width(22.dp).height(2.dp).background(if (t.id == tool) accent else Color.Transparent))
+        // 3. tools: tabs + panel
+        Column(Modifier.fillMaxSize()) {
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp)) {
+                TOOLS.forEach { t ->
+                    val modified = t.keys(look) != look
+                    Column(Modifier.clickable { tool = t.id }.padding(horizontal = 10.dp, vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(Modifier.size(5.dp).clip(CircleShape).background(if (modified) accent else Color.Transparent))
+                        Text(t.label, color = if (t.id == tool) Pal.text else Pal.dim, fontSize = 14.sp)
+                        Box(Modifier.width(22.dp).height(2.dp).background(if (t.id == tool) accent else Color.Transparent))
+                    }
                 }
             }
+            Column(Modifier.fillMaxWidth().weight(1f).background(Pal.darkPanel)
+                .verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 12.dp)) {
+                ToolPanel(state, tool, item, look, accent, engine.film(LookMapper.filmStock(look)).isPositive)
+            }
         }
-        // tool panel
-        Column(Modifier.fillMaxWidth().height(250.dp).background(Pal.darkPanel)
-            .verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 12.dp)) {
-            ToolPanel(state, tool, item, look, accent, engine.film(LookMapper.filmStock(look)).isPositive)
+    }
+}
+
+/** Preview source resolution: enough for the largest (unfolded) display, capped for GPU memory. */
+private fun previewDecodeEdge(context: android.content.Context): Int {
+    val long = if (android.os.Build.VERSION.SDK_INT >= 30) {
+        val b = context.getSystemService(android.view.WindowManager::class.java).maximumWindowMetrics.bounds
+        maxOf(b.width(), b.height())
+    } else context.resources.displayMetrics.let { maxOf(it.widthPixels, it.heightPixels) }
+    return long.coerceIn(1600, 3072)
+}
+
+enum class EditorMode { COMPACT, SIDE, BOOK, TABLETOP }
+
+/**
+ * Places the editor's four parts (top bar, preview, actions, tools) without
+ * changing their order in the composition, so the GL preview survives
+ * folding / unfolding:
+ *  - COMPACT  phone: stacked, tools at the bottom
+ *  - SIDE     unfolded inner screen / tablet: preview left, tools in a side pane
+ *  - BOOK     vertical hinge: preview and tools on either side of the hinge
+ *  - TABLETOP half-folded on a table: preview above the hinge, tools below
+ */
+@Composable
+internal fun EditorLayout(mode: EditorMode, hinge: Rect?, modifier: Modifier, content: @Composable () -> Unit) {
+    Layout(content, modifier) { m, c ->
+        val w = c.maxWidth
+        val h = c.maxHeight
+        val loose = { cw: Int, ch: Int -> Constraints(0, cw.coerceAtLeast(0), 0, ch.coerceAtLeast(0)) }
+        val fixed = { cw: Int, ch: Int -> Constraints.fixed(cw.coerceAtLeast(0), ch.coerceAtLeast(0)) }
+        when (mode) {
+            EditorMode.COMPACT -> {
+                val top = m[0].measure(loose(w, h))
+                val actions = m[2].measure(loose(w, h))
+                val toolsH = minOf(300.dp.roundToPx(), (h * 0.42f).toInt())
+                val tools = m[3].measure(fixed(w, toolsH))
+                val previewH = h - top.height - actions.height - toolsH
+                val preview = m[1].measure(fixed(w, previewH))
+                layout(w, h) {
+                    top.place(0, 0)
+                    preview.place(0, top.height)
+                    actions.place(0, top.height + previewH)
+                    tools.place(0, h - toolsH)
+                }
+            }
+            EditorMode.SIDE, EditorMode.BOOK -> {
+                // split at the hinge in book posture, otherwise give tools a side pane
+                val paneW = (w * 0.38f).toInt().coerceIn(340.dp.roundToPx(), 460.dp.roundToPx())
+                val leftW = if (mode == EditorMode.BOOK && hinge != null && hinge.left > 0 && hinge.left < w) hinge.left.toInt() else w - paneW
+                val rightX = if (mode == EditorMode.BOOK && hinge != null && hinge.right < w) hinge.right.toInt() else leftW
+                val top = m[0].measure(loose(w, h))
+                val actions = m[2].measure(loose(leftW, h))
+                val previewH = h - top.height - actions.height
+                val preview = m[1].measure(fixed(leftW, previewH))
+                val tools = m[3].measure(fixed(w - rightX, h - top.height))
+                layout(w, h) {
+                    top.place(0, 0)
+                    preview.place(0, top.height)
+                    actions.place(0, top.height + previewH)
+                    tools.place(rightX, top.height)
+                }
+            }
+            EditorMode.TABLETOP -> {
+                val hingeTop = hinge?.top?.toInt()?.takeIf { it in 1 until h } ?: (h / 2)
+                val hingeBottom = hinge?.bottom?.toInt()?.takeIf { it in hingeTop..h } ?: hingeTop
+                val top = m[0].measure(loose(w, hingeTop))
+                val preview = m[1].measure(fixed(w, hingeTop - top.height))
+                val actions = m[2].measure(loose(w, h - hingeBottom))
+                val tools = m[3].measure(fixed(w, h - hingeBottom - actions.height))
+                layout(w, h) {
+                    top.place(0, 0)
+                    preview.place(0, top.height)
+                    actions.place(0, hingeBottom)
+                    tools.place(0, hingeBottom + actions.height)
+                }
+            }
         }
     }
 }

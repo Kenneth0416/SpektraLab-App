@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clipboard, Copy, Download, FileArchive, FolderOpen, Github, Image, ShieldCheck, SlidersHorizontal, Smartphone, Terminal } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { downloadMeta } from '../generated/download-meta';
@@ -9,17 +9,24 @@ type CopyTarget = 'android' | 'prototype' | 'clone';
 
 async function copyText(text: string) {
   if (navigator.clipboard && window.isSecureContext) {
-    await navigator.clipboard.writeText(text);
-    return;
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch { /* Try the legacy copy path when clipboard permission is denied. */ }
   }
+  const previousFocus = document.activeElement;
   const field = document.createElement('textarea');
   field.value = text;
   field.style.position = 'fixed';
   field.style.opacity = '0';
   document.body.appendChild(field);
-  field.select();
-  document.execCommand('copy');
-  field.remove();
+  try {
+    field.select();
+    if (!document.execCommand('copy')) throw new Error('Copy failed');
+  } finally {
+    field.remove();
+    if (previousFocus instanceof HTMLElement) previousFocus.focus({ preventScroll: true });
+  }
 }
 
 const packageIcons = [Smartphone, SlidersHorizontal, Image];
@@ -31,14 +38,25 @@ export function DownloadPage() {
   const apk = downloadMeta.android;
   const hasApk = Boolean(apk);
   const [copied, setCopied] = useState<CopyTarget | null>(null);
+  const [copyFailed, setCopyFailed] = useState<CopyTarget | null>(null);
   const [downloaded, setDownloaded] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleCopy = async (target: CopyTarget, value: string) => {
-    await copyText(value);
-    setCopied(target);
+  useEffect(() => () => {
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => setCopied(null), 2200);
+  }, []);
+
+  const handleCopy = async (target: CopyTarget, value: string) => {
+    if (timer.current) clearTimeout(timer.current);
+    setCopied(null);
+    setCopyFailed(null);
+    try {
+      await copyText(value);
+      setCopied(target);
+      timer.current = setTimeout(() => setCopied(null), 2200);
+    } catch {
+      setCopyFailed(target);
+    }
   };
 
   return (
@@ -61,6 +79,7 @@ export function DownloadPage() {
                 {copied === 'clone' ? <Check size={17} /> : <Copy size={17} />}<span>{copied === 'clone' ? m.copied : m.copy}</span>
               </button>
             </div>
+            {copyFailed === 'clone' && <p role="alert">{m.copyFailed}</p>}
             <a className="source-link" href={downloadMeta.source.href} download={downloadMeta.source.filename} aria-label={`${m.sourceTitle} ${m.sourceDescription}`}>
               <FileArchive size={18} /><span><small>{m.sourceKicker}</small>{m.sourceDownload}</span><strong>{downloadMeta.source.size}</strong>
             </a>
@@ -91,6 +110,7 @@ export function DownloadPage() {
                 {copied === 'android' ? <Check size={15} /> : <Clipboard size={15} />}
               </button>
             </div>
+            {copyFailed === 'android' && <p role="alert">{m.copyFailed}</p>}
             <div className="ticket-status" role="status">{!hasApk ? <><ShieldCheck size={15} />{m.apkUnavailable}</> : downloaded ? <><CheckCircle2 size={15} />{m.statusStarted}</> : <><ShieldCheck size={15} />{m.statusReady}</>}</div>
           </div>
         </div>
@@ -129,6 +149,7 @@ export function DownloadPage() {
               {copied === 'prototype' ? <Check size={14} /> : <Clipboard size={14} />}{copied === 'prototype' ? m.prototypeHashCopied : m.copyPrototypeHash}
             </button>
           </Reveal>
+          {copyFailed === 'prototype' && <p role="alert">{m.copyFailed}</p>}
         </div>
       </section>
 

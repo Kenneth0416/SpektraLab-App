@@ -16,7 +16,7 @@ export function SiteHeader() {
     { label: messages.nav.credits, to: '/credits' },
   ];
 
-  useEffect(() => setOpen(false), [location.pathname, location.hash]);
+  useEffect(() => setOpen(false), [location.pathname, location.search, location.hash]);
   useEffect(() => {
     document.body.classList.toggle('menu-open', open);
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -30,7 +30,9 @@ export function SiteHeader() {
   }, [open]);
 
   return (
-    <header className="site-header">
+    <header className="site-header" onClick={(event) => {
+      if (event.target instanceof Element && event.target.closest('a')) setOpen(false);
+    }}>
       <div className="header-inner">
         <Logo />
         <nav className="desktop-nav" aria-label={messages.nav.mainNavigation}>

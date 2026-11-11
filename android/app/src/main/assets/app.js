@@ -161,10 +161,32 @@ try {
   if (localeOrder.includes(saved)) locale = saved;
   else if ((navigator.language || '').toLowerCase().startsWith('en')) locale = 'en';
   else if (['zh-cn', 'zh-sg'].includes((navigator.language || '').toLowerCase())) locale = 'zh-Hans';
-} catch { /* Use the default locale. */ }
+} catch (error) { /* Use the default locale. */ }
 
 const state = { film: 4, scene: 0, exposure: .3, grain: .65, halation: .7, compare: false, view: 'darkroom', licenseIndex: null };
+// Save the model, not WebView history: history does not retain the JS heap.
+// Rotation keeps the live WebView via configChanges; this also restores edits
+// after other Activity recreation or process death. A held comparison is transient.
+try {
+  const saved = JSON.parse(localStorage.getItem('silvercam-editor-v1') || 'null');
+  if (saved && typeof saved === 'object') {
+    const bounds = { film: [0, films.length - 1], scene: [0, scenes.length - 1], exposure: [-2, 2], grain: [0, 1.5], halation: [0, 1.5] };
+    Object.keys(bounds).forEach((key) => {
+      const value = saved[key];
+      if (typeof value === 'number' && Number.isFinite(value) && value >= bounds[key][0] && value <= bounds[key][1]
+        && (!['film', 'scene'].includes(key) || Number.isInteger(value))) state[key] = value;
+    });
+    if (['darkroom', 'recipes', 'about'].includes(saved.view)) state.view = saved.view;
+    if (Number.isInteger(saved.licenseIndex) && licenseDocs[saved.licenseIndex]) state.licenseIndex = saved.licenseIndex;
+  }
+} catch (error) { /* Missing or invalid storage leaves safe defaults. */ }
+
 const $ = (selector) => document.querySelector(selector);
+// replaceChildren only arrived in Chromium 86; Android 8 shipped Chromium 58.
+function replaceNodes(parent, children) {
+  while (parent.firstChild) parent.removeChild(parent.firstChild);
+  children.forEach((child) => parent.appendChild(child));
+}
 const filmList = $('#filmList');
 const sceneList = $('#sceneList');
 const recipeList = $('#recipeList');
@@ -235,7 +257,7 @@ function render() {
   document.querySelectorAll('[data-recipe-brand]').forEach((node) => { node.textContent = `${m.brand} / RECIPE 00${Number(node.dataset.recipeBrand) + 1}`; });
   document.querySelectorAll('.recipe-card em').forEach((node) => { node.textContent = `${m.apply} →`; });
 
-  legalNotices.replaceChildren(...m.legalCards.map((card) => {
+  replaceNodes(legalNotices, m.legalCards.map((card) => {
     const el = document.createElement('article');
     el.className = 'legal-card';
     const h2 = document.createElement('h2');
@@ -246,7 +268,7 @@ function render() {
     return el;
   }));
 
-  licenseButtons.replaceChildren(...licenseDocs.map((doc, idx) => {
+  replaceNodes(licenseButtons, licenseDocs.map((doc, idx) => {
     const info = m.licenseLabels[idx];
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -273,8 +295,20 @@ function render() {
     modal.hidden = true;
   }
 
-  try { localStorage.setItem('silvercam-language', locale); } catch { /* Storage is optional. */ }
+  try {
+    localStorage.setItem('silvercam-language', locale);
+    localStorage.setItem('silvercam-editor-v1', JSON.stringify(state));
+  } catch (error) { /* Storage is optional. */ }
 }
+
+window.silvercamBack = function () {
+  if (state.licenseIndex !== null) state.licenseIndex = null;
+  else if (state.view !== 'darkroom') { state.view = 'darkroom'; $('#main').scrollTop = 0; }
+  else return false;
+  state.compare = false;
+  render();
+  return true;
+};
 
 $('#languageButton').addEventListener('click', () => { locale = localeOrder[(localeOrder.indexOf(locale) + 1) % localeOrder.length]; render(); });
 $('#resetButton').addEventListener('click', () => { Object.assign(state, { film: 4, exposure: .3, grain: .65, halation: .7, compare: false }); render(); });

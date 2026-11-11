@@ -23,9 +23,12 @@ function RouteEffects() {
     document.title = `${page} — ${brand}`;
     document.querySelector<HTMLMetaElement>('meta[property="og:title"]')?.setAttribute('content', `${page} — ${brand}`);
     if (location.hash) {
-      requestAnimationFrame(() => {
-        document.querySelector(location.hash)?.scrollIntoView({ behavior: 'smooth' });
+      const frame = requestAnimationFrame(() => {
+        let id = location.hash.slice(1);
+        try { id = decodeURIComponent(id); } catch { /* Keep malformed escapes as literal IDs. */ }
+        document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
       });
+      return () => cancelAnimationFrame(frame);
     } else {
       window.scrollTo({ top: 0, behavior: 'instant' });
     }

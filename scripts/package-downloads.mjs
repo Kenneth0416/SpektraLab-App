@@ -1,144 +1,28 @@
-import { createHash } from 'node:crypto';
-import { existsSync } from 'node:fs';
-import { copyFile, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { zipSync } from 'fflate';
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const outputDir = path.join(root, 'public', 'downloads');
-const generatedDir = path.join(root, 'src', 'generated');
-
-async function collectFiles(relativePath) {
-  const absolutePath = path.join(root, relativePath);
-  if (!existsSync(absolutePath)) return [];
-  const entries = await readdir(absolutePath, { withFileTypes: true });
-  const files = [];
-  for (const entry of entries) {
-    const child = path.join(relativePath, entry.name);
-    const excluded = [
-      path.join('src', 'generated', 'download-meta.ts'),
-      path.join('android', 'local.properties'),
-      path.join('android', '.gradle'),
-      path.join('android', 'build'),
-      path.join('android', 'app', 'build'),
-      path.join('app', 'build'),
-      path.join('engine', 'build'),
-      path.join('.gradle'),
-      path.join('.git'),
-      path.join('.vite'),
-      path.join('node_modules'),
-      path.join('dist'),
-      path.join('tools', 'bake', '__pycache__'),
-    ];
-    if (excluded.some((item) => child === item || child.startsWith(`${item}${path.sep}`))) continue;
-    if (entry.name === '.DS_Store' || entry.name.endsWith('.pyc')) continue;
-
-    if (entry.isDirectory()) files.push(...await collectFiles(child));
-    else if (entry.isFile()) files.push(child);
-  }
-  return files;
-}
-
-async function expandPaths(paths) {
-  const files = [];
-  for (const item of paths) {
-    const absolutePath = path.join(root, item);
-    if (!existsSync(absolutePath)) continue;
-    if ((await readdir(absolutePath).catch(() => null)) === null) files.push(item);
-    else files.push(...await collectFiles(item));
-  }
-  return [...new Set(files)].sort();
-}
-
-async function makeArchive(filename, paths) {
-  const files = await expandPaths(paths);
-  const archive = {};
-  for (const relativePath of files) {
-    archive[relativePath] = new Uint8Array(await readFile(path.join(root, relativePath)));
-  }
-  const bytes = zipSync(archive, { level: 9 });
-  await writeFile(path.join(outputDir, filename), bytes);
-  return {
-    filename,
-    href: `/downloads/${filename}`,
-    bytes: bytes.byteLength,
-    size: bytes.byteLength > 1024 * 1024
-      ? `${(bytes.byteLength / 1024 / 1024).toFixed(1)} MB`
-      : `${(bytes.byteLength / 1024).toFixed(1)} KB`,
-    sha256: createHash('sha256').update(bytes).digest('hex'),
-    fileCount: files.length,
-  };
-}
+import {
+  root, outputDir, sourceFilename, prototypePaths, cachedArchive, verifiedAndroidPair,
+} from './download-archives.mjs';
 
 await mkdir(outputDir, { recursive: true });
+const generatedDir = path.join(root, 'src', 'generated');
 await mkdir(generatedDir, { recursive: true });
 
-const sourcePaths = [
-  'README.md',
-  'LICENSE',
-  'NOTICE.md',
-  'docs',
-  'package.json',
-  'package-lock.json',
-  'tsconfig.json',
-  'vite.config.ts',
-  'index.html',
-  '.gitignore',
-  'src',
-  'scripts',
-  'prototype',
-  'android',
-  'app',
-  'engine',
-  'tools',
-  'build.gradle.kts',
-  'settings.gradle.kts',
-  'gradle.properties',
-  'gradlew',
-  'gradlew.bat',
-  'gradle',
-  'public/assets',
-  'public/favicon.svg',
-  'public/_redirects',
-  'public/_headers',
-];
+// Never regenerate an APK's corresponding source from today's working tree.
+// Its source ZIP was captured and verified by the successful Android build.
+// Missing/tampered provenance fails closed instead of advertising a stale pair.
+const pair = await verifiedAndroidPair();
+const source = pair ? pair.source : await cachedArchive(sourceFilename);
+const android = pair ? pair.android : null;
+const prototype = await cachedArchive('Silvercam-interaction-prototype.zip', prototypePaths);
 
-const prototypePaths = [
-  'README.md',
-  'LICENSE',
-  'NOTICE.md',
-  'docs/YSJF_SAMPLES.md',
-  'prototype',
-];
-
-const source = await makeArchive('Silvercam-App-source.zip', sourcePaths);
-const prototype = await makeArchive('Silvercam-interaction-prototype.zip', prototypePaths);
-
-// Legacy source-archive filenames kept for existing download links.
-// The APK is deliberately NOT aliased: a binary named after the upstream
-// SpektraLab product would imply an affiliation that does not exist.
-await copyFile(path.join(outputDir, 'Silvercam-App-source.zip'), path.join(outputDir, 'SpektraLab-App-source.zip'));
-await copyFile(path.join(outputDir, 'Silvercam-interaction-prototype.zip'), path.join(outputDir, 'SpektraLab-interaction-prototype.zip'));
-
-const silvercamApkPath = path.join(outputDir, 'Silvercam-Android.apk');
-
-const android = existsSync(silvercamApkPath) ? await (async () => {
-  const bytes = await readFile(silvercamApkPath);
-  return {
-    filename: 'Silvercam-Android.apk',
-    href: '/downloads/Silvercam-Android.apk',
-    bytes: bytes.byteLength,
-    size: `${(bytes.byteLength / 1024).toFixed(1)} KB`,
-    sha256: createHash('sha256').update(bytes).digest('hex'),
-    version: '0.1.0',
-    minAndroid: '8.0+',
-  };
-})() : null;
-
+// Legacy source links point at the same verified snapshot.
+await copyFile(path.join(outputDir, sourceFilename), path.join(outputDir, 'SpektraLab-App-source.zip'));
+await copyFile(path.join(outputDir, prototype.filename), path.join(outputDir, 'SpektraLab-interaction-prototype.zip'));
+const metaPath = path.join(generatedDir, 'download-meta.ts');
 const meta = `// Generated by scripts/package-downloads.mjs — do not edit.\nimport type { DownloadMetadata } from '../download-meta-types';\n\nexport const downloadMeta: DownloadMetadata = ${JSON.stringify({ android, source, prototype }, null, 2)};\n`;
-await writeFile(path.join(generatedDir, 'download-meta.ts'), meta);
+if (await readFile(metaPath, 'utf8').catch(() => '') !== meta) await writeFile(metaPath, meta);
 
-console.log(`Packaged ${source.filename} (${source.size}, ${source.fileCount} files)`);
+console.log(`Packaged ${source.filename} (${source.size}, ${source.fileCount} files)${pair ? ' — APK build snapshot' : ''}`);
 console.log(`Packaged ${prototype.filename} (${prototype.size}, ${prototype.fileCount} files)`);
-console.log(android ? `APK found: ${android.filename} (${android.size})` : 'APK not present; run npm run android:build to generate it.');
+console.log(android ? `Verified APK: ${android.filename} (${android.size})` : 'APK not present; run npm run android:build to generate it.');

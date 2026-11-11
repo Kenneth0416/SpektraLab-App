@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { localeOptions, translations } from './translations';
 import type { Locale, Messages } from './translations';
 
@@ -42,10 +42,10 @@ type LanguageContextValue = {
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const location = useLocation();
   const [locale, setLocaleState] = useState<Locale>(getInitialLocale);
-  const queryLocale = parseLocale(searchParams.get('lang'));
+  const queryLocale = parseLocale(new URLSearchParams(location.search).get('lang'));
 
   useEffect(() => {
     if (queryLocale) setLocaleState((current) => current === queryLocale ? current : queryLocale);
@@ -55,9 +55,9 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     if (!queryLocale) {
       const nextParams = new URLSearchParams(location.search);
       nextParams.set('lang', locale);
-      setSearchParams(nextParams, { replace: true });
+      navigate({ pathname: location.pathname, search: `?${nextParams}`, hash: location.hash }, { replace: true });
     }
-  }, [location.pathname, location.search, queryLocale, locale, setSearchParams]);
+  }, [location.pathname, location.search, location.hash, queryLocale, locale, navigate]);
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -71,10 +71,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
   const setLocale = useCallback((nextLocale: Locale) => {
     setLocaleState(nextLocale);
-    const nextParams = new URLSearchParams(window.location.search);
+    const nextParams = new URLSearchParams(location.search);
     nextParams.set('lang', nextLocale);
-    setSearchParams(nextParams, { replace: true });
-  }, [setSearchParams]);
+    navigate({ pathname: location.pathname, search: `?${nextParams}`, hash: location.hash }, { replace: true });
+  }, [location.pathname, location.search, location.hash, navigate]);
 
   const value = useMemo(() => ({ locale, messages: translations[locale], setLocale }), [locale, setLocale]);
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;

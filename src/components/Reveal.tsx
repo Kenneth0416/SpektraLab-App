@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
+import { gsap, motionReduced } from '../motion/gsap';
 
 type RevealProps = {
   children: ReactNode;
@@ -9,26 +10,25 @@ type RevealProps = {
 
 export function Reveal({ children, className = '', delay = 0 }: RevealProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const node = ref.current;
-    if (!node || !('IntersectionObserver' in window)) {
-      setVisible(true);
-      return;
-    }
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) {
-        setVisible(true);
-        observer.disconnect();
-      }
-    }, { threshold: 0.12, rootMargin: '0px 0px -40px' });
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
+    if (!node || motionReduced()) return;
+    const context = gsap.context(() => {
+      gsap.from(node, {
+        y: 32,
+        autoAlpha: 0,
+        duration: 0.85,
+        delay: delay / 1000,
+        ease: 'power3.out',
+        scrollTrigger: { trigger: node, start: 'top 88%', once: true },
+      });
+    }, node);
+    return () => context.revert();
+  }, [delay]);
 
   return (
-    <div ref={ref} className={`reveal ${visible ? 'is-visible' : ''} ${className}`} style={{ '--reveal-delay': `${delay}ms` } as React.CSSProperties}>
+    <div ref={ref} className={`reveal ${className}`}>
       {children}
     </div>
   );

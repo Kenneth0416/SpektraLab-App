@@ -5,42 +5,7 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { downloadMeta } from '../generated/download-meta';
 import { Reveal } from '../components/Reveal';
 
-const gplNoticeText = `GNU GENERAL PUBLIC LICENSE
-Version 3, 29 June 2007
-
-Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
-Everyone is permitted to copy and distribute verbatim copies
-of this license document, but changing it is not allowed.
-
-Preamble
-The GNU General Public License is a free, copyleft license for software and other kinds of works.
-When we speak of free software, we are referring to freedom, not price. Our General Public Licenses are designed to make sure that you have the freedom to distribute copies of free software (and charge for them if you wish), that you receive source code or can get it if you want it, that you can change the software or use pieces of it in new free programs, and that you know you can do these things.
-
-TERMS AND CONDITIONS
-
-0. Definitions.
-"This License" refers to version 3 of the GNU General Public License.
-"Copyright" also means copyright-like laws that apply to other kinds of works, such as semiconductor masks.
-"The Program" refers to any copyrightable work licensed under this License. Each licensee is addressed as "you". "Licensees" and "recipients" may be individuals or organizations.
-
-1. Source Code.
-The "source code" for a work means the preferred form of the work for making modifications to it. "Object code" means any non-source form of a work.
-The "Corresponding Source" for a work in object code form means all the source code needed to generate, install, and (for an executable work) run the object code and to modify the work, including scripts to control those activities.
-
-5. Conveying Modified Source Versions.
-You may convey a work based on the Program, or the modifications to produce it from the Program, in the form of source code under the terms of section 4, provided that you also meet all of these conditions:
-  a) The work must carry prominent notices stating that you modified it, and giving a relevant date.
-  b) The work must carry prominent notices stating that it is released under this License and any conditions added under section 7.
-  c) You must license the entire work, as a whole, under this License to anyone who comes into possession of a copy.
-
-6. Conveying Non-Source Forms.
-You may convey a work in object code form under the terms of sections 4 and 5, provided that you also convey the machine-readable Corresponding Source under the terms of this License.
-
-15. Disclaimer of Warranty.
-THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT PERMITTED BY APPLICABLE LAW. EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES PROVIDE THE PROGRAM "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
-
-16. Limitation of Liability.
-IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS THE PROGRAM AS PERMITTED ABOVE, BE LIABLE TO YOU FOR DAMAGES.`;
+import gplNoticeText from '../../LICENSE?raw';
 
 const preambleNoticeText = `================================================================================
         License for spektrafilm profiles, LUTs, and direct derivatives

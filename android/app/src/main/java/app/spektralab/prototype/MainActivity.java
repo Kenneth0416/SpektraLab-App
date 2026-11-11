@@ -3,8 +3,10 @@ package app.spektralab.prototype;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.graphics.Color;
+import android.os.Build;
 import android.os.Bundle;
 import android.webkit.WebView;
+import android.window.OnBackInvokedDispatcher;
 
 public final class MainActivity extends Activity {
     private WebView webView;
@@ -26,6 +28,26 @@ public final class MainActivity extends Activity {
         webView.getSettings().setAllowUniversalAccessFromFileURLs(false);
         webView.loadUrl("file:///android_asset/index.html");
         setContentView(webView);
+        if (Build.VERSION.SDK_INT >= 33) {
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::handleBack);
+        }
+    }
+
+    @Override
+    public void onBackPressed() {
+        handleBack();
+    }
+
+    private void handleBack() {
+        // The local app owns its view/modal stack; WebView history has only index.html.
+        webView.evaluateJavascript(
+            "typeof window.silvercamBack === 'function' && window.silvercamBack()",
+            handled -> {
+                if (!"true".equals(handled) && !isFinishing() && !isDestroyed()) {
+                    finish();
+                }
+            });
     }
 
     @Override

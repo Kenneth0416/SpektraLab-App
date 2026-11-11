@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { copyFile, mkdir, stat } from 'node:fs/promises';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { snapshot, archiveBytes, sha256, sourceFilename, apkFilename, provenanceFilename } from './download-archives.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,9 +20,12 @@ if (!sdk || !existsSync(sdk)) {
   process.exit(1);
 }
 
+// Capture after license generation, before Gradle reads any inputs.
+const before = await snapshot();
 const isWindows = process.platform === 'win32';
 const gradleCommand = isWindows ? 'gradlew.bat' : 'sh';
-const gradleArgs = isWindows ? ['assembleDebug'] : ['gradlew', 'assembleDebug'];
+const buildArgs = [...(process.env.ANDROID_BUILD_OFFLINE === '1' ? ['--offline'] : []), 'assembleDebug'];
+const gradleArgs = isWindows ? buildArgs : ['gradlew', ...buildArgs];
 const result = spawnSync(gradleCommand, gradleArgs, {
   cwd: androidDir,
   stdio: 'inherit',
@@ -33,10 +37,31 @@ if (result.status !== 0) process.exit(result.status ?? 1);
 
 const input = path.join(androidDir, 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
 const outputDir = path.join(root, 'public', 'downloads');
-const output = path.join(outputDir, 'Silvercam-Android.apk');
+const after = await snapshot();
+if (before.digest !== after.digest) {
+  throw new Error('Source changed during the Android build. Downloads were not replaced; run the build again after edits finish.');
+}
+const apk = await readFile(input);
+const source = archiveBytes(before);
+const gradleConfig = await readFile(path.join(androidDir, 'app', 'build.gradle'), 'utf8');
+const version = gradleConfig.match(/versionName\s+['"]([^'"]+)['"]/)[1];
+const provenance = {
+  schema: 1, version, builtAt: new Date().toISOString(),
+  apkSha256: sha256(apk), sourceSha256: sha256(source),
+  sourceDigest: before.digest, files: before.manifest,
+};
 await mkdir(outputDir, { recursive: true });
-await copyFile(input, output);
-const info = await stat(output);
-console.log(`APK ready: public/downloads/Silvercam-Android.apk (${(info.size / 1024).toFixed(1)} KB)`);
+// Publish provenance last. An interrupted replacement is rejected by the
+// packaging verifier rather than silently pairing files from different builds.
+for (const [filename, bytes] of [
+  [sourceFilename, source], [apkFilename, apk],
+  [provenanceFilename, JSON.stringify(provenance, null, 2) + '\n'],
+]) {
+  const destination = path.join(outputDir, filename);
+  const temporary = `${destination}.${process.pid}.tmp`;
+  await writeFile(temporary, bytes);
+  await rename(temporary, destination);
+}
+console.log(`APK ready: public/downloads/${apkFilename} (${(apk.length / 1024).toFixed(1)} KB)`);
 
 await import('./package-downloads.mjs');

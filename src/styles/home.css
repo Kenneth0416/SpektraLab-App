@@ -146,7 +146,7 @@
 .paper-swatches i:nth-child(4) { background: repeating-linear-gradient(45deg,#322c26 0 4px,#c5bbaa 4px 5px); }
 .texture-card { grid-column: span 7; min-height: 420px; padding: 0; color: #f5eee2; background: #14100e; }
 .texture-card > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: saturate(.85) contrast(1.08); transition: transform 1.2s cubic-bezier(.22,.61,.36,1); }
-.texture-card:hover > img { transform: scale(1.04); }
+.texture-card:hover > img { filter: saturate(1) contrast(1.05); }
 .texture-wash { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8,6,5,.72), transparent 45%, rgba(8,6,5,.85)), radial-gradient(circle at 70% 45%, rgba(255,83,44,.2), transparent 35%); }
 .texture-content { position: relative; z-index: 2; height: 100%; min-height: 420px; padding: 30px; display: flex; flex-direction: column; justify-content: space-between; }
 .texture-content .card-heading { color: #e6d7c7; }
@@ -178,8 +178,9 @@
 .workflow-step { min-width: 0; }
 .workflow-image { position: relative; height: 270px; margin-bottom: 25px; overflow: hidden; background: #211c18; }
 .workflow-image::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(7,6,5,.7)); }
-.workflow-image > img { width: 100%; height: 100%; object-fit: cover; filter: saturate(.75); transition: transform .8s, filter .5s; }
-.workflow-step:hover .workflow-image > img { transform: scale(1.04); filter: saturate(1); }
+.workflow-image > img, .texture-card > img { transform-origin: center center; }
+.workflow-image > img { width: 100%; height: 100%; object-fit: cover; filter: saturate(.75); transition: filter .5s; }
+.workflow-step:hover .workflow-image > img { filter: saturate(1); }
 .workflow-image > span { position: absolute; z-index: 2; left: 18px; top: 16px; font-family: var(--mono); font-size: 11px; }
 .workflow-icon { position: absolute; z-index: 2; right: 16px; bottom: 16px; width: 48px; height: 48px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.45); background: rgba(12,11,10,.45); backdrop-filter: blur(7px); }
 .workflow-subtitle { color: var(--red); font-family: var(--mono); font-size: 8px; letter-spacing: .1em; }

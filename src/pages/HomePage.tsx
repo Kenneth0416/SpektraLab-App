@@ -1,5 +1,7 @@
+import { useLayoutEffect, useRef } from 'react';
 import { ArrowDown, ArrowRight, ArrowUpRight, Camera, Check, Download, Film, Image, Layers3, SlidersHorizontal, Sparkles, Video } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { setupHomeMotion } from '../motion/homeMotion';
 import { FilmLab } from '../components/FilmLab';
 import { FilmStrip } from '../components/FilmStrip';
 import { Reveal } from '../components/Reveal';
@@ -15,9 +17,15 @@ const mediaIcons = [Image, Video, Camera];
 export function HomePage() {
   const { messages, locale } = useLanguage();
   const m = messages.home;
+  const mainRef = useRef<HTMLElement>(null);
+
+  useLayoutEffect(() => {
+    if (!mainRef.current) return;
+    return setupHomeMotion(mainRef.current);
+  }, []);
 
   return (
-    <main id="main-content">
+    <main id="main-content" ref={mainRef}>
       <section
         className="hero"
         onPointerMove={(event) => {

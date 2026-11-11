@@ -59,7 +59,7 @@ class BurstTest {
     }
 
     private fun frame(dx: Double, dy: Double, noisy: Boolean, seed: Long, obj: Pair<Int, Int>? = null,
-                      sceneFn: (Double, Double) -> DoubleArray = ::scene): DngImage {
+                      sceneFn: (Double, Double) -> DoubleArray = ::scene, w: Int = this.w, h: Int = this.h): DngImage {
         val inv = DngReader.invert(fm)!!
         val rnd = java.util.Random(seed)
         val px = le(w * h * 2)
@@ -145,8 +145,10 @@ class BurstTest {
         val frames = shifts.mapIndexed { i, s -> frame(s.first, s.second, true, 100L + i) }
         val single = psnr(RawDeveloper.develop(frames[0], 4096, options = quiet))
         val t0 = System.nanoTime()
-        val merged = BurstMerge.merge(frames)
-        println("merge of %d frames %dx%d: %d ms".format(frames.size, w, h, (System.nanoTime() - t0) / 1_000_000))
+        val plan = BurstMerge.plan(frames)
+        val t1 = System.nanoTime()
+        val merged = BurstMerge.finish(plan, BurstMerge.gather(plan))
+        println("merge of %d frames %dx%d: plan %d ms, gather %d ms".format(frames.size, w, h, (t1 - t0) / 1_000_000, (System.nanoTime() - t1) / 1_000_000))
         val burst = psnr(develop(merged, frames[0]))
         println("noisy scene: single frame %.2f dB, %d-frame merge %.2f dB (frames used %.2f)".format(single, frames.size, burst, merged.framesUsed))
         assertTrue(burst > single + 3.0, "expected at least 3 dB from $single, got $burst")
@@ -193,6 +195,53 @@ class BurstTest {
         File(dir, "merged_camera.txt").printWriter().use { p ->
             p.println("${m.width} ${m.height}")
             for (i in 0 until m.width * m.height) p.println("${(m.rgb[i * 3].toInt() and 0xffff) / 65535f} ${(m.rgb[i * 3 + 1].toInt() and 0xffff) / 65535f} ${(m.rgb[i * 3 + 2].toInt() and 0xffff) / 65535f}")
+        }
+    }
+
+    /** Inputs and the CPU result of the gather, for the WebGL check of Shaders.MERGE (tools/glcheck/merge.js). */
+    @Test
+    fun dumpForGl() {
+        val dir = System.getProperty("spektra.gldump")?.takeIf { it.isNotEmpty() } ?: return
+        File(dir).mkdirs()
+        val frames = shifts.take(4).mapIndexed { i, s -> frame(s.first, s.second, true, 500L + i, if (i == 2) 60 to 50 else null) }
+        val p = BurstMerge.plan(frames)
+        val rgb = BurstMerge.gather(p)
+        fun bin(name: String, n: Int, fill: (ByteBuffer) -> Unit) =
+            File(dir, name).writeBytes(ByteBuffer.allocate(n).order(ByteOrder.LITTLE_ENDIAN).also(fill).array())
+        bin("merge_raw.bin", p.frames.size * w * h * 2) { b ->
+            for (f in p.frames) for (y in 0 until h) for (x in 0 until w) b.putShort(f.data[(f.cropY + y) * f.rawWidth + f.cropX + x])
+        }
+        bin("merge_flow.bin", p.flows.size * p.flows[0].u.size * 8) { b -> for (f in p.flows) for (i in f.u.indices) { b.putFloat(f.u[i]); b.putFloat(f.v[i]) } }
+        bin("merge_robust.bin", p.robust.size * p.guideW * p.guideH) { b -> for (r in p.robust) b.put(r) }
+        bin("merge_kernel.bin", p.kernW * p.kernH * 12) { b -> for (i in p.ka.indices) { b.putFloat(p.ka[i]); b.putFloat(p.kb[i]); b.putFloat(p.kc[i]) } }
+        bin("merge_expected.bin", rgb.size * 2) { b -> for (v in rgb) b.putShort(v) }
+        val fl = p.flows[0]
+        File(dir, "merge.json").writeText("""{"w":$w,"h":$h,"frames":${p.frames.size},"guide":[${p.guideW},${p.guideH}],"kern":[${p.kernW},${p.kernH}],
+"tiles":[${fl.tilesX},${fl.tilesY}],"origin":${fl.origin},"stride":${fl.stride},"cfa":[${p.frames[0].cfa.joinToString(",")}],
+"black":[${p.frames.joinToString(",") { it.black.joinToString(",") }}],"scale":[${p.frames.indices.joinToString(",") { p.scale(it).joinToString(",") }}]}""")
+        File(dir, "merge.glsl").writeText(app.spektralab.gl.Shaders.MERGE)
+    }
+
+    /** Timing at a real sensor size: -Dspektra.burstbench=4000x3000 */
+    @Test
+    fun benchmark() {
+        val size = System.getProperty("spektra.burstbench")?.takeIf { it.isNotEmpty() } ?: return
+        val (bw, bh) = size.split("x").map { it.toInt() }
+        val frames = shifts.take(5).mapIndexed { i, s -> frame(s.first, s.second, true, 600L + i, sceneFn = ::texture, w = bw, h = bh) }
+        repeat(3) {
+            val t0 = System.nanoTime()
+            val plan = BurstMerge.plan(frames)
+            val t1 = System.nanoTime()
+            val m = BurstMerge.finish(plan, BurstMerge.gather(plan))
+            val t2 = System.nanoTime()
+            val bos = ByteArrayOutputStream(1 shl 26)
+            DngWriter.writeLinear(bos, m.width, m.height, m.rgb, frames[0], m.gainMaps, m.noise)
+            val t3 = System.nanoTime()
+            val bytes = bos.toByteArray()
+            val t4 = System.nanoTime()
+            DngReader.read(bytes)
+            println("%d frames %dx%d: plan %d ms, gather (CPU) %d ms, write DNG %d ms (%d MB), read back %d ms".format(frames.size, bw, bh,
+                (t1 - t0) / 1_000_000, (t2 - t1) / 1_000_000, (t3 - t2) / 1_000_000, bytes.size shr 20, (System.nanoTime() - t4) / 1_000_000))
         }
     }
 }

@@ -38,13 +38,12 @@ object DngWriter {
         // compress strips first so their offsets are known
         val rowsPerStrip = 64
         val stripCount = (height + rowsPerStrip - 1) / rowsPerStrip
-        val strips = ArrayList<ByteArray>(stripCount)
         val n = width * 3
-        val raw = ByteArray(rowsPerStrip * n * 2)
-        val deflater = Deflater(4)
-        val chunk = ByteArray(1 shl 16)
-        for (s in 0 until stripCount) {
+        // strips are independent: compress them on all cores (this is most of the time spent here)
+        val strips = arrayOfNulls<ByteArray>(stripCount)
+        java.util.stream.IntStream.range(0, stripCount).parallel().forEach { s ->
             val rows = minOf(rowsPerStrip, height - s * rowsPerStrip)
+            val raw = ByteArray(rows * n * 2)
             for (r in 0 until rows) {
                 val start = (s * rowsPerStrip + r) * n
                 val o = r * n * 2
@@ -56,14 +55,15 @@ object DngWriter {
                 }
                 for (k in 2 * n - 1 downTo 3) raw[o + k] = (raw[o + k] - raw[o + k - 3]).toByte()
             }
-            deflater.reset()
-            deflater.setInput(raw, 0, rows * n * 2)
+            val deflater = Deflater(2)
+            deflater.setInput(raw)
             deflater.finish()
-            val bos = ByteArrayOutputStream(rows * width * 3)
+            val bos = ByteArrayOutputStream(raw.size / 2)
+            val chunk = ByteArray(1 shl 16)
             while (!deflater.finished()) bos.write(chunk, 0, deflater.deflate(chunk))
-            strips += bos.toByteArray()
+            deflater.end()
+            strips[s] = bos.toByteArray()
         }
-        deflater.end()
 
         val tags = arrayListOf(
             longs(254, 0), longs(256, width), longs(257, height), shorts(258, 16, 16, 16), shorts(259, 8),
@@ -87,7 +87,7 @@ object DngWriter {
         noise?.let { (s, o) -> tags += doubles(51041, doubleArrayOf(s, o, s, o, s, o)) }
         if (gainMaps.isNotEmpty()) gainMapOpcodes(gainMaps, width, height).let { tags += Tag(51009, 7, it.size, it) }
         // placeholders: filled in below once the layout is known
-        tags += longs(273, *IntArray(stripCount)); tags += longs(279, *IntArray(stripCount) { strips[it].size })
+        tags += longs(273, *IntArray(stripCount)); tags += longs(279, *IntArray(stripCount) { strips[it]!!.size })
         tags.sortBy { it.id }
 
         val ifdSize = 2 + tags.size * 12 + 4
@@ -95,7 +95,7 @@ object DngWriter {
         val offsets = HashMap<Tag, Int>()
         for (t in tags) if (t.data.size > 4) { offsets[t] = dataPos; dataPos += t.data.size + (t.data.size and 1) }
         val stripOffsets = IntArray(stripCount)
-        for (i in 0 until stripCount) { stripOffsets[i] = dataPos; dataPos += strips[i].size + (strips[i].size and 1) }
+        for (i in 0 until stripCount) { stripOffsets[i] = dataPos; dataPos += strips[i]!!.size + (strips[i]!!.size and 1) }
         val offsetTag = tags.first { it.id == 273 }
         le(stripCount * 4).apply { stripOffsets.forEach { putInt(it) } }.array().copyInto(offsetTag.data)
 
@@ -109,7 +109,7 @@ object DngWriter {
         ifd.putInt(0)
         out.write(ifd.array())
         for (t in tags) if (t.data.size > 4) { out.write(t.data); if (t.data.size and 1 == 1) out.write(0) }
-        for (s in strips) { out.write(s); if (s.size and 1 == 1) out.write(0) }
+        for (s in strips) { out.write(s!!); if (s.size and 1 == 1) out.write(0) }
         out.flush()
     }
 

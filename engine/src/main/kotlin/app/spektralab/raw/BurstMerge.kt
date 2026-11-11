@@ -76,7 +76,13 @@ object BurstAlign {
 
     private val FACTOR = intArrayOf(1, 2, 8, 32)       // level size relative to level 0
     private val TILE = intArrayOf(16, 16, 16, 8)
-    private val RADIUS = intArrayOf(1, 4, 4, 4)
+    private val RADIUS = intArrayOf(1, 2, 4, 4)
+    /** Search offsets, nearest first: the likely match comes early and the others stop early. */
+    private val ORDER = Array(5) { r ->
+        val list = ArrayList<IntArray>()
+        for (dv in -r..r) for (du in -r..r) list += intArrayOf(du, dv)
+        list.sortedBy { it[0] * it[0] + it[1] * it[1] }.toTypedArray()
+    }
 
     /** Flow of [alt] relative to [ref]: ref(x) matches alt(x + flow). */
     internal fun align(ref: Pyramid, alt: Pyramid): FlowField {
@@ -102,7 +108,8 @@ object BurstAlign {
                         gu = pu[py * pnx + px] * up; gv = pv[py * pnx + px] * up
                     }
                     var best = Float.MAX_VALUE; var bu = gu; var bv = gv
-                    for (dv in -rad..rad) for (du in -rad..rad) {
+                    for (o in ORDER[rad]) {
+                        val du = o[0]; val dv = o[1]
                         val ax = x0 + gu + du; val ay = y0 + gv + dv
                         if (ax < 0 || ay < 0 || ax + t > a.w || ay + t > a.h) continue
                         var d = 0f
@@ -199,66 +206,123 @@ object BurstMerge {
         val kShrink: Float = 2f,
     )
 
+    /**
+     * Everything the gather needs, worked out on the CPU: which frames, how each one moved,
+     * where it may be trusted and the kernel at every position. The gather itself (the
+     * expensive part) then runs on the CPU ([gather]) or on the GPU (Shaders.MERGE).
+     */
+    class Plan(
+        val width: Int, val height: Int,
+        /** Reference first, then the frames that could be aligned to it. */
+        val frames: List<DngImage>,
+        /** Per alternate frame (index f - 1). */
+        val flows: List<FlowField>, val robust: List<ByteArray>,
+        val guideW: Int, val guideH: Int,
+        /** Inverse covariance of the kernel on a half-resolution grid. */
+        val kernW: Int, val kernH: Int, val ka: FloatArray, val kb: FloatArray, val kc: FloatArray,
+        val framesUsed: Float,
+    ) {
+        /** 1 / (white - black) per CFA position of frame [f]. */
+        fun scale(f: Int) = FloatArray(4) { 1f / (frames[f].white - frames[f].black[it]).coerceAtLeast(1f) }
+    }
+
+    private const val EXP_N = 16384
+
     /** Merge [frames] (same sensor mode); the first frame is the reference. */
     fun merge(frames: List<DngImage>, options: Options = Options(), progress: (Float) -> Unit = {}): MergedRaw {
-        val ref = frames[0]
-        require(!ref.linear) { "burst frames must be Bayer raw" }
-        val w = ref.cropWidth; val h = ref.cropHeight
-        val alts = frames.drop(1).filter {
-            !it.linear && it.cropWidth == w && it.cropHeight == h && it.cfa.contentEquals(ref.cfa)
+        val plan = plan(frames, options) { progress(it * 0.5f) }
+        return finish(plan, gather(plan) { progress(0.5f + it * 0.5f) })
+    }
+
+    fun finish(plan: Plan, rgb: ShortArray): MergedRaw {
+        val ref = plan.frames[0]
+        return MergedRaw(plan.width, plan.height, rgb, cropGainMaps(ref),
+            ref.noiseScale?.let { (it / plan.framesUsed).toDouble() to (ref.noiseOffset / plan.framesUsed).toDouble() }, plan.framesUsed)
+    }
+
+    fun plan(frames: List<DngImage>, options: Options = Options(), progress: (Float) -> Unit = {}): Plan {
+        val planner = Planner(frames[0], options)
+        progress(0.2f)
+        for (i in 1 until frames.size) { planner.add(frames[i]); progress(0.2f + 0.8f * i / (frames.size - 1)) }
+        return planner.build()
+    }
+
+    /**
+     * Builds a [Plan] one frame at a time, so the frames of a burst can be aligned while
+     * the camera is still taking the next ones. Not thread safe: one caller at a time.
+     */
+    class Planner(private val ref: DngImage, options: Options = Options()) {
+        private val w = ref.cropWidth
+        private val h = ref.cropHeight
+        private val noiseS = ref.noiseScale ?: 3e-4f
+        private val noiseO = if (ref.noiseScale != null) ref.noiseOffset else 2e-6f
+        private val refPyr: BurstAlign.Pyramid
+        private val refGuide: Guide
+        private val kernels: Kernels
+        private val alts = ArrayList<DngImage>()
+        private val flows = ArrayList<FlowField>()
+        private val robust = ArrayList<ByteArray>()
+        private var trust = 0.0
+
+        init {
+            require(!ref.linear) { "burst frames must be Bayer raw" }
+            refPyr = BurstAlign.pyramid(ref)
+            refGuide = Guide(ref)
+            // relative noise at mid grey decides how wide the detail kernel may be
+            val relNoise = sqrt(noiseS * 0.18f + noiseO) / 0.18f
+            val kDetail = options.kDetail ?: (0.35f + 0.35f * ((relNoise - 0.01f) / 0.04f).coerceIn(0f, 1f))
+            kernels = Kernels(refPyr.levels[0], noiseS, noiseO, options, kDetail)
         }
-        val noiseS = ref.noiseScale ?: 3e-4f
-        val noiseO = if (ref.noiseScale != null) ref.noiseOffset else 2e-6f
 
-        val refPyr = BurstAlign.pyramid(ref)
-        val refGuide = Guide(ref)
-        // relative noise at mid grey decides how wide the detail kernel may be
-        val relNoise = sqrt(noiseS * 0.18f + noiseO) / 0.18f
-        val kDetail = options.kDetail ?: (0.35f + 0.35f * ((relNoise - 0.01f) / 0.04f).coerceIn(0f, 1f))
-        val kernels = Kernels(refPyr.levels[0], noiseS, noiseO, options, kDetail)
-        progress(0.1f)
+        val frames get() = alts.size + 1
 
-        // align every other frame and decide where it can be trusted
-        val flows = ArrayList<FlowField>(); val robust = ArrayList<ByteArray>()
-        for ((i, alt) in alts.withIndex()) {
+        /** Align [alt] to the reference and decide where it can be trusted; false if it does not fit the burst. */
+        fun add(alt: DngImage): Boolean {
+            if (alt.linear || alt.cropWidth != w || alt.cropHeight != h || !alt.cfa.contentEquals(ref.cfa)) return false
             val flow = BurstAlign.align(refPyr, BurstAlign.pyramid(alt))
-            flows += flow
-            robust += robustness(refGuide, Guide(alt), flow, noiseS, noiseO)
-            progress(0.1f + 0.4f * (i + 1) / alts.size)
+            val r = robustness(refGuide, Guide(alt), flow, noiseS, noiseO)
+            var sum = 0L
+            for (b in r) sum += b.toInt() and 0xff
+            trust += sum / 255.0 / r.size
+            alts += alt; flows += flow; robust += r
+            return true
         }
 
-        // gather
-        val out = ShortArray(w * h * 3)
-        val expLut = FloatArray(1025) { exp(-it * (50.0 / 1024.0) * 0.5).toFloat() }
-        val all = listOf(ref) + alts
-        val scale = Array(all.size) { f -> FloatArray(4) { 1f / (all[f].white - all[f].black[it]).coerceAtLeast(1f) } }
-        val trust = DoubleArray(h)
+        fun build() = Plan(w, h, listOf(ref) + alts, flows.toList(), robust.toList(), refGuide.w, refGuide.h,
+            kernels.w, kernels.h, kernels.a, kernels.b, kernels.c, 1f + trust.toFloat())
+    }
+
+    /** The gather on the CPU; rows [y0, y1) of the picture, interleaved RGB 0..65535. */
+    fun gather(plan: Plan, y0: Int = 0, y1: Int = plan.height, progress: (Float) -> Unit = {}): ShortArray {
+        val w = plan.width; val h = plan.height
+        val all = plan.frames; val flows = plan.flows; val robust = plan.robust
+        val out = ShortArray(w * (y1 - y0) * 3)
+        val expLut = FloatArray(EXP_N + 1) { exp(-it * (50.0 / EXP_N) * 0.5).toFloat() }
+        val scale = Array(all.size) { plan.scale(it) }
         val done = java.util.concurrent.atomic.AtomicInteger()
-        IntStream.range(0, h).parallel().forEach { y ->
+        IntStream.range(y0, y1).parallel().forEach { y ->
             val acc = FloatArray(3); val ws = FloatArray(3)
-            var rowTrust = 0.0
             for (x in 0 until w) {
                 acc.fill(0f); ws.fill(0f)
-                val ki = (min(y / 2, kernels.h - 1)) * kernels.w + min(x / 2, kernels.w - 1)
-                val ka = kernels.a[ki]; val kb = kernels.b[ki]; val kc = kernels.c[ki]
+                val ki = (min(y / 2, plan.kernH - 1)) * plan.kernW + min(x / 2, plan.kernW - 1)
+                val ka = plan.ka[ki]; val kb = plan.kb[ki]; val kc = plan.kc[ki]
                 for (f in all.indices) {
                     val img = all[f]
                     var px = x.toFloat(); var py = y.toFloat(); var r = 1f
                     if (f > 0) {
                         val rb = robust[f - 1]
-                        r = (rb[min(y / 2, refGuide.h - 1) * refGuide.w + min(x / 2, refGuide.w - 1)].toInt() and 0xff) / 255f
+                        r = (rb[min(y / 2, plan.guideH - 1) * plan.guideW + min(x / 2, plan.guideW - 1)].toInt() and 0xff) / 255f
                         if (r <= 0f) continue
                         val fl = flows[f - 1]
                         // bilinear flow between tile centres
                         val gx = ((x - fl.origin) / fl.stride.toFloat()).coerceIn(0f, (fl.tilesX - 1).toFloat())
                         val gy = ((y - fl.origin) / fl.stride.toFloat()).coerceIn(0f, (fl.tilesY - 1).toFloat())
-                        val x0 = min(gx.toInt(), max(fl.tilesX - 2, 0)); val y0 = min(gy.toInt(), max(fl.tilesY - 2, 0))
-                        val x1 = min(x0 + 1, fl.tilesX - 1); val y1 = min(y0 + 1, fl.tilesY - 1)
-                        val tx = gx - x0; val ty = gy - y0
-                        val i00 = y0 * fl.tilesX + x0; val i10 = y0 * fl.tilesX + x1; val i01 = y1 * fl.tilesX + x0; val i11 = y1 * fl.tilesX + x1
+                        val x0 = min(gx.toInt(), max(fl.tilesX - 2, 0)); val ty0 = min(gy.toInt(), max(fl.tilesY - 2, 0))
+                        val x1 = min(x0 + 1, fl.tilesX - 1); val ty1 = min(ty0 + 1, fl.tilesY - 1)
+                        val tx = gx - x0; val ty = gy - ty0
+                        val i00 = ty0 * fl.tilesX + x0; val i10 = ty0 * fl.tilesX + x1; val i01 = ty1 * fl.tilesX + x0; val i11 = ty1 * fl.tilesX + x1
                         px += (fl.u[i00] * (1 - tx) + fl.u[i10] * tx) * (1 - ty) + (fl.u[i01] * (1 - tx) + fl.u[i11] * tx) * ty
                         py += (fl.v[i00] * (1 - tx) + fl.v[i10] * tx) * (1 - ty) + (fl.v[i01] * (1 - tx) + fl.v[i11] * tx) * ty
-                        rowTrust += r
                     }
                     val cx = px.roundToInt(); val cy = py.roundToInt()
                     val sc = scale[f]
@@ -272,7 +336,7 @@ object BurstMerge {
                             if (qx < 0 || qx >= w) continue
                             val dx = qx - px
                             val q = ka * dx * dx + 2f * kb * dx * dy + kc * dy * dy
-                            val wgt = r * expLut[min((q * (1024f / 50f)).toInt(), 1024)]
+                            val wgt = r * expLut[min((q * (EXP_N / 50f) + 0.5f).toInt(), EXP_N)]
                             val pos = (qy and 1) * 2 + (qx and 1)
                             val c = img.cfa[pos]
                             val v = (((img.data[rowBase + qx].toInt() and 0xffff) - img.black[pos]) * sc[pos]).coerceIn(0f, 1f)
@@ -280,16 +344,14 @@ object BurstMerge {
                         }
                     }
                 }
-                val o = (y * w + x) * 3
+                val o = ((y - y0) * w + x) * 3
                 for (c in 0..2) out[o + c] = ((acc[c] / ws[c]) * 65535f + 0.5f).toInt().coerceIn(0, 65535).toShort()
             }
-            trust[y] = rowTrust
             val d = done.incrementAndGet()
-            if (d % 64 == 0) progress(0.5f + 0.5f * d / h)
+            if (d % 64 == 0) progress(d.toFloat() / (y1 - y0))
         }
-        val framesUsed = 1f + (trust.sum() / (w.toDouble() * h)).toFloat()
         progress(1f)
-        return MergedRaw(w, h, out, cropGainMaps(ref), ref.noiseScale?.let { (it / framesUsed).toDouble() to (ref.noiseOffset / framesUsed).toDouble() }, framesUsed)
+        return out
     }
 
     // ------------------------------------------------------------------ guide image

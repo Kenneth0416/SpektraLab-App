@@ -138,46 +138,53 @@ object DngReader {
             if (float != (predictor == 3)) return null                     // half float with its predictor, or integers
             val bytes = b.array()
             val rowBytes = width * spp * 2
-            val buf = ByteArray(rowsPerStrip * rowBytes)
-            for (i in offsets.indices) {
+            val n = width * spp
+            // strips are independent: inflate them on all cores
+            val failed = java.util.concurrent.atomic.AtomicBoolean(false)
+            java.util.stream.IntStream.range(0, offsets.size).parallel().forEach { i ->
                 val rows = minOf(rowsPerStrip, height - i * rowsPerStrip)
-                if (rows <= 0) break
+                if (rows <= 0 || failed.get()) return@forEach
+                val buf = ByteArray(rows * rowBytes)
                 val inf = java.util.zip.Inflater()
-                inf.setInput(bytes, offsets[i], counts[i])
-                var got = 0
-                while (got < rows * rowBytes && !inf.finished()) {
-                    val n = inf.inflate(buf, got, rows * rowBytes - got)
-                    if (n == 0 && (inf.needsInput() || inf.needsDictionary())) break
-                    got += n
+                try {
+                    inf.setInput(bytes, offsets[i], counts[i])
+                    var got = 0
+                    while (got < buf.size && !inf.finished()) {
+                        val m = inf.inflate(buf, got, buf.size - got)
+                        if (m == 0 && (inf.needsInput() || inf.needsDictionary())) break
+                        got += m
+                    }
+                    if (got < buf.size) { failed.set(true); return@forEach }
+                } catch (e: Exception) {
+                    failed.set(true); return@forEach
+                } finally {
+                    inf.end()
                 }
-                inf.end()
-                if (got < rows * rowBytes) return null
+                val at = i * rowsPerStrip * n
                 if (float) {
                     // undo the floating point predictor, then store as 16-bit integers (1.0 = 65535)
-                    val n = width * spp
                     for (r in 0 until rows) {
                         val o = r * rowBytes
                         for (k in spp until 2 * n) buf[o + k] = (buf[o + k] + buf[o + k - spp]).toByte()
                         for (k in 0 until n) {
                             val half = ((buf[o + k].toInt() and 0xff) shl 8) or (buf[o + n + k].toInt() and 0xff)
                             val v = app.spektralab.engine.Half.toFloat(half.toShort())
-                            data[pos + r * n + k] = (v.coerceIn(0f, 1f) * 65535f + 0.5f).toInt().toShort()
+                            data[at + r * n + k] = (v.coerceIn(0f, 1f) * 65535f + 0.5f).toInt().toShort()
                         }
                     }
-                    pos += rows * n
-                    continue
-                }
-                val sb = ByteBuffer.wrap(buf, 0, rows * rowBytes).order(order).asShortBuffer()
-                sb.get(data, pos, rows * width * spp)
-                if (predictor == 2) {
-                    // horizontal differencing, per sample
-                    for (r in 0 until rows) {
-                        val start = pos + r * width * spp
-                        for (k in spp until width * spp) data[start + k] = (data[start + k] + data[start + k - spp]).toShort()
+                } else {
+                    ByteBuffer.wrap(buf).order(order).asShortBuffer().get(data, at, rows * n)
+                    if (predictor == 2) {
+                        // horizontal differencing, per sample
+                        for (r in 0 until rows) {
+                            val start = at + r * n
+                            for (k in spp until n) data[start + k] = (data[start + k] + data[start + k - spp]).toShort()
+                        }
                     }
                 }
-                pos += rows * width * spp
             }
+            if (failed.get() || offsets.size * rowsPerStrip < height) return null
+            pos = data.size
         }
         if (pos < data.size) return null
 

@@ -365,4 +365,79 @@ void main() {
     fragColor = vec4(exp(-clamp(d, 0.0, 8.0) / 2.2), 1.0);
 }
 """
+
+    /** Most frames one merge pass can take (reference included). */
+    const val MERGE_MAX_FRAMES = 8
+
+    /**
+     * Burst merge gather (BurstMerge.gather on the GPU): every output pixel collects the
+     * raw samples of all frames that land within a 3x3 neighbourhood of its (motion
+     * compensated) position, weighted by the local anisotropic kernel and by how far the
+     * frame can be trusted there. Integer output 0..65535, rendered in strips from uRow0.
+     */
+    const val MERGE = """#version 300 es
+precision highp float;
+precision highp int;
+precision highp sampler2D;
+precision highp sampler2DArray;
+precision highp usampler2DArray;
+uniform usampler2DArray uRaw;      // R16UI: sensor values of the crop area, one layer per frame
+uniform sampler2DArray uFlow;      // RG32F: motion per tile in raw pixels, layer = frame - 1
+uniform sampler2DArray uRobust;    // R8: trust on the half-resolution grid, layer = frame - 1
+uniform sampler2D uKernel;         // RGB32F: inverse covariance (a, b, c) on the half-resolution grid
+uniform int uFrames;
+uniform ivec2 uSize;
+uniform ivec2 uGuide;
+uniform ivec2 uKern;
+uniform ivec2 uTiles;
+uniform float uOrigin;
+uniform float uStride;
+uniform int uRow0;
+uniform ivec4 uCfa;                // colour at each CFA position
+uniform vec4 uBlack[8];            // per frame, per CFA position
+uniform vec4 uScale[8];
+out highp uvec4 oColor;
+void main() {
+    ivec2 p = ivec2(gl_FragCoord.xy) + ivec2(0, uRow0);
+    vec3 k = texelFetch(uKernel, min(p / 2, uKern - 1), 0).rgb;
+    vec3 acc = vec3(0.0);
+    vec3 ws = vec3(0.0);
+    for (int f = 0; f < uFrames; f++) {
+        vec2 pos = vec2(p);
+        float r = 1.0;
+        if (f > 0) {
+            r = texelFetch(uRobust, ivec3(min(p / 2, uGuide - 1), f - 1), 0).r;
+            if (r <= 0.0) continue;
+            vec2 g = clamp((vec2(p) - uOrigin) / uStride, vec2(0.0), vec2(uTiles - 1));
+            ivec2 t0 = min(ivec2(g), max(uTiles - 2, ivec2(0)));
+            ivec2 t1 = min(t0 + 1, uTiles - 1);
+            vec2 t = g - vec2(t0);
+            vec2 f00 = texelFetch(uFlow, ivec3(t0, f - 1), 0).rg;
+            vec2 f10 = texelFetch(uFlow, ivec3(t1.x, t0.y, f - 1), 0).rg;
+            vec2 f01 = texelFetch(uFlow, ivec3(t0.x, t1.y, f - 1), 0).rg;
+            vec2 f11 = texelFetch(uFlow, ivec3(t1, f - 1), 0).rg;
+            pos += mix(mix(f00, f10, t.x), mix(f01, f11, t.x), t.y);
+        }
+        ivec2 c = ivec2(floor(pos + 0.5));
+        vec4 black = uBlack[f];
+        vec4 scale = uScale[f];
+        for (int j = -1; j <= 1; j++) {
+            for (int i = -1; i <= 1; i++) {
+                ivec2 q = c + ivec2(i, j);
+                if (q.x < 0 || q.y < 0 || q.x >= uSize.x || q.y >= uSize.y) continue;
+                vec2 d = vec2(q) - pos;
+                float e = k.x * d.x * d.x + 2.0 * k.y * d.x * d.y + k.z * d.y * d.y;
+                float w = r * exp(-0.5 * min(e, 50.0));
+                int cp = (q.y & 1) * 2 + (q.x & 1);
+                float v = clamp((float(texelFetch(uRaw, ivec3(q, f), 0).r) - black[cp]) * scale[cp], 0.0, 1.0);
+                int ch = uCfa[cp];
+                if (ch == 0) { acc.r += w * v; ws.r += w; }
+                else if (ch == 2) { acc.b += w * v; ws.b += w; }
+                else { acc.g += w * v; ws.g += w; }
+            }
+        }
+    }
+    oColor = uvec4(uvec3(clamp(acc / ws * 65535.0 + 0.5, 0.0, 65535.0)), 65535u);
+}
+"""
 }

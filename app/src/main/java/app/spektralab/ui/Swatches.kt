@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -198,7 +199,16 @@ fun paperChoices(look: Look, accent: Color): List<FrameChoice> = Catalog.papers.
 @Composable
 fun FrameRow(app: SpektraApp, source: LibraryItem?, choices: List<FrameChoice>, selected: String, onPick: (String) -> Unit) {
     val start = remember { (choices.indexOfFirst { it.id == selected } - 1).coerceAtLeast(0) }
-    LazyRow(Modifier.fillMaxWidth(), rememberLazyListState(start), contentPadding = PaddingValues(start = 4.dp, top = 8.dp, bottom = 2.dp, end = 8.dp)) {
+    // The row runs past the panel's side padding to its edges, and the frames are inset by
+    // the same amount: the loaded frame has room to lift and grow without being clipped,
+    // and frames scroll off under the panel edge instead of stopping short of it.
+    val bleed = 18.dp
+    LazyRow(Modifier.fillMaxWidth().layout { measurable, constraints ->
+        val extra = 2 * bleed.roundToPx()
+        val wide = constraints.maxWidth + extra
+        val placeable = measurable.measure(constraints.copy(minWidth = wide, maxWidth = wide))
+        layout(constraints.maxWidth, placeable.height) { placeable.place(-extra / 2, 0) }
+    }, rememberLazyListState(start), contentPadding = PaddingValues(start = bleed, top = 12.dp, bottom = 4.dp, end = bleed - 10.dp)) {
         items(choices, key = { it.id }) { c -> FilmFrame(app, source, c, c.id == selected) { onPick(c.id) } }
     }
 }

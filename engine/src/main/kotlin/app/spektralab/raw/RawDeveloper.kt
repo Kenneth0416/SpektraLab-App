@@ -36,6 +36,13 @@ object RawDeveloper {
      */
     fun develop(img: DngImage, maxLongEdge: Int, fast: Boolean = false, options: Options = Options()): LinearImage {
         val long = maxOf(img.cropWidth, img.cropHeight)
+        if (img.linear) {
+            // already demosaiced (merged burst): only reduce the size when asked for less
+            val k = maxOf(1, long / maxOf(maxLongEdge, 1))
+            val out = linear(img, k, options)
+            if (options.chromaDenoise) ChromaDenoise.apply(out, img, samplesPerChannel = (k * k).toFloat())
+            return out
+        }
         val bin = fast || long / 2 >= maxLongEdge
         val k = if (bin) maxOf(1, long / 2 / maxOf(maxLongEdge, 1)) else 0
         val out = if (bin) binned(img, k, options) else malvar(img, options)
@@ -51,6 +58,7 @@ object RawDeveloper {
         /** Gain maps per colour (two for green on a Bayer sensor). */
         private val maps: Array<List<GainMap>> = Array(3) { c ->
             if (img.gainMaps.size == 1) img.gainMaps
+            else if (img.linear) img.gainMaps.filter { it.plane == c }
             else (0 until 4).filter { img.cfa[it] == c }.mapNotNull { pos ->
                 val y = img.cropY + pos / 2; val x = img.cropX + pos % 2
                 img.gainMaps.firstOrNull { it.covers(x, y) }
@@ -132,6 +140,29 @@ object RawDeveloper {
         }
 
         fun image() = LinearImage(outW, outH, buf)
+    }
+
+    // ------------------------------------------------------------------ demosaiced input
+    private fun linear(img: DngImage, k: Int, options: Options): LinearImage {
+        val p = Prep(img, options)
+        val w = img.cropWidth / k
+        val h = img.cropHeight / k
+        val out = Writer(img, w, h)
+        val rgb = FloatArray(3)
+        val scale = 1f / (img.white - img.black[0]).coerceAtLeast(1f)
+        val inv = 1f / (k * k)
+        for (v in 0 until h) for (u in 0 until w) {
+            rgb.fill(0f)
+            for (dy in 0 until k) for (dx in 0 until k) {
+                val i = ((img.cropY + v * k + dy) * img.rawWidth + img.cropX + u * k + dx) * 3
+                for (c in 0..2) rgb[c] += ((img.data[i + c].toInt() and 0xffff) - img.black[0]) * scale
+            }
+            for (c in 0..2) rgb[c] = (rgb[c] * inv).coerceIn(0f, 1f) * img.wb[c]
+            p.reconstruct(rgb)
+            if (p.hasGain) for (c in 0..2) rgb[c] *= p.gain(c, u * k + k / 2, v * k + k / 2)
+            out.put(u, v, rgb[0], rgb[1], rgb[2])
+        }
+        return out.image()
     }
 
     // ------------------------------------------------------------------ binning

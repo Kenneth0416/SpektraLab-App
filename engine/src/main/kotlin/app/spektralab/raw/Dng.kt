@@ -10,6 +10,8 @@ class GainMap(
     val pointsV: Int, val pointsH: Int,
     val spacingV: Double, val spacingH: Double, val originV: Double, val originH: Double,
     val gains: FloatArray,
+    /** Image plane the map applies to (used by demosaiced linear DNGs: 0 R, 1 G, 2 B). */
+    val plane: Int = 0,
 ) {
     /** Gain at raw pixel (x, y) of an image [width] x [height] (bilinear, clamped). */
     fun gain(x: Int, y: Int, width: Int, height: Int): Float {
@@ -29,6 +31,9 @@ class GainMap(
     fun covers(x: Int, y: Int) = y >= top && y < bottom && x >= left && x < right &&
         (y - top) % rowPitch == 0 && (x - left) % colPitch == 0
 }
+
+/** A TIFF tag value kept for copying: numeric values, or the raw bytes of an ASCII tag. */
+class DngTag(val type: Int, val values: DoubleArray, val ascii: ByteArray? = null)
 
 /** A Bayer raw frame with the metadata needed to develop it to linear sRGB. */
 class DngImage(
@@ -57,6 +62,13 @@ class DngImage(
      */
     val noiseScale: Float? = null,
     val noiseOffset: Float = 0f,
+    /**
+     * True for demosaiced data (DNG LinearRaw, e.g. a merged burst): [data] then holds
+     * interleaved camera RGB, three samples per pixel, and [cfa] is unused.
+     */
+    val linear: Boolean = false,
+    /** Colour and identification tags as read, so a derived DNG can carry them over. */
+    val tags: Map<Int, DngTag> = emptyMap(),
 ) {
     /** Size after applying [orientation]. */
     val uprightWidth get() = if (orientation == 6 || orientation == 8) cropHeight else cropWidth
@@ -83,29 +95,89 @@ object DngReader {
         // the raw image is IFD0 itself or one of its SubIFDs (when a preview comes first)
         val candidates = ArrayList<Ifd>().apply { add(ifd0) }
         ifd0.entries[330]?.let { e -> values(b, e).forEach { off -> readIfd(b, off.toInt())?.let { candidates += it } } }
-        val raw = candidates.firstOrNull { ints(b, it, 262)?.firstOrNull() == 32803 } ?: return null
+        val raw = candidates.firstOrNull { ints(b, it, 262)?.firstOrNull() == 32803 }
+            ?: candidates.firstOrNull { ints(b, it, 262)?.firstOrNull() == 34892 } ?: return null
+        val linear = ints(b, raw, 262)?.firstOrNull() == 34892
         fun rawInts(tag: Int) = ints(b, raw, tag)
         fun anyD(tag: Int) = doubles(b, raw, tag) ?: doubles(b, ifd0, tag)
 
         val width = rawInts(256)?.first() ?: return null
         val height = rawInts(257)?.first() ?: return null
-        if ((rawInts(259)?.first() ?: 1) != 1) return null                    // uncompressed only
+        val compression = rawInts(259)?.first() ?: 1
         if ((rawInts(258)?.first() ?: 0) != 16) return null
-        if ((rawInts(277)?.first() ?: 1) != 1) return null
-        val dim = rawInts(33421) ?: return null
-        if (dim.size != 2 || dim[0] != 2 || dim[1] != 2) return null
-        val cfa = rawInts(33422)?.takeIf { it.size == 4 && it.all { c -> c in 0..2 } } ?: return null
+        val spp = rawInts(277)?.first() ?: 1
+        val cfa: IntArray
+        if (linear) {
+            // demosaiced camera RGB: uncompressed or deflate, as written by DngWriter
+            if (spp != 3 || (compression != 1 && compression != 8)) return null
+            if ((rawInts(284)?.first() ?: 1) != 1) return null
+            cfa = intArrayOf(0, 1, 1, 2)
+        } else {
+            if (compression != 1 || spp != 1) return null                      // Bayer: uncompressed only
+            val dim = rawInts(33421) ?: return null
+            if (dim.size != 2 || dim[0] != 2 || dim[1] != 2) return null
+            cfa = rawInts(33422)?.takeIf { it.size == 4 && it.all { c -> c in 0..2 } } ?: return null
+        }
         val offsets = rawInts(273) ?: return null                              // strips (no tiles)
         val counts = rawInts(279) ?: return null
 
-        val data = ShortArray(width * height)
+        val data = ShortArray(width * height * spp)
         var pos = 0
-        for (i in offsets.indices) {
-            val n = minOf(counts[i] / 2, data.size - pos)
-            val sb = b.duplicate().order(order)
-            sb.position(offsets[i]); sb.limit(offsets[i] + n * 2)
-            sb.asShortBuffer().get(data, pos, n)
-            pos += n
+        if (compression == 1) {
+            for (i in offsets.indices) {
+                val n = minOf(counts[i] / 2, data.size - pos)
+                val sb = b.duplicate().order(order)
+                sb.position(offsets[i]); sb.limit(offsets[i] + n * 2)
+                sb.asShortBuffer().get(data, pos, n)
+                pos += n
+            }
+        } else {
+            val rowsPerStrip = rawInts(278)?.first() ?: height
+            val predictor = rawInts(317)?.first() ?: 1
+            val float = rawInts(339)?.first() == 3
+            if (float != (predictor == 3)) return null                     // half float with its predictor, or integers
+            val bytes = b.array()
+            val rowBytes = width * spp * 2
+            val buf = ByteArray(rowsPerStrip * rowBytes)
+            for (i in offsets.indices) {
+                val rows = minOf(rowsPerStrip, height - i * rowsPerStrip)
+                if (rows <= 0) break
+                val inf = java.util.zip.Inflater()
+                inf.setInput(bytes, offsets[i], counts[i])
+                var got = 0
+                while (got < rows * rowBytes && !inf.finished()) {
+                    val n = inf.inflate(buf, got, rows * rowBytes - got)
+                    if (n == 0 && (inf.needsInput() || inf.needsDictionary())) break
+                    got += n
+                }
+                inf.end()
+                if (got < rows * rowBytes) return null
+                if (float) {
+                    // undo the floating point predictor, then store as 16-bit integers (1.0 = 65535)
+                    val n = width * spp
+                    for (r in 0 until rows) {
+                        val o = r * rowBytes
+                        for (k in spp until 2 * n) buf[o + k] = (buf[o + k] + buf[o + k - spp]).toByte()
+                        for (k in 0 until n) {
+                            val half = ((buf[o + k].toInt() and 0xff) shl 8) or (buf[o + n + k].toInt() and 0xff)
+                            val v = app.spektralab.engine.Half.toFloat(half.toShort())
+                            data[pos + r * n + k] = (v.coerceIn(0f, 1f) * 65535f + 0.5f).toInt().toShort()
+                        }
+                    }
+                    pos += rows * n
+                    continue
+                }
+                val sb = ByteBuffer.wrap(buf, 0, rows * rowBytes).order(order).asShortBuffer()
+                sb.get(data, pos, rows * width * spp)
+                if (predictor == 2) {
+                    // horizontal differencing, per sample
+                    for (r in 0 until rows) {
+                        val start = pos + r * width * spp
+                        for (k in spp until width * spp) data[start + k] = (data[start + k] + data[start + k - spp]).toShort()
+                    }
+                }
+                pos += rows * width * spp
+            }
         }
         if (pos < data.size) return null
 
@@ -116,7 +188,8 @@ object DngReader {
             val r = i / 2; val c = i % 2
             blackVals[((r % blackRep[0]) * blackRep[1] + (c % blackRep[1])).coerceAtMost(blackVals.size - 1)].toFloat()
         }
-        val white = (anyD(50717)?.first() ?: 65535.0).toFloat()
+        val floatData = linear && rawInts(339)?.first() == 3
+        val white = if (floatData) 65535f else (anyD(50717)?.first() ?: 65535.0).toFloat()
 
         // crop: DefaultCropOrigin/Size are relative to the ActiveArea
         val active = rawInts(50829) ?: intArrayOf(0, 0, height, width)         // top, left, bottom, right
@@ -124,11 +197,14 @@ object DngReader {
         val size = anyD(50720) ?: doubleArrayOf((active[3] - active[1]).toDouble(), (active[2] - active[0]).toDouble())
         var cropX = active[1] + origin[0].toInt()
         var cropY = active[0] + origin[1].toInt()
-        // keep the CFA phase: start on an even raw coordinate
-        cropX += cropX % 2; cropY += cropY % 2
         var cropW = minOf(size[0].toInt(), width - cropX)
         var cropH = minOf(size[1].toInt(), height - cropY)
-        cropW -= cropW % 2; cropH -= cropH % 2
+        if (!linear) {
+            // keep the CFA phase: start on an even raw coordinate
+            cropX += cropX % 2; cropY += cropY % 2
+            cropW = minOf(cropW, width - cropX); cropH = minOf(cropH, height - cropY)
+            cropW -= cropW % 2; cropH -= cropH % 2
+        }
         if (cropW < 4 || cropH < 4) return null
 
         // colour
@@ -147,7 +223,8 @@ object DngReader {
         val noiseOffset = noise?.let { n -> (1 until n.size step 2).map { n[it] }.average().toFloat() }?.coerceAtLeast(0f) ?: 0f
 
         return DngImage(width, height, data, cfa, black, white, cropX, cropY, cropW, cropH,
-            wb, FloatArray(9) { camToSrgb[it].toFloat() }, orientation, baseline, gainMaps, noiseScale, noiseOffset)
+            wb, FloatArray(9) { camToSrgb[it].toFloat() }, orientation, baseline, gainMaps, noiseScale, noiseOffset,
+            linear, keepTags(b, ifd0, raw))
     }
 
     /**
@@ -207,6 +284,22 @@ object DngReader {
         else -> null
     }
 
+    /** Tags a derived DNG needs to stay interpretable: colour calibration, white balance, identity, date. */
+    private val KEEP = intArrayOf(271, 272, 306, 50708, 50721, 50722, 50728, 50730, 50778, 50779, 50964, 50965)
+
+    private fun keepTags(b: ByteBuffer, ifd0: Ifd, raw: Ifd): Map<Int, DngTag> {
+        val out = HashMap<Int, DngTag>()
+        for (tag in KEEP) {
+            val e = ifd0.entries[tag] ?: raw.entries[tag] ?: continue
+            if (e.type == 2) {
+                val bytes = ByteArray(e.count.coerceIn(0, 256))
+                val d = b.duplicate(); d.position(e.valueOffset); d.get(bytes)
+                out[tag] = DngTag(2, DoubleArray(0), bytes)
+            } else out[tag] = DngTag(e.type, values(b, e))
+        }
+        return out
+    }
+
     private fun parseGainMaps(b: ByteBuffer, e: Entry): List<GainMap> {
         // opcode lists are always big endian
         val o = b.duplicate().order(ByteOrder.BIG_ENDIAN)
@@ -219,7 +312,7 @@ object DngReader {
             val next = o.position() + size
             if (id == 9) {
                 val top = o.int; val left = o.int; val bottom = o.int; val right = o.int
-                o.int; o.int                                                   // plane, planes
+                val plane = o.int; o.int                                       // plane, planes
                 val rowPitch = o.int; val colPitch = o.int
                 val pv = o.int; val ph = o.int
                 val sv = o.double; val sh = o.double; val ov = o.double; val oh = o.double
@@ -227,7 +320,7 @@ object DngReader {
                 val gains = FloatArray(pv * ph)
                 for (i in 0 until pv * ph) { gains[i] = o.float; repeat(mapPlanes - 1) { o.float } }
                 if (pv >= 1 && ph >= 1 && rowPitch > 0 && colPitch > 0)
-                    out += GainMap(top, left, bottom, right, rowPitch, colPitch, pv, ph, sv, sh, ov, oh, gains)
+                    out += GainMap(top, left, bottom, right, rowPitch, colPitch, pv, ph, sv, sh, ov, oh, gains, plane)
             }
             o.position(next)
         }

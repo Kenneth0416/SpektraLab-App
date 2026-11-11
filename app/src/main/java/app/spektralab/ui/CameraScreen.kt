@@ -79,6 +79,7 @@ import app.spektralab.render.Framing
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -152,9 +153,11 @@ fun CameraScreen(state: AppState) {
     // bind the camera while this screen is shown
     DisposableEffect(granted, front) {
         var provider: ProcessCameraProvider? = null
+        var disposed = false
         if (granted) {
             val future = ProcessCameraProvider.getInstance(context)
             future.addListener({
+                if (disposed) return@addListener
                 val p = runCatching { future.get() }.getOrNull() ?: return@addListener
                 provider = p
                 var selector = if (front) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
@@ -193,6 +196,7 @@ fun CameraScreen(state: AppState) {
             }, ContextCompat.getMainExecutor(context))
         }
         onDispose {
+            disposed = true
             session = null
             runCatching { provider?.unbindAll() }
         }
@@ -207,6 +211,43 @@ fun CameraScreen(state: AppState) {
         val obs = androidx.lifecycle.Observer<androidx.camera.core.ZoomState> { zoomRange = it.minZoomRatio to it.maxZoomRatio }
         live?.observe(owner, obs)
         onDispose { live?.removeObserver(obs) }
+    }
+    // read the lens data once per bound session, not per recomposition
+    val lens = remember(session) { session?.let { readLens(context, it.camera) } }
+    // zoom stops shared by the chips and the pinch haptic; real lenses when they can be read
+    val zoomStops = remember(zoomRange, lens) {
+        val (min, max) = zoomRange
+        val real = lens?.stops.orEmpty().filter { it in min..max }
+        val all = (real + 1f).sorted().fold(listOf<Float>()) { acc, z ->
+            if (acc.isNotEmpty() && z / acc.last() < 1.1f) acc else acc + z
+        }
+        if (real.size >= 2) all else buildList {
+            if (min < 0.95f) add(min)
+            add(1f)
+            if (max >= 2f) add(2f)
+            if (max >= 5f) add(5f)
+        }
+    }
+    // 35mm-equivalent label for a zoom ratio; null when the focal length is unknown (falls back to ×)
+    val baseMm = lens?.baseMm
+    // only talk to the camera when the ratio really changed (pinch events often repeat a value)
+    var appliedZoom by remember(session) { mutableFloatStateOf(Float.NaN) }
+    fun applyZoom(z: Float) {
+        zoom = z
+        if (z == appliedZoom) return
+        appliedZoom = z
+        session?.camera?.cameraControl?.setZoomRatio(z)
+    }
+    var zoomJob by remember { mutableStateOf<Job?>(null) }
+    // chips and double tap glide to the target; a pinch or lens flip cancels the glide
+    fun animateZoom(target: Float) {
+        zoomJob?.cancel()
+        zoomJob = scope.launch {
+            Animatable(zoom).animateTo(target.coerceIn(zoomRange.first, zoomRange.second), Motion.glide) {
+                // a spring may overshoot the lens range, which the camera rejects
+                applyZoom(value.coerceIn(zoomRange.first, zoomRange.second))
+            }
+        }
     }
 
 
@@ -262,6 +303,7 @@ fun CameraScreen(state: AppState) {
     fun shoot() {
         val s = session ?: return state.say(if (granted) "相机还没准备好" else "需要相机权限")
         if (busy) return
+        if (!state.shooter.available) return state.say("上一张还在处理，请稍候")
         if (!cocked) {
             // shutter is locked until the film is advanced
             haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -331,13 +373,14 @@ fun CameraScreen(state: AppState) {
             val frames = if (multiFrame) state.shooter.frameCount(chars) else 1
             s.capture.flashMode = if (frames > 1) ImageCapture.FLASH_MODE_OFF else flash
             if (frames > 1) state.say("连拍 $frames 帧，请拿稳")
-            state.shooter.shoot(s.capture, chars, frames, "SPK_$stamp", evBias) { ok, retry ->
+            val accepted = state.shooter.shoot(s.capture, chars, frames, "SPK_$stamp", evBias) { ok, retry ->
                 when {
                     ok -> captured.complete(true)
                     retry && session === s -> saveThroughCameraX()
                     else -> { captured.complete(false); state.say("拍摄失败") }
                 }
             }
+            if (!accepted) { captured.complete(false); state.say("上一张还在处理，请稍候") }
         } else saveThroughCameraX()
     }
     val shootNow by rememberUpdatedState(::shoot)
@@ -399,7 +442,7 @@ fun CameraScreen(state: AppState) {
                 Box(Modifier.aspectRatio(aspect, matchHeightConstraintsFirst = aspect < boxAspect)
                     .pointerInput(session) {
                         // tap: focus and meter the sensor there (released after a few seconds);
-                        // long press: lock focus and exposure until the next tap
+                        // long press: hold focus until the next tap (AE continues to meter)
                         fun focusOn(p: Offset, lock: Boolean) {
                             val s = session ?: return
                             val point = previewView.meteringPointFactory.createPoint(p.x, p.y)
@@ -433,14 +476,18 @@ fun CameraScreen(state: AppState) {
                             onDoubleTap = { evBias = 0f },
                         )
                     }
-                    .pointerInput(session, zoomRange) {
+                    .pointerInput(session, zoomRange, zoomStops) {
+                        // pinch to zoom: follows the fingers directly, no animation
                         detectTransformGestures { _, pan, change, _ ->
                             if (change != 1f) {
-                                // pinch to zoom
-                                zoom = (zoom * change).coerceIn(zoomRange.first, zoomRange.second)
-                                session?.camera?.cameraControl?.setZoomRatio(zoom)
+                                zoomJob?.cancel()
+                                val old = zoom
+                                val new = (old * change).coerceIn(zoomRange.first, zoomRange.second)
+                                // tick when crossing (or landing on) a stop
+                                if (new != old && zoomStops.any { (old - it) * (new - it) < 0f || (new == it && old != it) })
+                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                applyZoom(new)
                             } else if (focusLocked || System.currentTimeMillis() - focusTouchedAt < 5000) {
-                                // after choosing a point, dragging up / down brightens / darkens the exposure
                                 focusTouchedAt = System.currentTimeMillis()
                                 evBias = (evBias - pan.y / 240.dp.toPx() * 2f).coerceIn(-2f, 2f)
                             }
@@ -498,7 +545,7 @@ fun CameraScreen(state: AppState) {
                                 modifier = Modifier.graphicsLayer { rotationZ = iconTurn }.background(Color(0x99140807)).padding(horizontal = 6.dp, vertical = 2.dp))
                         }
                         androidx.compose.animation.AnimatedVisibility(focusLocked, enter = fadeIn(), exit = fadeOut()) {
-                            Text("AE/AF 锁定", fontSize = 10.sp, color = Pal.dink,
+                            Text("对焦锁定", fontSize = 10.sp, color = Pal.dink,
                                 modifier = Modifier.padding(top = 4.dp).graphicsLayer { rotationZ = iconTurn }.background(accent, RoundedCornerShape(3.dp)).padding(horizontal = 5.dp, vertical = 1.dp))
                         }
                     }
@@ -512,25 +559,20 @@ fun CameraScreen(state: AppState) {
                                 .background(Color(0xB3140807), RoundedCornerShape(14.dp)).padding(horizontal = 14.dp, vertical = 7.dp))
                     }
                     // zoom steps sit on the lower edge of the finder, where thumbs expect them
-                    val stops = buildList {
-                        val (min, max) = zoomRange
-                        if (min < 0.95f) add(min)
-                        add(1f)
-                        if (max >= 2f) add(2f)
-                        if (max >= 5f) add(5f)
-                    }
+                    val stops = zoomStops
                     Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp)
                         .background(Color(0x80140807), CircleShape).padding(3.dp)) {
                         val nearest = stops.minByOrNull { kotlin.math.abs(it - zoom) }
                         stops.forEach { z ->
                             val on = z == nearest
-                            val label = if (on && kotlin.math.abs(zoom - z) > 0.05f) "%.1f×".format(zoom)
+                            val live = on && kotlin.math.abs(zoom - z) > 0.05f
+                            val label = if (baseMm != null) "${Math.round(baseMm * (if (live) zoom else z))}" + if (on) "mm" else ""
+                                else if (live) "%.1f×".format(zoom)
                                 else if (z < 1f) "%.1f".format(z).trimStart('0') else "${z.toInt()}" + if (on) "×" else ""
                             Text(label, fontFamily = Fonts.mono, fontSize = 11.sp,
                                 color = if (on) Pal.dink else Pal.text, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
                                 modifier = Modifier.padding(horizontal = 2.dp).springClick {
-                                    zoom = z
-                                    session?.camera?.cameraControl?.setZoomRatio(z)
+                                    animateZoom(z)
                                 }.graphicsLayer { rotationZ = iconTurn }.clip(CircleShape).background(if (on) accent else Color.Transparent)
                                     .padding(horizontal = 9.dp, vertical = 7.dp))
                         }
@@ -568,7 +610,7 @@ fun CameraScreen(state: AppState) {
         val spin = remember { Animatable(0f) }
         Box(Modifier.size(52.dp).semantics { contentDescription = "切换前后镜头" }
             .springClick(0.9f) {
-                front = !front; zoom = 1f
+                front = !front; zoomJob?.cancel(); zoom = 1f
                 scope.launch { spin.snapTo(0f); spin.animateTo(180f, Motion.settle) }
             }.border(1.dp, Pal.off, CircleShape), contentAlignment = Alignment.Center) {
             // Keep the drawing and rotation anchored to the button's center.
@@ -695,4 +737,26 @@ private fun requestRawMetadata(builder: ImageCapture.Builder, results: android.h
 private fun cameraCharacteristics(context: android.content.Context, camera: Camera): android.hardware.camera2.CameraCharacteristics? = runCatching {
     val id = androidx.camera.camera2.interop.Camera2CameraInfo.from(camera.cameraInfo).cameraId
     context.getSystemService(android.hardware.camera2.CameraManager::class.java).getCameraCharacteristics(id)
+}.getOrNull()
+
+/** Base 35mm-equivalent focal length (zoom 1.0) and the zoom ratios of the phone's physical lenses. */
+private class LensInfo(val baseMm: Float, val stops: List<Float>)
+
+@androidx.annotation.OptIn(androidx.camera.camera2.interop.ExperimentalCamera2Interop::class)
+private fun readLens(context: android.content.Context, camera: Camera): LensInfo? = runCatching {
+    val info = androidx.camera.camera2.interop.Camera2CameraInfo.from(camera.cameraInfo)
+    fun equiv(c: android.hardware.camera2.CameraCharacteristics): Float? {
+        val focal = c.get(android.hardware.camera2.CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)?.firstOrNull() ?: return null
+        val size = c.get(android.hardware.camera2.CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE) ?: return null
+        val diag = kotlin.math.hypot(size.width, size.height)
+        return if (focal > 0f && diag > 0f) focal * 43.27f / diag else null
+    }
+    val logical = info.getCameraCharacteristicsMap()[info.cameraId]
+        ?: (context.getSystemService(android.content.Context.CAMERA_SERVICE) as android.hardware.camera2.CameraManager).getCameraCharacteristics(info.cameraId)
+    val base = equiv(logical)?.takeIf { it > 0f } ?: return@runCatching null
+    val manager = context.getSystemService(android.content.Context.CAMERA_SERVICE) as android.hardware.camera2.CameraManager
+    val stops = runCatching {
+        logical.physicalCameraIds.mapNotNull { id -> equiv(manager.getCameraCharacteristics(id))?.let { it / base } }
+    }.getOrDefault(emptyList())
+    LensInfo(base, stops)
 }.getOrNull()

@@ -92,6 +92,12 @@ class AppState(application: Application) : AndroidViewModel(application) {
         sh.onSaved = { uri, evBias -> onShotSaved(uri, evBias) }
         sh.onFinished = { first, merged, used -> onShotFinished(first, merged, used) }
     }
+    override fun onCleared() {
+        shooter.close()
+        shots.clear()
+        super.onCleared()
+    }
+
     private val shots = HashMap<Uri, kotlinx.coroutines.Deferred<LibraryItem?>>()
 
     /** The first frame of a shot is in the album: it goes on the lightbox right away. */
@@ -111,12 +117,12 @@ class AppState(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val id = pending?.await()?.id
             if (merged != null) {
-                // one original per shot in the album: the merged one
+                // The lightbox uses the merged source. Keep the first frame in MediaStore:
+                // queued exports and in-flight decodes may still own its immutable URI.
                 if (id != null && library.item(id) != null) {
                     library.setSource(id, merged.toString(), withContext(Dispatchers.IO) { Media.name(app, merged) })
                     say("%.1f 帧合成完成".format(framesUsed))
                 }
-                withContext(Dispatchers.IO) { runCatching { app.contentResolver.delete(first, null, null) } }
             }
             // every shot is also printed: the film picture goes to the album next to the original
             id?.let { library.item(it) }?.let { exports.enqueue(it, exportOptions.value) }

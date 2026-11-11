@@ -91,6 +91,15 @@ class RawShooter(private val context: Context) {
     /** Alignment and merging, one shot after the other (memory). */
     private val work = Executors.newSingleThreadExecutor()
     private val merging = AtomicInteger()
+    // A lease lasts through capture AND merge; no later shot can queue more RAW arrays.
+    private val admission = ShotAdmission { io.shutdown(); work.shutdown() }
+    val available get() = admission.available
+
+    /** Stop new shots; queued callbacks still close their ImageProxy and drain safely. */
+    fun close() {
+        onProgress = {}; onSaved = { _, _ -> }; onFinished = { _, _, _ -> }
+        admission.close()
+    }
 
     /**
      * Frames worth taking now: in good light one raw frame is already clean; the more the
@@ -108,15 +117,26 @@ class RawShooter(private val context: Context) {
      *   not be taken this way and should be retried through CameraX's own saving ([retry])
      */
     fun shoot(capture: ImageCapture, chars: CameraCharacteristics, frames: Int, name: String, evBias: Float,
-              onExposed: (ok: Boolean, retry: Boolean) -> Unit) {
-        val shot = Shot(frames, name, evBias, onExposed)
-        // all requests at once: CameraX exposes them back to back while earlier frames are converted
-        repeat(frames) {
-            capture.takePicture(io, object : ImageCapture.OnImageCapturedCallback() {
-                override fun onCaptureSuccess(image: ImageProxy) = shot.frame(toDng(image, chars, shot.dead), null)
-                override fun onError(exception: ImageCaptureException) = shot.frame(null, exception)
-            })
+              onExposed: (ok: Boolean, retry: Boolean) -> Unit): Boolean {
+        require(frames in 1..MAX_FRAMES)
+        val lease = admission.acquire() ?: return false
+        val shot = Shot(frames, name, evBias, onExposed, lease)
+        // At most MAX_FRAMES callbacks/tasks exist: admission stays closed through merging.
+        repeat(frames) { index ->
+            try {
+                capture.takePicture(io, object : ImageCapture.OnImageCapturedCallback() {
+                    override fun onCaptureSuccess(image: ImageProxy) = shot.frame(toDng(image, chars, shot.dead), null)
+                    override fun onError(exception: ImageCaptureException) = shot.frame(null, exception)
+                })
+            } catch (e: Exception) {
+                // Requests that threw synchronously will never deliver callbacks. Count those
+                // and the unsubmitted remainder on the same serial thread as real callbacks.
+                val error = ImageCaptureException(ImageCapture.ERROR_UNKNOWN, "capture submission failed", e)
+                io.execute { repeat(frames - index) { shot.frame(null, error) } }
+                return true
+            }
         }
+        return true
     }
 
     @androidx.annotation.OptIn(ExperimentalGetImage::class)
@@ -144,7 +164,8 @@ class RawShooter(private val context: Context) {
     }
 
     /** One press of the shutter. [frame] runs on the io thread, in capture order. */
-    private inner class Shot(val frames: Int, val name: String, val evBias: Float, val onExposed: (Boolean, Boolean) -> Unit) {
+    private inner class Shot(val frames: Int, val name: String, val evBias: Float,
+                             val onExposed: (Boolean, Boolean) -> Unit, val lease: ShotAdmission.Lease) {
         @Volatile var dead = false
         private var arrived = 0
         private var first: Uri? = null
@@ -153,6 +174,7 @@ class RawShooter(private val context: Context) {
 
         fun frame(dng: ByteArray?, error: ImageCaptureException?) {
             arrived++
+            if (arrived == frames) lease.capturesDone()
             if (dead) return
             if (first == null) {
                 if (dng == null) {
@@ -161,12 +183,13 @@ class RawShooter(private val context: Context) {
                     if (arrived == 1 && error == null) unsupported = true
                     if (arrived == 1 || arrived == frames) {
                         dead = true
+                        lease.processingDone()
                         main.execute { onExposed(false, error == null) }
                     }
                     return
                 }
                 val uri = save("$name.dng") { it.write(dng) }
-                if (uri == null) { dead = true; main.execute { onExposed(false, false) }; return }
+                if (uri == null) { dead = true; lease.processingDone(); main.execute { onExposed(false, false) }; return }
                 first = uri
                 main.execute { onSaved(uri, evBias) }
                 if (frames > 1) {
@@ -182,7 +205,10 @@ class RawShooter(private val context: Context) {
             if (arrived == frames) {
                 main.execute { onExposed(true, false) }
                 val uri = first!!
-                if (frames > 1) work.execute { finish(uri) } else main.execute { onFinished(uri, null, 1f) }
+                if (frames > 1) work.execute { finish(uri) } else {
+                    lease.processingDone()
+                    main.execute { onFinished(uri, null, 1f) }
+                }
             }
         }
 
@@ -202,8 +228,11 @@ class RawShooter(private val context: Context) {
                 // also out of memory: the first frame stays the original
                 Log.w(TAG, "burst not merged", t)
                 planner = null
+            } finally {
+                planner = null
+                if (merging.decrementAndGet() == 0) onProgress(null)
+                lease.processingDone()
             }
-            if (merging.decrementAndGet() == 0) onProgress(null)
             main.execute { onFinished(first, merged, used) }
         }
     }

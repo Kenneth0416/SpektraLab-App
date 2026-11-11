@@ -366,6 +366,18 @@ void main() {
 }
 """
 
+    /** A window of a texture on the whole viewport: the zoomed view of a finished render. */
+    const val BLIT = HEADER + """
+in vec2 vUv;
+uniform sampler2D uSrc;
+uniform vec2 uOffset;
+uniform vec2 uScale;
+out vec4 oColor;
+void main() {
+    oColor = vec4(texture(uSrc, uOffset + vUv * uScale).rgb, 1.0);
+}
+"""
+
     /** Most frames one merge pass can take (reference included). */
     const val MERGE_MAX_FRAMES = 8
 

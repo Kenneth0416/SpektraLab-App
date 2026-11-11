@@ -42,7 +42,7 @@ enum class PhotoFormat(val label: String, val mime: String, val ext: String) {
 data class ExportOptions(
     val photoFormat: PhotoFormat = PhotoFormat.JPEG,
     /** Long edge in px; 0 = full size. */
-    val photoLongEdge: Int = 3400,
+    val photoLongEdge: Int = 0,
     val videoLongEdge: Int = 1920,
 )
 
@@ -164,6 +164,8 @@ class ExportManager(private val app: SpektraApp) {
                 put(MediaStore.Images.Media.DISPLAY_NAME, "SPK_${stamp}_${item.id}_$film.${o.photoFormat.ext}")
                 put(MediaStore.Images.Media.MIME_TYPE, o.photoFormat.mime)
                 put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/SpektraLab")
+                // sorted in the album by when the picture was taken, not when it was printed
+                put(MediaStore.Images.Media.DATE_TAKEN, item.dateTaken)
                 put(MediaStore.Images.Media.IS_PENDING, 1)
             }
             val cr = app.contentResolver
@@ -177,6 +179,17 @@ class ExportManager(private val app: SpektraApp) {
                         }
                     }
                     check(ok) { "encoding failed" }
+                    if (o.photoFormat == PhotoFormat.JPEG) runCatching {
+                        cr.openFileDescriptor(uri, "rw")?.use { pfd ->
+                            val exif = androidx.exifinterface.media.ExifInterface(pfd.fileDescriptor)
+                            val taken = SimpleDateFormat("yyyy:MM:dd HH:mm:ss", Locale.US).format(Date(item.dateTaken))
+                            exif.setAttribute(androidx.exifinterface.media.ExifInterface.TAG_DATETIME_ORIGINAL, taken)
+                            exif.setAttribute(androidx.exifinterface.media.ExifInterface.TAG_DATETIME, taken)
+                            exif.setAttribute(androidx.exifinterface.media.ExifInterface.TAG_SOFTWARE, "SpektraLab")
+                            exif.setAttribute(androidx.exifinterface.media.ExifInterface.TAG_IMAGE_DESCRIPTION, app.engine.film(item.look.film).name)
+                            exif.saveAttributes()
+                        }
+                    }
                     cr.update(uri, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null)
                 }
             } catch (e: Throwable) {

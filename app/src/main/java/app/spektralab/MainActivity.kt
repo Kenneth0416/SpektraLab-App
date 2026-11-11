@@ -10,8 +10,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -22,6 +20,7 @@ import androidx.compose.ui.Modifier
 import app.spektralab.ui.AppState
 import app.spektralab.ui.EditorScreen
 import app.spektralab.ui.LibraryScreen
+import app.spektralab.ui.RoomTransition
 import app.spektralab.ui.LocalFold
 import app.spektralab.ui.rememberFoldState
 import app.spektralab.ui.Sheet
@@ -61,7 +60,7 @@ class MainActivity : ComponentActivity() {
                 }
                 Box(Modifier.fillMaxSize()) {
                     // lightbox <-> darkroom: the bright table fades to near black
-                    Crossfade(editId, animationSpec = tween(450), label = "room") { id ->
+                    RoomTransition(editId, isDark = { it != null }) { id ->
                         if (id == null) LibraryScreen(state) else EditorScreen(state, id)
                     }
                     Sheets(state)

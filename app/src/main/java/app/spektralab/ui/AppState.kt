@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import app.spektralab.SpektraApp
 import app.spektralab.data.LibraryItem
 import app.spektralab.data.Media
+import app.spektralab.data.LookJson
 import app.spektralab.data.Recipe
 import app.spektralab.engine.Look
 import app.spektralab.export.ExportOptions
@@ -38,6 +39,49 @@ class AppState(application: Application) : AndroidViewModel(application) {
     val exportOptions = MutableStateFlow(ExportOptions())
     val importing = MutableStateFlow(false)
 
+    // camera: the look loaded in the camera, kept between sessions
+    val cameraOpen = MutableStateFlow(false)
+    val camLook = MutableStateFlow(runCatching {
+        LookJson.fromJson(org.json.JSONObject(application.getSharedPreferences("camera", android.content.Context.MODE_PRIVATE).getString("look", "{}")!!))
+    }.getOrDefault(Look.DEFAULT))
+
+    fun setCamLook(look: Look) {
+        camLook.value = look
+        app.getSharedPreferences("camera", android.content.Context.MODE_PRIVATE).edit().putString("look", LookJson.toJson(look).toString()).apply()
+    }
+
+    /** Hardware shutter (volume keys) while the camera is open. */
+    val shutterKey = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+    fun openCamera() { sheet.value = Sheet.NONE; selecting.value = false; picked.value = emptyList(); cameraOpen.value = true }
+    fun closeCamera() { cameraOpen.value = false; sheet.value = Sheet.NONE }
+
+    /**
+     * A shot was saved to the album ([uri] is the untouched original, raw when possible):
+     * put it on the lightbox with the camera's look and print it.
+     */
+    fun onCaptured(uri: Uri) {
+        val look = camLook.value
+        viewModelScope.launch {
+            val item = withContext(Dispatchers.IO) { Media.importItem(app, uri, library.reserveIds(1)) }?.copy(look = look)
+                ?: return@launch say("拍到了，但读不回原片")
+            library.add(listOf(item))
+            say(if (item.isRaw) "已放上灯箱 · RAW 原片保留" else "已放上灯箱 · 原片保留")
+            // every shot is also printed: the film picture goes to the album next to the original
+            exports.enqueue(item, exportOptions.value)
+        }
+    }
+
+    // viewing preferences (spektrafilm GUI display options)
+    private val prefs = application.getSharedPreferences("display", android.content.Context.MODE_PRIVATE)
+    /** 18% grey backdrop around the print, like spektrafilm's gray_18_canvas. */
+    val gray18 = MutableStateFlow(prefs.getBoolean("gray18", false))
+    /** spektrafilm's instant-film development animation when a photo opens. */
+    val reveal = MutableStateFlow(prefs.getBoolean("reveal", true))
+
+    fun setGray18(on: Boolean) { gray18.value = on; prefs.edit().putBoolean("gray18", on).apply() }
+    fun setReveal(on: Boolean) { reveal.value = on; prefs.edit().putBoolean("reveal", on).apply() }
+
     private val _hint = MutableStateFlow("")
     val hint: StateFlow<String> = _hint
     private var hintJob: Job? = null
@@ -55,6 +99,9 @@ class AppState(application: Application) : AndroidViewModel(application) {
 
     fun currentItem(): LibraryItem? = editId.value?.let { library.item(it) }
 
+    /** Recipes apply to the open item, else to the camera, else to the circled items. */
+    private val recipeTargetIsCamera get() = editId.value == null && cameraOpen.value
+
     // ----------------------------------------------------------- navigation
     fun openEdit(id: Long) {
         lastKey = null
@@ -64,6 +111,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
     }
 
     fun back() {
+        if (editId.value == null && cameraOpen.value) return closeCamera()
         editId.value = null
         sheet.value = Sheet.NONE
     }
@@ -129,28 +177,30 @@ class AppState(application: Application) : AndroidViewModel(application) {
     fun removePicked() {
         if (picked.value.isEmpty()) return say("先圈出要移除的项目")
         val n = picked.value.size
+        app.thumbs.forget(picked.value)
         library.remove(picked.value)
         picked.value = emptyList(); selecting.value = false
         say("已移除 $n 项，相册原片不受影响")
     }
 
     fun openRecipes() {
-        if (editId.value == null && picked.value.isEmpty()) return say("先圈出要套用的项目")
+        if (editId.value == null && !cameraOpen.value && picked.value.isEmpty()) return say("先圈出要套用的项目")
         sheet.value = Sheet.RECIPES
     }
 
     fun applyRecipe(r: Recipe) {
         val full = r.look
-        applyLook(full)
+        if (recipeTargetIsCamera) setCamLook(full) else applyLook(full)
         sheet.value = Sheet.NONE
         say("已套用：${r.name}")
     }
 
     fun saveRecipe() {
-        val item = currentItem() ?: return
-        val n = library.recipes.value.size + 1
-        library.addRecipe(Recipe("我的配方 $n", item.look))
-        say("已写成配方卡：我的配方 $n")
+        val look = currentItem()?.look ?: (if (cameraOpen.value) camLook.value else return)
+        val used = library.recipes.value.map { it.name }.toSet()
+        val name = generateSequence(1) { it + 1 }.map { "我的配方 $it" }.first { it !in used }
+        library.addRecipe(Recipe(name, look))
+        say("已写成配方卡：$name")
     }
 
     // ----------------------------------------------------------- import
@@ -160,8 +210,8 @@ class AppState(application: Application) : AndroidViewModel(application) {
         importing.value = true
         viewModelScope.launch {
             val items = withContext(Dispatchers.IO) {
-                var id = library.nextId()
-                uris.mapNotNull { u -> Media.importItem(app, u, id).also { if (it != null) id++ } }
+                val first = library.reserveIds(uris.size)
+                uris.mapIndexedNotNull { i, u -> Media.importItem(app, u, first + i) }
             }
             importing.value = false
             if (items.isEmpty()) return@launch say("没有可以导入的照片或视频")
@@ -182,6 +232,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
 
     fun startExport(share: Boolean) {
         val items = exportTargets.value.mapNotNull { library.item(it) }
+        if (items.isEmpty() || exports.isRunning()) { sheet.value = Sheet.NONE; return say("没有可以导出的项目") }
         exports.start(items, exportOptions.value, share)
         sheet.value = Sheet.PROGRESS
         selecting.value = false

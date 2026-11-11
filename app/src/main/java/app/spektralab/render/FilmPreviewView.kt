@@ -11,11 +11,17 @@ import android.opengl.GLES30
 import android.opengl.GLSurfaceView
 import android.view.Surface
 import app.spektralab.engine.Look
+import app.spektralab.data.SourceImage
 import app.spektralab.engine.LookSetup
 import app.spektralab.gl.FilmRenderer
 import app.spektralab.gl.GlUtil
 import app.spektralab.gl.InputImage
 import app.spektralab.gl.RenderRequest
+import app.spektralab.gl.RenderTarget
+import app.spektralab.gl.Program
+import app.spektralab.gl.FullscreenQuad
+import app.spektralab.gl.Shaders
+import app.spektralab.engine.Polaroid
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -25,6 +31,12 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
     private val r = PreviewRenderer()
 
     var onVideoState: ((playing: Boolean, positionMs: Long) -> Unit)? = null
+    /** Called on the main thread when the GPU cannot run the pipeline (message for the user). */
+    var onGpuError: ((String) -> Unit)? = null
+    /** Called on the main thread once the first processed frame is on screen. */
+    var onFirstFrame: (() -> Unit)? = null
+    /** Play spektrafilm's instant-film development animation when a photo opens. */
+    @Volatile var revealEnabled = true
 
     init {
         setEGLContextClientVersion(3)
@@ -34,35 +46,65 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
         renderMode = RENDERMODE_WHEN_DIRTY
     }
 
-    fun setPhoto(bitmap: Bitmap, autoEv: Float, seed: Int) = queueEvent {
+    fun setPhoto(bitmap: SourceImage, autoEv: Float, seed: Int) = queueEvent {
         r.pendingBitmap = bitmap
         r.currentBitmap = bitmap
         r.autoEv = autoEv
         r.seed = seed
         r.video = null
+        r.revealActive = false
+        r.revealPending = revealEnabled
+        r.firstFrameSent = false
         requestRender()
     }
 
     fun setVideo(uri: Uri, rotation: Int, width: Int, height: Int, autoEv: Float) = queueEvent {
         r.autoEv = autoEv
         r.videoRequest = VideoRequest(uri, rotation, width, height)
+        r.firstFrameSent = false
         requestRender()
     }
 
     fun setLook(look: Look, setup: LookSetup) = queueEvent {
+        if (r.look != look) r.revealActive = false
         r.look = look
         r.pendingSetup = setup
         r.currentSetup = setup
         requestRender()
     }
 
-    fun setOriginal(original: Boolean) = queueEvent { r.original = original; requestRender() }
+    fun setOriginal(original: Boolean) = queueEvent {
+        r.original = original
+        if (original) { r.revealActive = false; r.revealPending = false }
+        requestRender()
+    }
 
     fun play(playing: Boolean) {
+        r.wantPlay = playing
         val p = r.player ?: return
+        // start() before onPrepared puts MediaPlayer into its error state; onPrepared starts it
+        if (!r.prepared) return
         if (playing) p.start() else p.pause()
         onVideoState?.invoke(p.isPlaying, p.currentPosition.toLong())
     }
+
+    /** Same frame number and date as the export, so the date back / edge print match. */
+    fun setFrameInfo(frameNumber: Int, date: Long) = queueEvent {
+        r.frameNumber = frameNumber
+        r.stampDate = date
+        r.invalidateOverlay()
+        requestRender()
+    }
+
+    /** Activity went to the background: stop playback (and its sound) and the GL thread. */
+    fun pauseForBackground() {
+        r.wantPlay = false
+        if (r.prepared) r.player?.takeIf { it.isPlaying }?.pause()
+        onVideoState?.invoke(false, 0)
+        onPause()
+    }
+
+    fun resumeFromBackground() = onResume()
 
     fun release() {
         r.player?.release()
@@ -77,8 +119,8 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
         var renderer: FilmRenderer? = null
         var pendingSetup: LookSetup? = null
         var look: Look = Look.DEFAULT
-        var pendingBitmap: Bitmap? = null
-        var currentBitmap: Bitmap? = null
+        var pendingBitmap: SourceImage? = null
+        var currentBitmap: SourceImage? = null
         var currentSetup: LookSetup? = null
         var photoTex = 0
         var photoW = 0
@@ -88,7 +130,12 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
         var original = false
         var video: VideoRequest? = null
         var videoRequest: VideoRequest? = null
-        var player: MediaPlayer? = null
+        @Volatile var player: MediaPlayer? = null
+        @Volatile var prepared = false
+        @Volatile var wantPlay = false
+        var frameNumber = 1
+        var stampDate = System.currentTimeMillis()
+        fun invalidateOverlay() { overlayKey = "" }
         private var oesTex = 0
         private var surfaceTexture: SurfaceTexture? = null
         private val stMatrix = FloatArray(16)
@@ -97,12 +144,32 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
         private var surfaceH = 1
         private var overlayTex = 0
         private var overlayKey = ""
+        // instant-film reveal
+        var revealPending = false
+        var revealActive = false
+        var firstFrameSent = false
+        private var revealStart = 0L
+        private var revealTarget: RenderTarget? = null
+        private var revealMax: Polaroid.Maxima? = null
+        private var polaroid: Program? = null
+        private var quad: FullscreenQuad? = null
 
         override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
             // A new EGL context (first start, or the view was re-attached after a fold /
             // unfold): every GL object is gone, so re-upload what was on screen.
             val restore = renderer != null
-            renderer = FilmRenderer()
+            renderer = try {
+                FilmRenderer()
+            } catch (e: Exception) {
+                android.util.Log.e("SpektraPreview", "renderer init failed", e)
+                post { onGpuError?.invoke("这台设备的 GPU 不支持所需的半精度渲染，无法预览") }
+                null
+            }
+            if (renderer == null) return
+            polaroid = Program(Shaders.VERTEX, Shaders.POLAROID)
+            quad = FullscreenQuad()
+            revealTarget = null
+            revealActive = false
             photoTex = 0
             oesTex = 0
             overlayTex = 0
@@ -124,15 +191,30 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
         }
 
         override fun onDrawFrame(gl: GL10?) {
+            try {
+                drawFrame()
+            } catch (e: Exception) {
+                android.util.Log.e("SpektraPreview", "draw failed", e)
+                if (!errorReported) {
+                    errorReported = true
+                    post { onGpuError?.invoke(if (video != null) "这台设备的 GPU 无法处理视频帧" else "预览渲染失败") }
+                }
+            }
+        }
+
+        private var errorReported = false
+
+        private fun drawFrame() {
             val fr = renderer ?: return
             pendingSetup?.let { fr.setLook(it); pendingSetup = null }
             pendingBitmap?.let { bmp ->
                 GlUtil.deleteTexture(photoTex)
-                photoTex = GlWorker.uploadSrgb(bmp)
+                photoTex = GlWorker.upload(bmp)
                 photoW = bmp.width; photoH = bmp.height
                 pendingBitmap = null
             }
             videoRequest?.let { startVideo(it); videoRequest = null }
+            if (revealActive && drawReveal()) return
             GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0)
             GLES30.glViewport(0, 0, surfaceW, surfaceH)
             GLES30.glClearColor(0.05f, 0.03f, 0.03f, 1f)
@@ -150,7 +232,7 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
                 srcW = v.width; srcH = v.height
                 val framing = Framing.compute(srcW, srcH, look, maxOf(surfaceW, surfaceH))
                 input = InputImage(oesTex, true, FilmRenderer.multiply(
-                    FilmRenderer.multiply(Framing.surfaceTextureTransform(stMatrix), Framing.rotationTransform(v.rotation)),
+                    Framing.surfaceTextureTransform(stMatrix),
                     Framing.cropTransform(framing.crop)))
                 frameSeed = seed + frameCount * 7919
                 frameCount++
@@ -158,12 +240,64 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
             } else {
                 if (photoTex == 0) return
                 val framing = Framing.compute(photoW, photoH, look, maxOf(surfaceW, surfaceH))
-                input = InputImage(photoTex, false, Framing.bitmapUvTransform(framing.crop))
+                input = InputImage(photoTex, false, Framing.bitmapUvTransform(framing.crop), sceneLinear = currentBitmap?.linear != null)
+                if (revealPending && !original) {
+                    revealPending = false
+                    if (startReveal(fr, input, framing, frameSeed)) return
+                }
                 draw(fr, input, framing, frameSeed)
             }
+            notifyFirstFrame()
         }
 
-        private fun draw(fr: FilmRenderer, input: InputImage, framing: Framing, seed: Int) {
+        private fun notifyFirstFrame() {
+            if (firstFrameSent) return
+            firstFrameSent = true
+            post { onFirstFrame?.invoke() }
+        }
+
+        /** Render the finished print offscreen, measure it, and start the development animation. */
+        private fun startReveal(fr: FilmRenderer, input: InputImage, framing: Framing, seed: Int): Boolean {
+            val t = revealTarget?.takeIf { it.width == surfaceW && it.height == surfaceH }
+                ?: run { revealTarget?.release(); RenderTarget(surfaceW, surfaceH, GLES30.GL_RGBA8) }
+            revealTarget = t
+            draw(fr, input, framing, seed, t.framebuffer)
+            val buf = java.nio.ByteBuffer.allocateDirect(surfaceW * surfaceH * 4)
+            GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, t.framebuffer)
+            GLES30.glReadPixels(0, 0, surfaceW, surfaceH, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, buf)
+            val bytes = ByteArray(surfaceW * surfaceH * 4).also { buf.position(0); buf.get(it) }
+            revealMax = Polaroid.maxima(bytes, step = 5)
+            revealStart = System.nanoTime()
+            revealActive = true
+            return drawReveal()
+        }
+
+        /** One frame of spektrafilm's polaroid development; false when it has finished. */
+        private fun drawReveal(): Boolean {
+            val t = revealTarget ?: return false
+            val m = revealMax ?: return false
+            val p = polaroid ?: return false
+            val tt = (System.nanoTime() - revealStart) / 1e6 / Polaroid.DURATION_MS
+            if (tt >= 1.0) {
+                revealActive = false
+                requestRender()
+                return false
+            }
+            GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0)
+            GLES30.glViewport(0, 0, surfaceW, surfaceH)
+            p.use()
+            p.texture("uSrc", 0, t.texture)
+            p.set1fv("uCoef", Polaroid.coefficients(tt))
+            p.set3f("uDensityMax", m.density[0], m.density[1], m.density[2])
+            p.set3f("uChromaMax", m.chroma[0], m.chroma[1], m.chroma[2])
+            p.set1f("uNeutralMax", m.neutral)
+            quad?.draw()
+            notifyFirstFrame()
+            requestRender()
+            return true
+        }
+
+        private fun draw(fr: FilmRenderer, input: InputImage, framing: Framing, seed: Int, framebuffer: Int = 0) {
             // the view is sized to the frame aspect; match the processed area to the surface
             val sx = surfaceW.toFloat() / framing.outWidth
             val iw = (framing.imageWidth * sx).toInt().coerceAtLeast(2)
@@ -171,21 +305,22 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
             updateOverlay(framing)
             fr.render(RenderRequest(
                 input = input, imageWidth = iw, imageHeight = ih,
-                framebuffer = 0, outWidth = surfaceW, outHeight = surfaceH,
-                imageRect = framing.imageRect, overlayTexture = overlayTex,
+                framebuffer = framebuffer, outWidth = surfaceW, outHeight = surfaceH,
+                imageRect = framing.imageRect, border = currentSetup?.let { Borders.color(look, it) } ?: floatArrayOf(0f, 0f, 0f),
+                overlayTexture = overlayTex,
                 original = original, seed = seed, autoEv = autoEv,
             ))
         }
 
         private fun updateOverlay(framing: Framing) {
-            val key = "${look.filmEdge}/${look.dateStamp}/${look.film}/${look.format}/$surfaceW/$surfaceH"
+            val key = "${look.border}/${look.dateStamp}/${look.film}/${look.format}/$surfaceW/$surfaceH"
             if (key == overlayKey) return
             overlayKey = key
             GlUtil.deleteTexture(overlayTex)
             overlayTex = 0
             if (!OverlayPainter.needsOverlay(look)) return
             val scaled = Framing(framing.crop, framing.imageWidth, framing.imageHeight, surfaceW, surfaceH, framing.imageRect)
-            OverlayPainter.paint(scaled, look, 12, System.currentTimeMillis())?.let {
+            OverlayPainter.paint(scaled, look, frameNumber, stampDate)?.let {
                 overlayTex = GlWorker.uploadRgba(it)
                 it.recycle()
             }
@@ -206,14 +341,17 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
             video = req
             val surface = Surface(st)
             val mp = MediaPlayer()
+            prepared = false
+            wantPlay = req.resumePlaying
             try {
                 mp.setDataSource(context, req.uri)
                 mp.setSurface(surface)
                 mp.isLooping = true
                 mp.setOnPreparedListener {
+                    prepared = true
                     it.seekTo(req.resumeMs)
-                    if (req.resumePlaying) it.start()
-                    onVideoState?.invoke(req.resumePlaying, req.resumeMs.toLong())
+                    if (wantPlay) it.start()
+                    onVideoState?.invoke(wantPlay, req.resumeMs.toLong())
                 }
                 mp.setOnSeekCompleteListener { requestRender() }
                 mp.prepareAsync()
@@ -226,6 +364,9 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
 
         fun releaseGl() {
             renderer?.release(); renderer = null
+            revealTarget?.release(); revealTarget = null
+            polaroid?.release(); polaroid = null
+            quad?.release(); quad = null
             GlUtil.deleteTexture(photoTex); photoTex = 0
             GlUtil.deleteTexture(overlayTex); overlayTex = 0
             surfaceTexture?.release(); surfaceTexture = null

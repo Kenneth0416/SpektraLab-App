@@ -1,13 +1,15 @@
 package app.spektralab
 
 import android.os.Bundle
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -17,7 +19,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import app.spektralab.ui.AppState
 import app.spektralab.ui.EditorScreen
+import app.spektralab.ui.CameraScreen
 import app.spektralab.ui.LibraryScreen
+import app.spektralab.ui.RoomTransition
 import app.spektralab.ui.LocalFold
 import app.spektralab.ui.rememberFoldState
 import app.spektralab.ui.Sheet
@@ -26,27 +30,55 @@ import app.spektralab.ui.Sheets
 class MainActivity : ComponentActivity() {
     private val state: AppState by viewModels()
 
+    /** Volume keys release the shutter in the camera, like on every phone camera. */
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent): Boolean {
+        val isVolume = keyCode == android.view.KeyEvent.KEYCODE_VOLUME_DOWN || keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP
+        if (isVolume && state.cameraOpen.value && state.editId.value == null) {
+            if (event.repeatCount == 0) state.shutterKey.tryEmit(Unit)
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // share sheets can only be started by a foreground activity: open finished
+        // "share" exports when we are (back) on screen
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                state.exports.pendingShare.collect { uris ->
+                    if (uris != null) {
+                        state.exports.pendingShare.value = null
+                        state.exports.shareUris(this@MainActivity, uris)
+                    }
+                }
+            }
+        }
         setContent {
             val fold = rememberFoldState(this)
             MaterialTheme { CompositionLocalProvider(LocalFold provides fold) {
                 val editId by state.editId.collectAsState()
                 val sheet by state.sheet.collectAsState()
                 val selecting by state.selecting.collectAsState()
-                BackHandler(sheet != Sheet.NONE || editId != null || selecting) {
+                val cameraOpen by state.cameraOpen.collectAsState()
+                BackHandler(sheet != Sheet.NONE || editId != null || selecting || cameraOpen) {
                     when {
                         sheet != Sheet.NONE && sheet != Sheet.PROGRESS -> state.sheet.value = Sheet.NONE
                         sheet == Sheet.PROGRESS -> state.sheet.value = Sheet.NONE
-                        editId != null -> state.back()
+                        editId != null || cameraOpen -> state.back()
                         selecting -> state.toggleSelecting()
                     }
                 }
                 Box(Modifier.fillMaxSize()) {
                     // lightbox <-> darkroom: the bright table fades to near black
-                    Crossfade(editId, animationSpec = tween(450), label = "room") { id ->
-                        if (id == null) LibraryScreen(state) else EditorScreen(state, id)
+                    // rooms: lightbox (bright), darkroom editor and camera (dark)
+                    RoomTransition(editId to cameraOpen, isDark = { it.first != null || it.second }) { (id, camera) ->
+                        when {
+                            id != null -> EditorScreen(state, id)
+                            camera -> CameraScreen(state)
+                            else -> LibraryScreen(state)
+                        }
                     }
                     Sheets(state)
                 }

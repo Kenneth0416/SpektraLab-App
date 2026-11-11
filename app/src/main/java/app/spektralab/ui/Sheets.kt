@@ -6,6 +6,24 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -40,7 +58,7 @@ import app.spektralab.export.PhotoFormat
 @Composable
 fun Sheets(state: AppState) {
     val sheet by state.sheet.collectAsState()
-    val dark = state.editId.collectAsState().value != null
+    val dark = state.editId.collectAsState().value != null || state.cameraOpen.collectAsState().value
     val fold = LocalFold.current
     val density = androidx.compose.ui.platform.LocalDensity.current
     var box by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
@@ -48,25 +66,38 @@ fun Sheets(state: AppState) {
     val maxSheet = fold.hinge?.takeIf { fold.posture == Posture.TABLETOP && box.height > 0f && it.bottom < box.bottom }
         ?.let { with(density) { (box.bottom - it.bottom).toDp() } } ?: androidx.compose.ui.unit.Dp.Infinity
     Box(Modifier.fillMaxSize().onGloballyPositioned { box = it.boundsInWindow() }) {
-        if (sheet != Sheet.NONE) {
+        // keep showing the last sheet's content while it slides away
+        var lastSheet by remember { mutableStateOf(Sheet.IMPORT) }
+        if (sheet != Sheet.NONE) lastSheet = sheet
+        AnimatedVisibility(sheet != Sheet.NONE, enter = fadeIn(tween(220)), exit = fadeOut(tween(260))) {
             Box(Modifier.fillMaxSize().background(Color(0x88000000))
                 .clickable(remember { MutableInteractionSource() }, null) {
                     if (sheet != Sheet.PROGRESS) state.sheet.value = Sheet.NONE
                 })
         }
         AnimatedVisibility(sheet != Sheet.NONE, Modifier.align(Alignment.BottomCenter),
-            enter = slideInVertically { it } + fadeIn(), exit = slideOutVertically { it } + fadeOut()) {
-            val bg = if (dark || sheet == Sheet.EXPORT || sheet == Sheet.PROGRESS) Pal.darkPanel else Pal.paper
+            enter = slideInVertically(Motion.settleOffset) { it } + fadeIn(tween(120)),
+            exit = slideOutVertically(tween(220, easing = FastOutLinearInEasing)) { it } + fadeOut(tween(220))) {
+            val shownSheet = lastSheet
+            val bg by animateColorAsState(
+                if (dark || shownSheet == Sheet.EXPORT || shownSheet == Sheet.PROGRESS) Pal.darkPanel else Pal.paper, tween(250), label = "sheetBg")
             Column(Modifier.widthIn(max = SheetMaxWidth).heightIn(max = maxSheet).fillMaxWidth().clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp)).background(bg)
                 .clickable(remember { MutableInteractionSource() }, null) {}
                 .verticalScroll(rememberScrollState())
-                .navigationBarsPadding().padding(20.dp)) {
-                when (sheet) {
-                    Sheet.IMPORT -> ImportSheet(state)
-                    Sheet.RECIPES -> RecipeSheet(state, dark)
-                    Sheet.EXPORT -> ExportSheet(state)
-                    Sheet.PROGRESS -> ProgressSheet(state)
-                    Sheet.NONE -> {}
+                .navigationBarsPadding().padding(20.dp).animateContentSize(Motion.glideSize)) {
+                // export options hand over to the progress view in place
+                AnimatedContent(shownSheet, label = "sheet", transitionSpec = {
+                    (fadeIn(tween(220, delayMillis = 90)) + slideInVertically(Motion.glideOffset) { it / 6 }) togetherWith fadeOut(tween(90))
+                }) { sh ->
+                    Column {
+                        when (sh) {
+                            Sheet.IMPORT -> ImportSheet(state)
+                            Sheet.RECIPES -> RecipeSheet(state, dark)
+                            Sheet.EXPORT -> ExportSheet(state)
+                            Sheet.PROGRESS -> ProgressSheet(state)
+                            Sheet.NONE -> {}
+                        }
+                    }
                 }
             }
         }
@@ -85,10 +116,11 @@ private fun ImportSheet(state: AppState) {
     }
     Spacer(Modifier.height(14.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        SourceCard("相册", "照片和视频，可多选", Modifier.weight(1f)) {
+        // the two slide mounts are dealt out one after the other
+        SourceCard("相册", "照片和视频，可多选", Modifier.weight(1f).dealIn(1, fromY = 50f, tilt = -4f)) {
             photos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
         }
-        SourceCard("文件", "RAW / DNG / JPEG / 视频", Modifier.weight(1f)) {
+        SourceCard("文件", "RAW / DNG / JPEG / 视频", Modifier.weight(1f).dealIn(2, fromY = 50f, tilt = 4f)) {
             files.launch(arrayOf("image/*", "video/*"))
         }
     }
@@ -99,7 +131,7 @@ private fun ImportSheet(state: AppState) {
 @Composable
 private fun SourceCard(title: String, sub: String, modifier: Modifier, onClick: () -> Unit) {
     Column(modifier.clip(RoundedCornerShape(10.dp)).background(Color.White).border(1.dp, Pal.ink, RoundedCornerShape(10.dp))
-        .clickable(onClick = onClick).padding(16.dp)) {
+        .springClick(0.95f, onClick = onClick).padding(16.dp)) {
         Text(title, fontSize = 18.sp, color = Pal.ink, fontWeight = FontWeight.Bold)
         Text(sub, fontSize = 12.sp, color = Pal.grey)
     }
@@ -120,7 +152,8 @@ private fun RecipeSheet(state: AppState, inEditor: Boolean) {
     Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
         (mine + Library.BUILTIN_RECIPES).forEachIndexed { i, r ->
             val rot = floatArrayOf(-0.6f, 0.5f, -0.3f, 0.7f)[i % 4]
-            Row(Modifier.padding(vertical = 5.dp).rotate(rot).fillMaxWidth().clip(RoundedCornerShape(4.dp)).background(Pal.card)
+            Row(Modifier.padding(vertical = 5.dp).dealIn(i, key = r.name, fromX = if (i % 2 == 0) -90f else 90f, fromY = 24f, tilt = rot * 10f)
+                .rotate(rot).fillMaxWidth().clip(RoundedCornerShape(4.dp)).background(Pal.card)
                 .combinedClickable(onClick = { state.applyRecipe(r) },
                     onLongClick = { if (!r.builtin) { state.library.removeRecipe(r.name); state.say("已删除：${r.name}") } })
                 .padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -177,9 +210,9 @@ private fun ExportSheet(state: AppState) {
     }
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("分享…", color = Pal.text, fontSize = 15.sp, modifier = Modifier.weight(1f).clip(RoundedCornerShape(22.dp))
-            .border(1.dp, Pal.text, RoundedCornerShape(22.dp)).clickable { go(true) }.padding(12.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            .border(1.dp, Pal.text, RoundedCornerShape(22.dp)).springClick { go(true) }.padding(12.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         Text("存到相册", color = Pal.dink, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f)
-            .clip(RoundedCornerShape(22.dp)).background(acc).clickable { go(false) }.padding(12.dp),
+            .clip(RoundedCornerShape(22.dp)).background(acc).springClick { go(false) }.padding(12.dp),
             textAlign = androidx.compose.ui.text.style.TextAlign.Center)
     }
 }
@@ -190,12 +223,25 @@ private fun Label(t: String) = Text(t, color = Pal.dim, fontSize = 12.sp, modifi
 @Composable
 private fun ProgressSheet(state: AppState) {
     val st = state.exports.state.collectAsState().value ?: return
-    Text("正在冲印", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Pal.text)
-    Text("${minOf(st.total, st.done + 1)} / ${st.total}", fontFamily = Fonts.mono, color = Pal.text, fontSize = 14.sp,
-        modifier = Modifier.padding(vertical = 8.dp))
-    val pct = ((st.done + st.current) / st.total.coerceAtLeast(1)).coerceIn(0f, 1f)
-    Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(Pal.line)) {
-        Box(Modifier.fillMaxWidth(pct).fillMaxHeight().background(Pal.safelight))
+    Text("正在冲印" + busyDots(), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Pal.text)
+    Row(Modifier.padding(vertical = 8.dp)) {
+        RollingNumber(minOf(st.total, st.done + 1), Fonts.mono, 14.sp, Pal.text)
+        Text(" / ${st.total}", fontFamily = Fonts.mono, color = Pal.text, fontSize = 14.sp)
+    }
+    val target = ((st.done + st.current) / st.total.coerceAtLeast(1)).coerceIn(0f, 1f)
+    val pct by animateFloatAsState(target, Motion.glide, label = "progress")
+    // a strip of film being pulled through: sprocket holes run along the filled part
+    val run by rememberInfiniteTransition(label = "film").animateFloat(0f, 1f, infiniteRepeatable(tween(700, easing = LinearEasing)), label = "run")
+    Canvas(Modifier.fillMaxWidth().height(12.dp).clip(RoundedCornerShape(3.dp)).background(Pal.line)) {
+        val w = size.width * pct
+        drawRect(Pal.safelight, size = Size(w, size.height))
+        val pitch = 12.dp.toPx()
+        var x = -pitch + run * pitch
+        while (x < w) {
+            if (x + 5.dp.toPx() <= w) drawRoundRect(Pal.dink.copy(alpha = 0.55f), Offset(x, size.height * 0.3f),
+                Size(5.dp.toPx(), size.height * 0.4f), CornerRadius(1.dp.toPx()))
+            x += pitch
+        }
     }
     Spacer(Modifier.height(10.dp))
     Text("每一项都要完整算一遍，全尺寸需要几秒，视频需要更久。可以先回去继续修图。", color = Pal.dim, fontSize = 12.sp)
@@ -205,7 +251,7 @@ private fun ProgressSheet(state: AppState) {
         Spacer(Modifier.weight(1f))
         Text("后台继续", color = Pal.dink, fontSize = 15.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier.clip(RoundedCornerShape(22.dp)).background(Pal.text)
-                .clickable { state.sheet.value = Sheet.NONE }.padding(horizontal = 18.dp, vertical = 12.dp))
+                .springClick { state.sheet.value = Sheet.NONE }.padding(horizontal = 18.dp, vertical = 12.dp))
     }
 }
 
@@ -213,20 +259,36 @@ private fun ProgressSheet(state: AppState) {
 private fun ProgressPill(state: AppState, modifier: Modifier) {
     val st = state.exports.state.collectAsState().value
     val sheet by state.sheet.collectAsState()
-    if (st == null || !st.running || sheet == Sheet.PROGRESS) return
-    Row(modifier.clip(RoundedCornerShape(16.dp)).background(Pal.ink).clickable { state.sheet.value = Sheet.PROGRESS }
-        .padding(horizontal = 14.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(7.dp).clip(CircleShape).background(Pal.safelight))
-        Spacer(Modifier.width(8.dp))
-        Text("冲印中 ${minOf(st.total, st.done + 1)} / ${st.total}", color = Pal.paper, fontSize = 13.sp, fontFamily = Fonts.mono)
+    // drops down from the top edge while printing continues in the background
+    var last by remember { mutableStateOf(st) }
+    if (st != null) last = st
+    AnimatedVisibility(st != null && st.running && sheet != Sheet.PROGRESS, modifier,
+        enter = slideInVertically(Motion.settleOffset) { -it * 2 } + fadeIn(), exit = slideOutVertically(tween(200)) { -it * 2 } + fadeOut()) {
+        val s = last ?: return@AnimatedVisibility
+        val pulse by rememberInfiniteTransition(label = "pill").animateFloat(0.35f, 1f,
+            infiniteRepeatable(tween(700), RepeatMode.Reverse), label = "pulse")
+        Row(Modifier.clip(RoundedCornerShape(16.dp)).background(Pal.ink).springClick { state.sheet.value = Sheet.PROGRESS }
+            .padding(horizontal = 14.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(7.dp).graphicsLayer { alpha = pulse; scaleX = 0.7f + 0.3f * pulse; scaleY = 0.7f + 0.3f * pulse }
+                .clip(CircleShape).background(Pal.safelight))
+            Spacer(Modifier.width(8.dp))
+            Text("冲印中 ", color = Pal.paper, fontSize = 13.sp, fontFamily = Fonts.mono)
+            RollingNumber(minOf(s.total, s.done + 1), Fonts.mono, 13.sp, Pal.paper)
+            Text(" / ${s.total}", color = Pal.paper, fontSize = 13.sp, fontFamily = Fonts.mono)
+        }
     }
 }
 
 @Composable
 private fun Hint(state: AppState, modifier: Modifier) {
     val hint by state.hint.collectAsState()
-    AnimatedVisibility(hint.isNotEmpty(), modifier, enter = fadeIn(), exit = fadeOut()) {
-        Text(hint, color = Pal.paper, fontSize = 14.sp, modifier = Modifier.clip(RoundedCornerShape(18.dp))
+    // keep the text while the note fades out
+    var lastHint by remember { mutableStateOf("") }
+    if (hint.isNotEmpty()) lastHint = hint
+    AnimatedVisibility(hint.isNotEmpty(), modifier,
+        enter = slideInVertically(Motion.settleOffset) { it } + scaleIn(Motion.settle, initialScale = 0.85f) + fadeIn(tween(120)),
+        exit = fadeOut(tween(260)) + slideOutVertically(tween(260)) { it / 2 }) {
+        Text(lastHint, color = Pal.paper, fontSize = 14.sp, modifier = Modifier.clip(RoundedCornerShape(18.dp))
             .background(Color(0xE61B1A17)).padding(horizontal = 16.dp, vertical = 9.dp))
     }
 }

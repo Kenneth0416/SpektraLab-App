@@ -31,6 +31,9 @@ object Pal {
     val greenShift = Color(0xFF28C85A)
 }
 
+/** spektrafilm GUI GRAY_18 canvas (#767676). */
+val Gray18 = Color(0xFF767676)
+
 object Fonts {
     val hand = FontFamily(Font(R.font.long_cang))
     val mono = FontFamily(Font(R.font.martian_mono))

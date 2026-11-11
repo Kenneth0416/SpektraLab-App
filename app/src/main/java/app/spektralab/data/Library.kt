@@ -34,7 +34,7 @@ object LookJson {
         put("filmEv", l.filmEv); put("push", l.push); put("halation", l.halation); put("halationSize", l.halationSize)
         put("grain", l.grain); put("grainSize", l.grainSize); put("diffusion", l.diffusion)
         put("diffusionAmount", l.diffusionAmount); put("y", l.yFilter); put("m", l.mFilter)
-        put("format", l.format); put("edge", l.filmEdge); put("date", l.dateStamp)
+        put("format", l.format); put("border", l.border); put("date", l.dateStamp)
     }
 
     fun fromJson(o: JSONObject?): Look {
@@ -48,7 +48,9 @@ object LookJson {
             grain = o.optDouble("grain", d.grain), grainSize = o.optDouble("grainSize", d.grainSize),
             diffusion = o.optString("diffusion", d.diffusion), diffusionAmount = o.optDouble("diffusionAmount", d.diffusionAmount),
             yFilter = o.optDouble("y", d.yFilter), mFilter = o.optDouble("m", d.mFilter),
-            format = o.optString("format", d.format), filmEdge = o.optBoolean("edge", d.filmEdge),
+            format = o.optString("format", d.format),
+            // older libraries stored the film edge as a boolean
+            border = o.optString("border", if (o.optBoolean("edge", false)) "edge" else d.border),
             dateStamp = o.optBoolean("date", d.dateStamp),
         )
     }
@@ -61,6 +63,11 @@ class Library(context: Context) {
     val items: StateFlow<List<LibraryItem>> = _items
     private val _recipes = MutableStateFlow<List<Recipe>>(emptyList())
     val recipes: StateFlow<List<Recipe>> = _recipes
+
+    /** Ids are never reused, so caches keyed by id can't show a removed item. */
+    private var idCounter = 0L
+    private val saver = java.util.concurrent.Executors.newSingleThreadExecutor { Thread(it, "spektra-library") }
+    private val saveQueued = java.util.concurrent.atomic.AtomicBoolean(false)
 
     init { load() }
 
@@ -96,13 +103,21 @@ class Library(context: Context) {
         save()
     }
 
-    fun nextId(): Long = (_items.value.maxOfOrNull { it.id } ?: 0L) + 1
+    /** Reserve [count] fresh ids. */
+    @Synchronized fun reserveIds(count: Int): Long {
+        idCounter = maxOf(idCounter, _items.value.maxOfOrNull { it.id } ?: 0L)
+        val first = idCounter + 1
+        idCounter += count
+        save()
+        return first
+    }
 
     private fun load() {
         if (!file.exists()) return
         runCatching {
             val root = JSONObject(file.readText())
             val arr = root.optJSONArray("items") ?: JSONArray()
+            idCounter = root.optLong("nextId", 0L)
             _items.value = (0 until arr.length()).map { i ->
                 val o = arr.getJSONObject(i)
                 LibraryItem(
@@ -121,8 +136,18 @@ class Library(context: Context) {
         }
     }
 
+    /** Persist off the main thread; bursts of edits (slider drags) collapse into one write. */
     private fun save() {
+        if (saveQueued.getAndSet(true)) return
+        saver.execute {
+            saveQueued.set(false)
+            writeNow()
+        }
+    }
+
+    @Synchronized private fun writeNow() {
         val root = JSONObject()
+        root.put("nextId", idCounter)
         root.put("items", JSONArray().apply {
             _items.value.forEach { it2 ->
                 put(JSONObject().apply {

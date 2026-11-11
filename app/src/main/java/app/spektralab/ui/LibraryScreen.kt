@@ -1,8 +1,25 @@
 package app.spektralab.ui
 
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -10,7 +27,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -47,9 +64,10 @@ fun LibraryScreen(state: AppState) {
     val picked by state.picked.collectAsState()
     val importing by state.importing.collectAsState()
     // the lightbox "switches on" like a fluorescent tube
-    var lit by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { lit = true }
-    val glow by animateFloatAsState(if (lit) 1f else 0.6f, tween(700, easing = FastOutSlowInEasing), label = "glow")
+    val tube by tubeFlicker()
+    // strips are dealt onto the table only when the lightbox opens, not while scrolling
+    var dealing by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) { delay(900); dealing = false }
 
     val shown = items.filter { filter == Filter.ALL || (filter == Filter.VIDEO) == it.isVideo }
     // three frames per strip on a phone, more on an unfolded inner screen / tablet
@@ -57,24 +75,40 @@ fun LibraryScreen(state: AppState) {
     val strips = remember(shown, perStrip) { buildStrips(shown, perStrip) }
 
     Box(Modifier.fillMaxSize().background(
-        Brush.radialGradient(listOf(Pal.glow, Pal.paper.copy(alpha = 0.96f + 0.04f * glow)), radius = 1800f)
-    )) {
+        Brush.radialGradient(listOf(Pal.glow, Pal.paper), radius = 1800f)
+    ).drawWithContent {
+        drawContent()
+        // tube not fully on yet: the whole table is dimmer
+        if (tube < 1f) drawRect(Pal.ink.copy(alpha = 0.32f * (1f - tube)))
+    }) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
             // header
             Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 16.dp, top = 14.dp), verticalAlignment = Alignment.Bottom) {
                 Column(Modifier.weight(1f)) {
                     Text("SPEKTRALAB · CONTACT SHEET", fontFamily = Fonts.mono, fontSize = 9.sp, color = Pal.grey, letterSpacing = 1.5.sp)
-                    if (selecting) Text("圈出 ${picked.size} 张", fontFamily = Fonts.hand, fontSize = 34.sp, color = Pal.red)
-                    else Row(verticalAlignment = Alignment.Bottom) {
-                        Text("图库", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Pal.ink)
-                        Spacer(Modifier.width(10.dp))
-                        Text("${items.size} FRAMES", fontFamily = Fonts.mono, fontSize = 10.sp, color = Pal.grey,
-                            modifier = Modifier.padding(bottom = 6.dp))
+                    // the printed title is swapped for a handwritten note when circling frames
+                    AnimatedContent(selecting, label = "title", transitionSpec = {
+                        (slideInVertically(Motion.glideOffset) { if (targetState) it / 2 else -it / 2 } + fadeIn(tween(180))) togetherWith
+                            (slideOutVertically(Motion.glideOffset) { if (targetState) -it / 2 else it / 2 } + fadeOut(tween(120)))
+                    }) { sel ->
+                        if (sel) Row(verticalAlignment = Alignment.Bottom) {
+                            Text("圈出 ", fontFamily = Fonts.hand, fontSize = 34.sp, color = Pal.red)
+                            RollingNumber(picked.size, Fonts.hand, 34.sp, Pal.red)
+                            Text(" 张", fontFamily = Fonts.hand, fontSize = 34.sp, color = Pal.red)
+                        }
+                        else Row(verticalAlignment = Alignment.Bottom) {
+                            Text("图库", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Pal.ink)
+                            Spacer(Modifier.width(10.dp))
+                            Row(Modifier.padding(bottom = 6.dp)) {
+                                RollingNumber(items.size, Fonts.mono, 10.sp, Pal.grey)
+                                Text(" FRAMES", fontFamily = Fonts.mono, fontSize = 10.sp, color = Pal.grey)
+                            }
+                        }
                     }
                 }
                 Text(if (selecting) "完成" else "选择", color = Pal.ink, fontSize = 15.sp,
                     modifier = Modifier.clip(RoundedCornerShape(16.dp)).border(1.dp, Pal.ink, RoundedCornerShape(16.dp))
-                        .clickable { state.toggleSelecting() }.padding(horizontal = 14.dp, vertical = 6.dp))
+                        .springClick { state.toggleSelecting() }.padding(horizontal = 14.dp, vertical = 6.dp))
             }
             // filters with a red crayon underline
             Row(Modifier.padding(start = 20.dp, top = 10.dp, bottom = 4.dp)) {
@@ -82,13 +116,15 @@ fun LibraryScreen(state: AppState) {
                     Column(Modifier.padding(end = 20.dp).clickable { state.filter.value = f }, horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(label, color = if (filter == f) Pal.ink else Pal.grey, fontSize = 15.sp,
                             fontWeight = if (filter == f) FontWeight.Bold else FontWeight.Normal)
+                        // the underline is drawn with a quick crayon stroke each time
+                        val stroke by drawOnProgress(filter == f, durationMs = 260)
                         Canvas(Modifier.width(30.dp).height(6.dp)) {
                             if (filter == f) {
                                 val p = Path().apply {
                                     moveTo(0f, size.height * 0.6f)
                                     quadraticTo(size.width * 0.5f, size.height * 0.1f, size.width, size.height * 0.5f)
                                 }
-                                drawPath(p, Pal.red, style = Stroke(width = 3.dp.toPx()))
+                                drawPartialPath(p, stroke, Pal.red, 3.dp.toPx())
                             }
                         }
                     }
@@ -98,8 +134,13 @@ fun LibraryScreen(state: AppState) {
                 EmptyLightbox(Modifier.weight(1f).fillMaxWidth(), filter)
             } else {
                 LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 110.dp)) {
-                    items(strips, key = { it.key }) { strip ->
-                        FilmStrip(state, strip, selecting, picked)
+                    itemsIndexed(strips, key = { _, it -> it.key }) { i, strip ->
+                        // tossed onto the table from alternating sides, then they settle;
+                        // removing / filtering slides the remaining strips together
+                        val side = if (i % 2 == 0) -1f else 1f
+                        Box(Modifier.animateItem().dealIn(i, enabled = dealing, fromX = side * 140f, fromY = 30f, tilt = side * 5f)) {
+                            FilmStrip(state, strip, selecting, picked)
+                        }
                     }
                 }
             }
@@ -109,14 +150,20 @@ fun LibraryScreen(state: AppState) {
             .clip(RoundedCornerShape(26.dp)).background(Pal.ink).padding(horizontal = 8.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
             val clip by state.clip.collectAsState()
-            if (!selecting) {
-                BarButton(if (importing) "导入中…" else "＋ 导入", Pal.paper, filled = true) { if (!importing) state.sheet.value = Sheet.IMPORT }
-                BarButton("相机", Pal.paper.copy(alpha = 0.45f)) { state.say("相机暂未开放，先从相册导入") }
-            } else {
-                BarButton("粘贴设置", if (clip != null) Pal.paper else Color(0xFF8F8A7E)) { state.pasteToPicked() }
-                BarButton("配方", Pal.paper) { state.openRecipes() }
-                BarButton("导出", Pal.paper) { state.openExport(state.picked.value) }
-                BarButton("移除", Pal.paper) { state.removePicked() }
+            AnimatedContent(selecting, Modifier.fillMaxWidth(), label = "bar", transitionSpec = {
+                (fadeIn(tween(200, delayMillis = 80)) + scaleIn(Motion.settle, initialScale = 0.9f)) togetherWith fadeOut(tween(100))
+            }) { sel ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                    if (!sel) {
+                        BarButton(if (importing) "导入中" + busyDots() else "＋ 导入", Pal.paper, filled = true) { if (!importing) state.sheet.value = Sheet.IMPORT }
+                        BarButton("相机", Pal.paper) { state.openCamera() }
+                    } else {
+                        BarButton("粘贴设置", if (clip != null) Pal.paper else Color(0xFF8F8A7E)) { state.pasteToPicked() }
+                        BarButton("配方", Pal.paper) { state.openRecipes() }
+                        BarButton("导出", Pal.paper) { state.openExport(state.picked.value) }
+                        BarButton("移除", Pal.paper) { state.removePicked() }
+                    }
+                }
             }
         }
     }
@@ -127,17 +174,51 @@ private fun BarButton(label: String, color: Color, filled: Boolean = false, onCl
     Text(label, color = if (filled) Pal.ink else color, fontSize = 15.sp, fontWeight = FontWeight.Medium,
         modifier = Modifier.clip(RoundedCornerShape(20.dp))
             .background(if (filled) Pal.paper else Color.Transparent)
-            .clickable(onClick = onClick).padding(horizontal = 18.dp, vertical = 10.dp))
+            .springClick(0.9f, onClick = onClick).padding(horizontal = 18.dp, vertical = 10.dp))
+}
+
+/** "…" that fills up one dot at a time while something is in progress. */
+@Composable
+fun busyDots(): String {
+    val t by rememberInfiniteTransition(label = "dots").animateFloat(0f, 4f, infiniteRepeatable(tween(1200, easing = LinearEasing)), label = "dots")
+    return "·".repeat(t.toInt().coerceIn(0, 3)).padEnd(3, ' ')
+}
+
+/** A counter whose digits roll up or down when the value changes. */
+@Composable
+fun RollingNumber(value: Int, font: androidx.compose.ui.text.font.FontFamily, size: androidx.compose.ui.unit.TextUnit, color: Color) {
+    AnimatedContent(value, label = "count", transitionSpec = {
+        val up = targetState > initialState
+        (slideInVertically(Motion.settleOffset) { if (up) it else -it } + fadeIn(tween(120))) togetherWith
+            (slideOutVertically(tween(140)) { if (up) -it else it } + fadeOut(tween(100)))
+    }) { v -> Text("$v", fontFamily = font, fontSize = size, color = color) }
 }
 
 @Composable
 private fun EmptyLightbox(modifier: Modifier, filter: Filter) {
+    val bob by idleBob()
+    val arrow by drawOnProgress(filter, durationMs = 700, delayMs = 500)
     Box(modifier, contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(when (filter) { Filter.VIDEO -> "还没有视频"; Filter.PHOTO -> "还没有照片"; else -> "灯箱是空的" },
-                fontFamily = Fonts.hand, fontSize = 32.sp, color = Pal.grey)
+                fontFamily = Fonts.hand, fontSize = 32.sp, color = Pal.grey,
+                modifier = Modifier.graphicsLayer { translationY = bob * 4.dp.toPx(); rotationZ = bob * 0.8f })
             Spacer(Modifier.height(8.dp))
             Text("点「＋ 导入」从相册或文件放上几张底片", color = Pal.grey, fontSize = 13.sp)
+            // a pencilled arrow that draws itself towards the import button
+            Canvas(Modifier.padding(top = 14.dp).size(60.dp, 90.dp).graphicsLayer { translationY = bob * 3.dp.toPx() }) {
+                val shaft = Path().apply {
+                    moveTo(size.width * 0.75f, 0f)
+                    cubicTo(size.width * 0.1f, size.height * 0.25f, size.width * 0.9f, size.height * 0.55f, size.width * 0.35f, size.height * 0.95f)
+                }
+                drawPartialPath(shaft, (arrow / 0.8f).coerceAtMost(1f), Pal.grey, 2.dp.toPx())
+                val head = Path().apply {
+                    moveTo(size.width * 0.32f, size.height * 0.72f)
+                    lineTo(size.width * 0.35f, size.height * 0.95f)
+                    lineTo(size.width * 0.62f, size.height * 0.88f)
+                }
+                drawPartialPath(head, ((arrow - 0.8f) / 0.2f).coerceIn(0f, 1f), Pal.grey, 2.dp.toPx())
+            }
         }
     }
 }
@@ -212,23 +293,42 @@ private fun Frame(state: AppState, item: LibraryItem, selecting: Boolean, order:
         value = state.app.thumbs.get(item)
     }
     val desc = (if (item.isVideo) "视频：" else "照片：") + item.name + if (order >= 0) "，已圈选" else ""
-    Box(modifier.aspectRatio(1.5f).clip(RoundedCornerShape(2.dp)).background(Color(0xFF3A2C22))
+    // a circled frame sinks a little under the crayon
+    val sink by animateFloatAsState(if (order >= 0) 0.94f else 1f, Motion.settle, label = "sink")
+    Box(modifier.aspectRatio(1.5f).graphicsLayer { scaleX = sink; scaleY = sink }
+        .clip(RoundedCornerShape(2.dp)).background(Color(0xFF3A2C22))
         .semantics { contentDescription = desc }
-        .clickable { if (selecting) state.togglePick(item.id) else state.openEdit(item.id) }) {
-        thumb?.let {
-            Image(it.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-        } ?: Box(Modifier.fillMaxSize().alpha(0.4f).background(Brush.linearGradient(listOf(Color(0xFF5A4636), Color(0xFF2A1F18)))))
+        .springClick(0.92f) { if (selecting) state.togglePick(item.id) else state.openEdit(item.id) }) {
+        // the picture "develops" out of the paper back when its thumbnail is ready
+        Crossfade(thumb, animationSpec = tween(450), label = "develop") { t ->
+            if (t != null) Image(t.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            else {
+                // not developed yet: the back of the photo paper (spektrafilm virtual paper back)
+                val ctx = androidx.compose.ui.platform.LocalContext.current
+                val back = remember { app.spektralab.render.PaperBack.render(ctx, 240, 160) }
+                Image(back.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            }
+        }
         val tag = if (item.isVideo) mmss(item.durationMs / 1000) else if (item.isRaw) "RAW" else ""
         if (tag.isNotEmpty()) Text(tag, fontFamily = Fonts.mono, fontSize = 8.sp, color = Color.White,
             modifier = Modifier.align(Alignment.BottomEnd).padding(3.dp).background(Color(0xCC0D0B09)).padding(horizontal = 3.dp, vertical = 1.dp))
         if (item.look != Look.DEFAULT) RedTick(Modifier.align(Alignment.TopEnd).padding(3.dp).size(14.dp))
-        if (order >= 0) CrayonCircle(order + 1, Modifier.fillMaxSize())
+        // drawn on when picked, quickly rubbed out when unpicked
+        androidx.compose.animation.AnimatedVisibility(order >= 0, enter = EnterTransition.None, exit = fadeOut(tween(160)) + scaleOut(tween(160), targetScale = 1.08f)) {
+            val shownOrder = remember { mutableIntStateOf(order) }
+            if (order >= 0) shownOrder.intValue = order
+            CrayonCircle(shownOrder.intValue + 1, Modifier.fillMaxSize())
+        }
     }
 }
 
 /** Hand-drawn red circle with a handwritten order number (multi-select). */
 @Composable
 fun CrayonCircle(number: Int, modifier: Modifier) {
+    // the hand goes once around, then writes the number
+    val stroke by drawOnProgress(Unit, durationMs = 380)
+    val pop = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { delay(260); pop.animateTo(1f, Motion.settle) }
     Box(modifier) {
         Canvas(Modifier.fillMaxSize()) {
             val p = Path()
@@ -241,22 +341,24 @@ fun CrayonCircle(number: Int, modifier: Modifier) {
                 val y = cy + ry * wob * kotlin.math.sin(a)
                 if (i == 0) p.moveTo(x, y) else p.lineTo(x, y)
             }
-            drawPath(p, Pal.red, style = Stroke(width = 3.dp.toPx()))
+            drawPartialPath(p, stroke, Pal.red, 3.dp.toPx())
         }
-        Text("$number", fontFamily = Fonts.hand, fontSize = 24.sp, color = Pal.red,
-            modifier = Modifier.align(Alignment.TopStart).padding(start = 4.dp))
+        Box(Modifier.align(Alignment.TopStart).padding(start = 4.dp).graphicsLayer {
+            scaleX = pop.value; scaleY = pop.value; alpha = pop.value.coerceIn(0f, 1f); rotationZ = -18f * (1f - pop.value)
+        }) { RollingNumber(number, Fonts.hand, 24.sp, Pal.red) }
     }
 }
 
 @Composable
 private fun RedTick(modifier: Modifier) {
+    val stroke by drawOnProgress(Unit, durationMs = 300, delayMs = 150)
     Canvas(modifier) {
         val p = Path().apply {
             moveTo(size.width * 0.1f, size.height * 0.55f)
             lineTo(size.width * 0.4f, size.height * 0.85f)
             lineTo(size.width * 0.95f, size.height * 0.1f)
         }
-        drawPath(p, Pal.red, style = Stroke(width = 2.5.dp.toPx()))
+        drawPartialPath(p, stroke, Pal.red, 2.5.dp.toPx())
     }
 }
 

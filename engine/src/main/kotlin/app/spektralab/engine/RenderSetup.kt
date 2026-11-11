@@ -40,6 +40,25 @@ class LookSetup(val look: Look, val params: RuntimeParams, global: GlobalData, l
 
     val grain = GrainSetup(params)
 
+    /**
+     * Colour of unexposed print paper (linear sRGB): the easel-masked white border of a
+     * print, i.e. the paper density at the lowest exposure through the scanner.
+     * Null when the film is scanned directly (no paper).
+     */
+    val paperWhite: DoubleArray? = params.paper?.takeIf { !params.scanFilm }?.let { paper ->
+        val d = paper.densityCurves.first()
+        DoubleArray(3).also { paper.scanLut.sample(d[0], d[1], d[2], it); for (c in 0..2) it[c] += glare }
+    }
+
+    /**
+     * Colour of the film rebate (unexposed film base) after the whole chain: black on a
+     * print from a negative, black on a slide, orange mask on a direct negative scan.
+     */
+    val rebateColor: DoubleArray = run {
+        val d = film.normalizedDensityCurves.first()
+        DoubleArray(3).also { outputLut.sample(d[0], d[1], d[2], it); for (c in 0..2) it[c] += glare }
+    }
+
     fun exposureBlur(pixelSizeUm: Double, maxSigmaPx: Double) =
         SpatialKernels.exposureBlur(params, pixelSizeUm, maxSigmaPx)
 

@@ -274,6 +274,7 @@ uniform int uOverlay;
 uniform sampler2D uOverlayTex;
 uniform int uFlipY;
 uniform int uOriginal;
+uniform float uOriginalGain;
 
 vec3 dens(vec2 uv) { return texture(uDensity, uv).rgb; }
 
@@ -286,7 +287,7 @@ void main() {
     } else {
         vec2 iuv = (p - uImageRect.xy) / (uImageRect.zw - uImageRect.xy);
         if (uOriginal == 1) {
-            col = linearToSrgb(inputLinear(iuv));
+            col = linearToSrgb(inputLinear(iuv) * uOriginalGain);
         } else {
             vec3 d = dens(iuv);
             if (uGrainBlur.x < 0.999) {
@@ -312,4 +313,56 @@ void main() {
 
     val FINAL = HEADER + INPUT + FINAL_BODY
     val FINAL_EXTERNAL = EXTERNAL_HEADER + INPUT + FINAL_BODY
+
+    /**
+     * Instant-film development reveal: GLSL port of spektrafilm_gui
+     * `polaroid_animation.py` (layer stack + time coefficients from [Polaroid]).
+     * Image-wide maxima (density, chroma, neutral) are measured on the CPU.
+     */
+    const val POLAROID = """#version 300 es
+precision highp float;
+in vec2 vUv;
+out vec4 fragColor;
+uniform sampler2D uSrc;
+uniform float uCoef[9];
+uniform vec3 uDensityMax;
+uniform vec3 uChromaMax;
+uniform float uNeutralMax;
+const float EPS = 1e-4;
+const vec3 SHADOW_RGB = vec3(0.34, 0.39, 0.27);
+const vec3 RECEIVER_RGB = vec3(0.04, 0.08, 0.15);
+const vec3 SILVER_RGB = vec3(0.18, 0.19, 0.20);
+const vec3 SILVER_CROSS_RGB = vec3(0.03, 0.02, 0.04);
+const vec3 ANTI_HIGHLIGHT_RGB = vec3(0.10, 0.06, 0.02);
+const vec3 ANTI_INVERT_RGB = vec3(0.13, 0.07, 0.18);
+const vec3 ANTI_LATENT_RGB = vec3(0.04, 0.02, 0.06);
+const vec3 WARM_FLASH_RGB = vec3(0.02, 0.08, 0.19);
+const vec3 STAIN_RGB = vec3(0.03, 0.06, 0.11);
+void main() {
+    vec3 img = clamp(texture(uSrc, vUv).rgb, EPS, 1.0);
+    vec3 density = clamp(-log(pow(img, vec3(2.2))), 0.0, 6.0);
+    float neutral = min(density.r, min(density.g, density.b));
+    vec3 chroma = density - neutral;
+    vec3 densityLatent = density / (uDensityMax + EPS);
+    vec3 chromaLatent = chroma / (uChromaMax + EPS);
+    float neutralLatent = neutral / (uNeutralMax + EPS);
+    float shadow = clamp(dot(density, SHADOW_RGB), 0.0, 1.75) / 1.75;
+    float highlight = 1.0 - shadow;
+    float chromaStrength = max(chromaLatent.r, max(chromaLatent.g, chromaLatent.b));
+    float warmth = clamp((chroma.g + 1.25 * chroma.b - 0.85 * chroma.r) / (chroma.r + chroma.g + chroma.b + EPS), 0.0, 1.0);
+    vec3 receiver = (0.30 + 0.70 * highlight) * RECEIVER_RGB;
+    float silverMap = clamp(0.24 + 0.46 * shadow + 0.30 * neutralLatent, 0.0, 1.0);
+    vec3 silver = clamp(silverMap * SILVER_RGB + chromaLatent.gbr * SILVER_CROSS_RGB, 0.0, 0.28);
+    vec3 anti = highlight * ANTI_HIGHLIGHT_RGB + (1.0 - densityLatent.brg) * ANTI_INVERT_RGB + chromaLatent.gbr * ANTI_LATENT_RGB;
+    anti *= 0.40 + 0.60 * highlight;
+    vec3 warm = (0.24 + 0.42 * highlight + 0.34 * max(warmth, chromaStrength)) * WARM_FLASH_RGB;
+    vec3 stain = highlight * STAIN_RGB;
+    vec3 d = uCoef[0] * vec3(neutral)
+           + uCoef[1] * vec3(0.0, 0.0, chroma.b)
+           + uCoef[2] * vec3(0.0, chroma.g, 0.0)
+           + uCoef[3] * vec3(chroma.r, 0.0, 0.0)
+           + uCoef[4] * receiver + uCoef[5] * silver + uCoef[6] * anti + uCoef[7] * warm + uCoef[8] * stain;
+    fragColor = vec4(exp(-clamp(d, 0.0, 8.0) / 2.2), 1.0);
+}
+"""
 }

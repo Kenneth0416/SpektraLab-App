@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.opengl.EGLSurface
 import android.opengl.GLES30.*
 import app.spektralab.engine.LookSetup
+import app.spektralab.data.SourceImage
 import app.spektralab.gl.EglCore
 import app.spektralab.gl.FilmRenderer
 import app.spektralab.gl.GlUtil
@@ -40,19 +41,20 @@ class GlWorker {
     }
 
     /** Render an upright photo through [setup]; returns an ARGB bitmap of the output canvas. */
-    fun renderPhoto(source: Bitmap, setup: LookSetup, autoEv: Float, framing: Framing, overlay: Bitmap?, seed: Int): Bitmap {
+    fun renderPhoto(source: SourceImage, setup: LookSetup, autoEv: Float, framing: Framing, overlay: Bitmap?, seed: Int,
+                    border: FloatArray = Borders.color(setup.look, setup)): Bitmap {
         val maxTex = GlUtil.maxTextureSize
         require(framing.outWidth <= maxTex && framing.outHeight <= maxTex) { "image too large for GPU" }
-        val tex = uploadSrgb(source)
+        val tex = upload(source)
         val overlayTex = overlay?.let { uploadRgba(it) } ?: 0
         val out = RenderTarget(framing.outWidth, framing.outHeight, GL_RGBA8)
         try {
             renderer.setLook(setup)
             renderer.render(RenderRequest(
-                input = InputImage(tex, false, Framing.bitmapUvTransform(framing.crop)),
+                input = InputImage(tex, false, Framing.bitmapUvTransform(framing.crop), sceneLinear = source.linear != null),
                 imageWidth = framing.imageWidth, imageHeight = framing.imageHeight,
                 framebuffer = out.framebuffer, outWidth = out.width, outHeight = out.height,
-                imageRect = framing.imageRect, overlayTexture = overlayTex, flipY = true,
+                imageRect = framing.imageRect, border = border, overlayTexture = overlayTex, flipY = true,
                 seed = seed, autoEv = autoEv,
             ))
             glBindFramebuffer(GL_FRAMEBUFFER, out.framebuffer)
@@ -74,6 +76,17 @@ class GlWorker {
     }
 
     companion object {
+        fun upload(source: SourceImage): Int = source.linear?.let { uploadLinear(it) } ?: uploadSrgb(source.bitmap!!)
+
+        /** Scene-linear half-float image (developed raw) as an RGBA16F texture. */
+        fun uploadLinear(img: app.spektralab.raw.LinearImage): Int {
+            val tex = GlUtil.texture2d()
+            img.halfRgba.position(0)
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, img.width, img.height, 0, GL_RGBA, GL_HALF_FLOAT, img.halfRgba)
+            return tex
+        }
+
         fun uploadSrgb(bmp: Bitmap): Int {
             val b = if (bmp.config == Bitmap.Config.ARGB_8888) bmp else bmp.copy(Bitmap.Config.ARGB_8888, false)
             val buf = ByteBuffer.allocateDirect(b.byteCount).order(ByteOrder.nativeOrder())

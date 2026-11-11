@@ -10,6 +10,7 @@ import app.spektralab.data.Library
 import app.spektralab.data.LibraryItem
 import app.spektralab.data.LookJson
 import app.spektralab.data.Media
+import app.spektralab.data.SourceImage
 import app.spektralab.engine.EngineData
 import app.spektralab.engine.Look
 import app.spektralab.engine.LookSetup
@@ -81,7 +82,14 @@ class Thumbnails(private val app: SpektraApp) {
     private val mutex = Mutex()
 
     private fun key(item: LibraryItem) =
-        "${item.id}_${Integer.toHexString(LookJson.toJson(item.look).toString().hashCode())}"
+        "${item.id}_${Integer.toHexString(item.uri.hashCode())}_${Integer.toHexString(LookJson.toJson(item.look).toString().hashCode())}"
+
+    /** Drop memory and disk thumbnails of removed items. */
+    fun forget(ids: Collection<Long>) {
+        val prefixes = ids.map { "${it}_" }
+        mem.snapshot().keys.filter { k -> prefixes.any { k.startsWith(it) } }.forEach { mem.remove(it) }
+        dir.listFiles()?.filter { f -> prefixes.any { f.name.startsWith(it) } }?.forEach { it.delete() }
+    }
 
     fun cached(item: LibraryItem): Bitmap? = mem.get(key(item))
 
@@ -104,12 +112,12 @@ class Thumbnails(private val app: SpektraApp) {
         val src = withContext(Dispatchers.IO) {
             val uri = Uri.parse(item.uri)
             runCatching {
-                if (item.isVideo) Media.videoFrame(app, uri, minOf(item.durationMs * 500, 1_000_000L), 640)
-                else Media.decodeImage(app, uri, 640)
+                if (item.isVideo) Media.videoFrame(app, uri, minOf(item.durationMs * 500, 1_000_000L), 640)?.let { SourceImage(it, null) }
+                else Media.loadSource(app, uri, 640, tryRaw = item.isRaw)
             }.getOrNull()
         } ?: return null
         val setup = withContext(Dispatchers.Default) { app.looks.get(item.look) }
-        val look = item.look.copy(filmEdge = false, dateStamp = false)
+        val look = item.look.copy(border = "none", dateStamp = false)
         val framing = Framing.compute(src.width, src.height, look, 480)
         return runCatching {
             app.glWorker.run { renderPhoto(src, setup, item.autoEv, framing, null, item.id.toInt()) }

@@ -15,7 +15,8 @@ class GlDumpTest {
     fun dump() {
         val out = File(outDir ?: return).apply { mkdirs() }
         mapOf("vertex" to Shaders.VERTEX, "expose" to Shaders.EXPOSE, "down" to Shaders.DOWN, "blur" to Shaders.BLUR,
-            "combine" to Shaders.COMBINE, "corr" to Shaders.CORR, "develop" to Shaders.DEVELOP, "final" to Shaders.FINAL)
+            "combine" to Shaders.COMBINE, "corr" to Shaders.CORR, "develop" to Shaders.DEVELOP, "final" to Shaders.FINAL,
+            "polaroid" to Shaders.POLAROID)
             .forEach { (k, v) -> File(out, "$k.glsl").writeText(v) }
         val assets = File(System.getProperty("spektra.assets"))
         val data = EngineData { File(assets, it).inputStream() }
@@ -41,6 +42,8 @@ class GlDumpTest {
 "positive":${s.positive},"dmax":${arr(s.densityMax)},"lutN":${s.outputLut.n},"lutLo":${arrd(s.outputLut.lo)},"lutHi":${arrd(s.outputLut.hi)},
 "lut":${arr(s.outputLut.values)},"glare":${s.glare},"colors":${arrd(colors)},"expected":${arrd(expected)}}""")
         }
+        // polaroid reveal coefficients from the Kotlin port
+        File(out, "polaroid_coef.json").writeText((0..10).joinToString(",", "[", "]") { i -> arr(Polaroid.coefficients(i / 10.0)) })
         // grain statistics from the CPU model
         val s = LookSetup.create(Look(film = "kodak_portra_400"), data, 24)
         val g = s.grain

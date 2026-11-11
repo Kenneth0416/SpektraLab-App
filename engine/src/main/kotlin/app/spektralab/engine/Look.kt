@@ -31,9 +31,13 @@ data class Look(
     val yFilter: Double = 0.0,
     val mFilter: Double = 0.0,
     val format: String = "135",
-    val filmEdge: Boolean = false,
+    /** "none", "white" (spektrafilm print white border) or "edge" (film rebate with edge print). */
+    val border: String = "none",
     val dateStamp: Boolean = false,
 ) {
+    val filmEdge: Boolean get() = border == "edge"
+    val whiteBorder: Boolean get() = border == "white"
+
     companion object {
         val DEFAULT = Look()
     }
@@ -43,6 +47,7 @@ data class FilmInfo(val stock: String, val name: String, val iso: String, val ki
                     val accent: Long)
 data class PaperInfo(val id: String, val label: String, val note: String)
 data class DiffusionInfo(val id: String, val label: String, val note: String)
+data class BorderInfo(val id: String, val label: String, val note: String)
 data class FormatInfo(val id: String, val label: String, val longMm: Double, val aspect: Double, val note: String)
 
 /** Stocks shipped with spektrafilm, with UI labels. */
@@ -96,6 +101,14 @@ object Catalog {
         FormatInfo("66", "6×6", 56.0, 1.0, "底片大，颗粒更细腻。"),
         FormatInfo("67", "6×7", 70.0, 70.0 / 56.0, "底片大，颗粒更细腻。"),
     )
+
+    val borders = listOf(
+        BorderInfo("none", "无", "不加边框。"),
+        BorderInfo("white", "相纸白边", "spektrafilm 的白边：四周留长边 3% 的相纸。白边颜色是这张相纸未曝光处的真实颜色；反转片和直接扫描时为纯白。"),
+        BorderInfo("edge", "片边", "连同底片片边一起印出来，带胶片名与格号；片边颜色按片基真实印出。"),
+    )
+
+    fun border(id: String): BorderInfo = borders.firstOrNull { it.id == id } ?: borders.first()
 
     fun film(stock: String): FilmInfo = films.firstOrNull { it.stock == stock } ?: films.first()
     fun paper(id: String): PaperInfo = papers.firstOrNull { it.id == id } ?: papers.first()

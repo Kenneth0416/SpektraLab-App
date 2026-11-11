@@ -24,3 +24,15 @@ scale = (a * b).sum() / (b * b).sum()
 print("exposure scale LibRaw -> ours: %.4f" % scale)
 print("max abs diff (after scale): %.4f, mean: %.5f" % (np.abs(a - b * scale).max(), np.abs(a - b * scale).mean()))
 print("mean chromaticity ours ", (a.mean((0, 1)) / a.mean()).round(4), " LibRaw", (b.mean((0, 1)) / b.mean()).round(4))
+
+
+# the burst merge writes a Linear DNG (half float, deflate): LibRaw must read it and agree
+import os
+if os.path.exists(d + "/merged.dng"):
+    raw = rawpy.imread(d + "/merged.dng")
+    ref = raw.raw_image.astype(np.float64) / raw.white_level
+    lines = open(d + "/merged_camera.txt").read().split("\n")
+    w, h = map(int, lines[0].split())
+    mine = np.array([[float(v) for v in l.split()] for l in lines[1:1 + w * h]]).reshape(h, w, 3)
+    print("merged Linear DNG: LibRaw reads", ref.shape, "camera RGB max abs diff %.5f, mean %.6f"
+          % (np.abs(mine - ref).max(), np.abs(mine - ref).mean()))

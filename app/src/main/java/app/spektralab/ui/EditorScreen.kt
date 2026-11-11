@@ -32,6 +32,13 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.ui.layout.onSizeChanged
+import kotlin.math.roundToInt
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -164,6 +171,28 @@ fun EditorScreen(state: AppState, id: Long) {
     }
     LaunchedEffect(hold) { preview.setOriginal(hold) }
 
+    // magnified view: pinch / double tap; the full-resolution original is loaded the first time
+    var zoom by remember(item.id) { mutableFloatStateOf(1f) }
+    var center by remember(item.id) { mutableStateOf(Offset(0.5f, 0.5f)) }
+    var fullRequested by remember(item.id) { mutableStateOf(false) }
+    val zoomScope = rememberCoroutineScope()
+    val shownId by rememberUpdatedState(item.id)
+    LaunchedEffect(zoom, center) { preview.setView(zoom, center.x, center.y) }
+    LaunchedEffect(item.id, zoom > 1f) {
+        val worthIt = item.isRaw || maxOf(item.width, item.height) > previewDecodeEdge(context)
+        if (zoom > 1f && !fullRequested && !item.isVideo && worthIt) {
+            fullRequested = true
+            val id = item.id; val uri = Uri.parse(item.uri); val raw = item.isRaw
+            // not tied to this effect: zooming back out must not cancel the load
+            zoomScope.launch {
+                val src = withContext(Dispatchers.IO) {
+                    runCatching { Media.loadSource(context, uri, FilmPreviewView.FULL_EDGE, tryRaw = raw, fast = false) }.getOrNull()
+                }
+                if (src != null && shownId == id) preview.setFullPhoto(src)
+            }
+        }
+    }
+
     val fold = LocalFold.current
     val wide = widthClass() != WidthClass.COMPACT
     var origin by remember { mutableStateOf(Offset.Zero) }
@@ -197,11 +226,68 @@ fun EditorScreen(state: AppState, id: Long) {
                 Framing.compute(item.width.coerceAtLeast(1), item.height.coerceAtLeast(1), look, 2048)
             }
             val aspect = framing.outWidth.toFloat() / framing.outHeight
+            // zoom at which one pixel of the full-size render is one pixel of the screen
+            var boxPx by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
+            val fullWidth = remember(item.width, item.height, look.format, look.border) {
+                Framing.compute(item.width.coerceAtLeast(1), item.height.coerceAtLeast(1), look, FilmPreviewView.FULL_EDGE).outWidth
+            }
+            val actualZoom = if (boxPx.width > 0) (fullWidth.toFloat() / boxPx.width).coerceAtLeast(1f) else 1f
+            val zoomLimits by rememberUpdatedState(actualZoom to maxOf(actualZoom * 2f, 3f))
+            fun clampCenter(c: Offset, z: Float) = (0.5f / z).let { h -> Offset(c.x.coerceIn(h, 1f - h), c.y.coerceIn(h, 1f - h)) }
             BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 // fit the frame into whatever the pane gives us (portrait or landscape pane)
                 val boxAspect = if (maxHeight.value > 0f) maxWidth.value / maxHeight.value else 1f
                 Box(Modifier.aspectRatio(aspect, matchHeightConstraintsFirst = aspect < boxAspect)
-                    .pointerInput(Unit) { detectTapGestures(onPress = { hold = true; tryAwaitRelease(); hold = false }) }) {
+                    .onSizeChanged { boxPx = it }
+                    .pointerInput(item.id) {
+                        // double tap: straight to 100% at that point, and back
+                        detectTapGestures(onDoubleTap = { pos ->
+                            if (item.isVideo) return@detectTapGestures
+                            if (zoom > 1f) { zoom = 1f; center = Offset(0.5f, 0.5f) } else {
+                                val z = zoomLimits.first.coerceAtLeast(2f)
+                                zoom = z
+                                center = clampCenter(Offset(pos.x / size.width, pos.y / size.height), z)
+                            }
+                        })
+                    }
+                    .pointerInput(item.id) {
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            // holding still shows the original; two fingers (or a drag once magnified) move the view
+                            var moving = false
+                            var travelled = 0f
+                            val holdJob = zoomScope.launch { kotlinx.coroutines.delay(180); hold = true }
+                            try {
+                                while (true) {
+                                    val e = awaitPointerEvent()
+                                    val pressed = e.changes.count { it.pressed }
+                                    if (pressed == 0) break
+                                    if (item.isVideo) continue
+                                    val pan = e.calculatePan()
+                                    travelled += pan.getDistance()
+                                    if (!moving && (pressed >= 2 || (zoom > 1f && travelled > viewConfiguration.touchSlop))) {
+                                        moving = true; holdJob.cancel(); hold = false
+                                    }
+                                    if (moving) {
+                                        val old = zoom
+                                        val nz = (old * e.calculateZoom()).coerceIn(1f, zoomLimits.second)
+                                        var c = center
+                                        val at = e.calculateCentroid(useCurrent = true)
+                                        if (at != Offset.Unspecified && size.width > 0 && size.height > 0) {
+                                            // keep the point under the fingers where it is
+                                            val fx = at.x / size.width - 0.5f; val fy = at.y / size.height - 0.5f
+                                            c = Offset(c.x + fx / old - fx / nz, c.y + fy / old - fy / nz)
+                                            c = Offset(c.x - pan.x / (size.width * nz), c.y - pan.y / (size.height * nz))
+                                        }
+                                        zoom = nz; center = clampCenter(c, nz)
+                                        e.changes.forEach { it.consume() }
+                                    }
+                                }
+                            } finally {
+                                holdJob.cancel(); hold = false
+                            }
+                        }
+                    }) {
                     AndroidView({ preview }, Modifier.fillMaxSize())
                     // spektrafilm's virtual photo-paper back until the first frame is developed
                     androidx.compose.animation.AnimatedVisibility(!developed, enter = EnterTransition.None, exit = fadeOut(tween(350))) {
@@ -211,6 +297,12 @@ fun EditorScreen(state: AppState, id: Long) {
                         Image(back.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                     }
                     CropCorners(Modifier.fillMaxSize(), hold)
+                    // how far in: 100% = one picture pixel per screen pixel
+                    androidx.compose.animation.AnimatedVisibility(zoom > 1.001f, Modifier.align(Alignment.TopStart).padding(10.dp),
+                        enter = fadeIn(tween(120)), exit = fadeOut(tween(200))) {
+                        Text("${(zoom / actualZoom * 100).roundToInt()}%", fontFamily = Fonts.mono, fontSize = 9.sp, color = Pal.text,
+                            modifier = Modifier.background(Color(0x99140807)).padding(horizontal = 6.dp, vertical = 2.dp))
+                    }
                     // the label flips like a film counter between the look and "original"
                     AnimatedContent(if (hold) "原图 ORIGINAL" else summary(look).uppercase(Locale.ROOT),
                         Modifier.align(Alignment.BottomStart).padding(10.dp), label = "badge", transitionSpec = {

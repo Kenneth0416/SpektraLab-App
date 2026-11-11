@@ -71,6 +71,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import app.spektralab.camera.RawShooter
 import app.spektralab.camera.FilmViewfinder
 import app.spektralab.engine.Catalog
 import app.spektralab.engine.LookMapper
@@ -86,7 +87,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private class CameraSession(val camera: Camera, val capture: ImageCapture, val raw: Boolean)
+private class CameraSession(val camera: Camera, val capture: ImageCapture, val raw: Boolean,
+                            /** For raw capture into memory; null when the camera would not tell. */
+                            val chars: android.hardware.camera2.CameraCharacteristics? = null)
 
 /**
  * The camera: a live viewfinder through the loaded film, and a shutter that saves the
@@ -107,6 +110,20 @@ fun CameraScreen(state: AppState) {
     var zoom by rememberSaveable { mutableFloatStateOf(1f) }
     var session by remember { mutableStateOf<CameraSession?>(null) }
     var busy by remember { mutableStateOf(false) }
+    val multiFrame by state.multiFrame.collectAsState()
+    val merging by state.merging.collectAsState()
+    // frames the next shot will take: follows the light (sensor gain) while multi-frame is on
+    var burstFrames by remember { mutableIntStateOf(RawShooter.MAX_FRAMES) }
+    LaunchedEffect(session, multiFrame) {
+        val chars = session?.chars ?: return@LaunchedEffect
+        while (multiFrame) { burstFrames = state.shooter.frameCount(chars); kotlinx.coroutines.delay(400) }
+    }
+    // exposure compensation for the film exposure, set by dragging on the finder after a tap
+    var evBias by rememberSaveable { mutableFloatStateOf(0f) }
+    // focus / metering point: 0 searching, 1 in focus, 2 could not focus; locked = held until tapped again
+    var focusResult by remember { mutableIntStateOf(0) }
+    var focusLocked by remember { mutableStateOf(false) }
+    var focusTouchedAt by remember { mutableLongStateOf(0L) }
 
     // permission
     var granted by remember {
@@ -161,10 +178,12 @@ fun CameraScreen(state: AppState) {
                             // raw: the sensor's own data (Camera2 RAW_SENSOR), written as DNG
                             if (raw) setOutputFormat(ImageCapture.OUTPUT_FORMAT_RAW)
                             else { setOutputFormat(ImageCapture.OUTPUT_FORMAT_JPEG); setResolutionSelector(fourThree) }
+                            if (raw) requestRawMetadata(this, state.shooter.results)
                         }.build()
                     val group = UseCaseGroup.Builder().addUseCase(preview).addUseCase(capture).addEffect(viewfinder.effect).build()
                     p.unbindAll()
-                    return CameraSession(p.bindToLifecycle(owner, selector, group), capture, raw)
+                    val camera = p.bindToLifecycle(owner, selector, group)
+                    return CameraSession(camera, capture, raw, if (raw) cameraCharacteristics(context, camera) else null)
                 }
                 session = runCatching { bind(rawSupported) }.recoverCatching {
                     // some devices list raw but cannot stream it next to the preview
@@ -179,6 +198,8 @@ fun CameraScreen(state: AppState) {
         }
     }
     DisposableEffect(Unit) { onDispose { viewfinder.release() } }
+    LaunchedEffect(evBias) { viewfinder.evBias = evBias }
+    LaunchedEffect(front) { focusLocked = false }
     // zoom range of the bound lens (0.5x ultra-wide, tele steps)
     var zoomRange by remember { mutableStateOf(1f to 1f) }
     DisposableEffect(session) {
@@ -279,28 +300,45 @@ fun CameraScreen(state: AppState) {
             }
         }
         val stamp = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
-        val values = ContentValues().apply {
-            put(MediaStore.Images.Media.DISPLAY_NAME, "SPK_$stamp." + if (s.raw) "dng" else "jpg")
-            put(MediaStore.Images.Media.MIME_TYPE, if (s.raw) "image/x-adobe-dng" else "image/jpeg")
-            put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_DCIM + "/Silvercam")
-        }
-        s.capture.flashMode = flash
         s.capture.targetRotation = when (deviceDeg) {
             90 -> android.view.Surface.ROTATION_270; 180 -> android.view.Surface.ROTATION_180
             270 -> android.view.Surface.ROTATION_90; else -> android.view.Surface.ROTATION_0
         }
-        val options = ImageCapture.OutputFileOptions.Builder(context.contentResolver, MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values).build()
-        s.capture.takePicture(options, ContextCompat.getMainExecutor(context), object : ImageCapture.OnImageSavedCallback {
-            override fun onImageSaved(result: ImageCapture.OutputFileResults) {
-                captured.complete(true)
-                result.savedUri?.let { state.onCaptured(it) } ?: state.say("原片没有保存下来")
+        // the original through CameraX's own saving: JPEG, or raw where frames cannot be taken into memory
+        fun saveThroughCameraX() {
+            val values = ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, "SPK_$stamp." + if (s.raw) "dng" else "jpg")
+                put(MediaStore.Images.Media.MIME_TYPE, if (s.raw) "image/x-adobe-dng" else "image/jpeg")
+                put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_DCIM + "/Silvercam")
             }
+            s.capture.flashMode = flash
+            val options = ImageCapture.OutputFileOptions.Builder(context.contentResolver, MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values).build()
+            s.capture.takePicture(options, ContextCompat.getMainExecutor(context), object : ImageCapture.OnImageSavedCallback {
+                override fun onImageSaved(result: ImageCapture.OutputFileResults) {
+                    captured.complete(true)
+                    result.savedUri?.let { state.onCaptured(it, evBias) } ?: state.say("原片没有保存下来")
+                }
 
-            override fun onError(e: ImageCaptureException) {
-                captured.complete(false)
-                state.say("拍摄失败：${e.message ?: e.imageCaptureError}")
+                override fun onError(e: ImageCaptureException) {
+                    captured.complete(false)
+                    state.say("拍摄失败：${e.message ?: e.imageCaptureError}")
+                }
+            })
+        }
+        val chars = s.chars
+        if (s.raw && chars != null && !state.shooter.unsupported) {
+            // raw frames into memory: one, or a burst that is merged in the background
+            val frames = if (multiFrame) state.shooter.frameCount(chars) else 1
+            s.capture.flashMode = if (frames > 1) ImageCapture.FLASH_MODE_OFF else flash
+            if (frames > 1) state.say("连拍 $frames 帧，请拿稳")
+            state.shooter.shoot(s.capture, chars, frames, "SPK_$stamp", evBias) { ok, retry ->
+                when {
+                    ok -> captured.complete(true)
+                    retry && session === s -> saveThroughCameraX()
+                    else -> { captured.complete(false); state.say("拍摄失败") }
+                }
             }
-        })
+        } else saveThroughCameraX()
     }
     val shootNow by rememberUpdatedState(::shoot)
     LaunchedEffect(Unit) { state.shutterKey.collect { shootNow() } }
@@ -321,10 +359,18 @@ fun CameraScreen(state: AppState) {
         Text("‹ 灯箱", color = Pal.text, fontSize = 15.sp, modifier = Modifier.springClick { state.closeCamera() }.padding(6.dp))
         // what the shutter will keep as the original
         AnimatedContent(session?.raw, label = "format", transitionSpec = { fadeIn() togetherWith fadeOut() }) { raw ->
-            Text(when (raw) { true -> "RAW"; false -> "JPEG"; null -> "…" }, fontFamily = Fonts.mono, fontSize = 10.sp,
+            // tapping the badge switches multi-frame capture (raw only)
+            Text(when (raw) { true -> if (multiFrame) "RAW×$burstFrames" else "RAW"; false -> "JPEG"; null -> "…" },
+                fontFamily = Fonts.mono, fontSize = 10.sp,
                 color = if (raw == true) accent else Pal.dim,
-                modifier = Modifier.padding(6.dp).border(1.dp, if (raw == true) accent else Pal.off, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp))
+                modifier = Modifier.springClick {
+                    if (raw == true) {
+                        state.setMultiFrame(!multiFrame)
+                        state.say(if (!multiFrame) "多帧合成：按光线连拍 1–${RawShooter.MAX_FRAMES} 帧 RAW，合成更干净的原片" else "单帧 RAW")
+                    }
+                }.padding(6.dp).border(1.dp, if (raw == true) accent else Pal.off, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp))
         }
+        merging?.let { Text("合成 ${(it * 100).toInt()}%", fontFamily = Fonts.mono, fontSize = 10.sp, color = Pal.dim, modifier = Modifier.padding(2.dp)) }
         gap()
         val flashLabel = when (flash) { ImageCapture.FLASH_MODE_ON -> "闪光 开"; ImageCapture.FLASH_MODE_AUTO -> "闪光 自动"; else -> "闪光 关" }
         Text(flashLabel, color = if (flash == ImageCapture.FLASH_MODE_OFF) Pal.dim else Pal.text, fontSize = 13.sp, modifier = Modifier.springClick {
@@ -352,20 +398,51 @@ fun CameraScreen(state: AppState) {
                 val focusRing = remember { Animatable(0f) }
                 Box(Modifier.aspectRatio(aspect, matchHeightConstraintsFirst = aspect < boxAspect)
                     .pointerInput(session) {
-                        detectTapGestures { p ->
-                            val s = session ?: return@detectTapGestures
+                        // tap: focus and meter the sensor there (released after a few seconds);
+                        // long press: lock focus and exposure until the next tap
+                        fun focusOn(p: Offset, lock: Boolean) {
+                            val s = session ?: return
                             val point = previewView.meteringPointFactory.createPoint(p.x, p.y)
-                            runCatching { s.camera.cameraControl.startFocusAndMetering(FocusMeteringAction.Builder(point).build()) }
+                            val action = FocusMeteringAction.Builder(point).apply {
+                                if (lock) disableAutoCancel() else setAutoCancelDuration(4, java.util.concurrent.TimeUnit.SECONDS)
+                            }.build()
                             focusAt = p
-                            scope.launch { focusRing.snapTo(1f); focusRing.animateTo(0f, tween(900)) }
+                            focusResult = 0
+                            focusLocked = lock
+                            focusTouchedAt = System.currentTimeMillis()
+                            scope.launch { focusRing.snapTo(1f); focusRing.animateTo(if (lock) 0.6f else 0f, tween(if (lock) 300 else 1600)) }
+                            runCatching {
+                                val f = s.camera.cameraControl.startFocusAndMetering(action)
+                                f.addListener({
+                                    // the lens reports whether it actually found focus
+                                    focusResult = if (runCatching { f.get().isFocusSuccessful }.getOrDefault(false)) 1 else 2
+                                    if (focusResult == 1) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                }, ContextCompat.getMainExecutor(context))
+                            }
                         }
+                        detectTapGestures(
+                            onTap = { p ->
+                                if (focusLocked) {
+                                    // unlock: back to continuous autofocus and metering
+                                    focusLocked = false
+                                    runCatching { session?.camera?.cameraControl?.cancelFocusAndMetering() }
+                                    scope.launch { focusRing.animateTo(0f, tween(250)) }
+                                } else focusOn(p, lock = false)
+                            },
+                            onLongPress = { p -> haptics.performHapticFeedback(HapticFeedbackType.LongPress); focusOn(p, lock = true) },
+                            onDoubleTap = { evBias = 0f },
+                        )
                     }
                     .pointerInput(session, zoomRange) {
-                        // pinch to zoom
-                        detectTransformGestures { _, _, change, _ ->
+                        detectTransformGestures { _, pan, change, _ ->
                             if (change != 1f) {
+                                // pinch to zoom
                                 zoom = (zoom * change).coerceIn(zoomRange.first, zoomRange.second)
                                 session?.camera?.cameraControl?.setZoomRatio(zoom)
+                            } else if (focusLocked || System.currentTimeMillis() - focusTouchedAt < 5000) {
+                                // after choosing a point, dragging up / down brightens / darkens the exposure
+                                focusTouchedAt = System.currentTimeMillis()
+                                evBias = (evBias - pan.y / 240.dp.toPx() * 2f).coerceIn(-2f, 2f)
                             }
                         }
                     }) {
@@ -398,12 +475,33 @@ fun CameraScreen(state: AppState) {
                         }
                         // focus ring closing in on the tapped point
                         focusAt?.let { c ->
-                            if (focusRing.value > 0f) drawCircle(Pal.safelight.copy(alpha = focusRing.value),
-                                radius = (22.dp.toPx()) * (1f + 0.6f * focusRing.value * focusRing.value), center = c,
-                                style = Stroke(1.5.dp.toPx()))
+                            if (focusRing.value > 0f) {
+                                // white while searching, the roll's colour once sharp, red if the lens gave up
+                                val ringColor = when (focusResult) { 1 -> accent; 2 -> Pal.safelight; else -> Pal.text }
+                                val rad = (22.dp.toPx()) * (1f + 0.6f * ((focusRing.value - 0.6f).coerceAtLeast(0f) / 0.4f))
+                                drawCircle(ringColor.copy(alpha = focusRing.value.coerceAtMost(1f)), radius = rad, center = c,
+                                    style = Stroke((if (focusLocked) 2.5f else 1.5f).dp.toPx()))
+                                // exposure compensation marker riding next to the ring
+                                if (evBias != 0f) {
+                                    val x = c.x + rad + 12.dp.toPx()
+                                    drawLine(ringColor.copy(alpha = 0.6f), Offset(x, c.y - 26.dp.toPx()), Offset(x, c.y + 26.dp.toPx()), 1.dp.toPx())
+                                    drawCircle(ringColor, 4.dp.toPx(), Offset(x, c.y - evBias / 2f * 26.dp.toPx()))
+                                }
+                            }
                         }
                     }
                     CropCorners(Modifier.fillMaxSize(), busy)
+                    // exposure compensation and lock read-outs
+                    Column(Modifier.align(Alignment.TopEnd).padding(10.dp), horizontalAlignment = Alignment.End) {
+                        androidx.compose.animation.AnimatedVisibility(evBias != 0f, enter = fadeIn(), exit = fadeOut()) {
+                            Text(signed(((evBias * 10).toInt() / 10.0), 1, " EV"), fontFamily = Fonts.mono, fontSize = 11.sp, color = accent,
+                                modifier = Modifier.graphicsLayer { rotationZ = iconTurn }.background(Color(0x99140807)).padding(horizontal = 6.dp, vertical = 2.dp))
+                        }
+                        androidx.compose.animation.AnimatedVisibility(focusLocked, enter = fadeIn(), exit = fadeOut()) {
+                            Text("AE/AF 锁定", fontSize = 10.sp, color = Pal.dink,
+                                modifier = Modifier.padding(top = 4.dp).graphicsLayer { rotationZ = iconTurn }.background(accent, RoundedCornerShape(3.dp)).padding(horizontal = 5.dp, vertical = 1.dp))
+                        }
+                    }
                     Text(summary(look).uppercase(Locale.ROOT), fontFamily = Fonts.mono, fontSize = 9.sp, color = Pal.text,
                         modifier = Modifier.align(Alignment.TopStart).padding(10.dp).background(Color(0x99140807)).padding(horizontal = 6.dp, vertical = 2.dp))
                     // prompt while the frame is spent
@@ -574,3 +672,27 @@ fun CameraScreen(state: AppState) {
         }
     }
 }
+
+/**
+ * Ask the camera for what a raw developer needs and a JPEG pipeline does itself:
+ * the lens shading map (DngCreator then embeds it as gain maps, so vignetting and colour
+ * shading can be corrected) and hot pixel correction on the sensor data.
+ */
+@androidx.annotation.OptIn(androidx.camera.camera2.interop.ExperimentalCamera2Interop::class)
+private fun requestRawMetadata(builder: ImageCapture.Builder, results: android.hardware.camera2.CameraCaptureSession.CaptureCallback) {
+    runCatching {
+        androidx.camera.camera2.interop.Camera2Interop.Extender(builder)
+            .setCaptureRequestOption(android.hardware.camera2.CaptureRequest.STATISTICS_LENS_SHADING_MAP_MODE,
+                android.hardware.camera2.CameraMetadata.STATISTICS_LENS_SHADING_MAP_MODE_ON)
+            .setCaptureRequestOption(android.hardware.camera2.CaptureRequest.HOT_PIXEL_MODE,
+                android.hardware.camera2.CameraMetadata.HOT_PIXEL_MODE_HIGH_QUALITY)
+            // the capture result of every frame: a raw frame becomes a DNG with its own
+            .setSessionCaptureCallback(results)
+    }
+}
+
+@androidx.annotation.OptIn(androidx.camera.camera2.interop.ExperimentalCamera2Interop::class)
+private fun cameraCharacteristics(context: android.content.Context, camera: Camera): android.hardware.camera2.CameraCharacteristics? = runCatching {
+    val id = androidx.camera.camera2.interop.Camera2CameraInfo.from(camera.cameraInfo).cameraId
+    context.getSystemService(android.hardware.camera2.CameraManager::class.java).getCameraCharacteristics(id)
+}.getOrNull()

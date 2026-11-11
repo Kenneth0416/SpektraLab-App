@@ -55,6 +55,27 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
         r.revealActive = false
         r.revealPending = revealEnabled
         r.firstFrameSent = false
+        r.dropFull = true
+        r.zoom = 1f
+        requestRender()
+    }
+
+    /**
+     * The full-resolution source, loaded once the picture is magnified. Only the texture is
+     * kept; after a lost GL context the zoomed view falls back to the preview source.
+     */
+    fun setFullPhoto(source: SourceImage) = queueEvent {
+        r.pendingFull = source
+        requestRender()
+    }
+
+    /**
+     * Magnification relative to the fitted frame (1 = whole frame) around the point
+     * ([centerX], [centerY]) of the frame, 0..1 with y down. Above 1 the picture is rendered
+     * once at full resolution through the whole pipeline and that render is panned.
+     */
+    fun setView(zoom: Float, centerX: Float, centerY: Float) = queueEvent {
+        r.zoom = zoom; r.centerX = centerX; r.centerY = 1f - centerY
         requestRender()
     }
 
@@ -153,6 +174,20 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
         private var revealMax: Polaroid.Maxima? = null
         private var polaroid: Program? = null
         private var quad: FullscreenQuad? = null
+        // magnified view
+        var zoom = 1f
+        var centerX = 0.5f
+        var centerY = 0.5f
+        var pendingFull: SourceImage? = null
+        var dropFull = false
+        private var fullTex = 0
+        private var fullW = 0
+        private var fullH = 0
+        private var fullLinear = false
+        private var blit: Program? = null
+        private var zoomTarget: RenderTarget? = null
+        private var zoomKey: List<Any?>? = null
+        private var zoomBroken = false
 
         override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
             // A new EGL context (first start, or the view was re-attached after a fold /
@@ -167,7 +202,9 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
             }
             if (renderer == null) return
             polaroid = Program(Shaders.VERTEX, Shaders.POLAROID)
+            blit = Program(Shaders.VERTEX, Shaders.BLIT)
             quad = FullscreenQuad()
+            fullTex = 0; zoomTarget = null; zoomKey = null
             revealTarget = null
             revealActive = false
             photoTex = 0
@@ -213,6 +250,14 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
                 photoW = bmp.width; photoH = bmp.height
                 pendingBitmap = null
             }
+            if (dropFull) { dropFull = false; pendingFull = null; zoomBroken = false; releaseZoom(); GlUtil.deleteTexture(fullTex); fullTex = 0 }
+            pendingFull?.let { src ->
+                pendingFull = null
+                GlUtil.deleteTexture(fullTex)
+                fullTex = runCatching { GlWorker.upload(src) }.getOrDefault(0)
+                fullW = src.width; fullH = src.height; fullLinear = src.linear != null
+                zoomKey = null
+            }
             videoRequest?.let { startVideo(it); videoRequest = null }
             if (revealActive && drawReveal()) return
             GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0)
@@ -245,6 +290,9 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
                     revealPending = false
                     if (startReveal(fr, input, framing, frameSeed)) return
                 }
+                if (zoom > 1.001f && !zoomBroken) {
+                    if (drawZoomed(fr)) { notifyFirstFrame(); return }
+                } else if (zoomTarget != null) releaseZoom()
                 draw(fr, input, framing, frameSeed)
             }
             notifyFirstFrame()
@@ -312,6 +360,68 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
             ))
         }
 
+        /**
+         * The magnified view: the whole frame rendered once at full resolution (the same
+         * pipeline and pixel size as an export, so grain and halation are the real ones),
+         * kept as a texture and shown through a window. False when it could not be done.
+         */
+        private fun drawZoomed(fr: FilmRenderer): Boolean {
+            val b = blit ?: return false
+            val q = quad ?: return false
+            try {
+                val full = fullTex != 0
+                val tex = if (full) fullTex else photoTex
+                val sw = if (full) fullW else photoW; val sh = if (full) fullH else photoH
+                val linear = if (full) fullLinear else currentBitmap?.linear != null
+                val cap = minOf(FULL_EDGE, (GlUtil.maxTextureSize / 1.07).toInt())
+                val framing = Framing.compute(sw, sh, look, cap)
+                val key = listOf(tex, currentSetup, look, original, autoEv, seed, frameNumber, stampDate, framing.outWidth, framing.outHeight)
+                if (key != zoomKey) {
+                    val t = zoomTarget?.takeIf { it.width == framing.outWidth && it.height == framing.outHeight }
+                        ?: run { zoomTarget?.release(); zoomTarget = null; RenderTarget(framing.outWidth, framing.outHeight, GLES30.GL_RGBA8) }
+                    zoomTarget = t
+                    val overlay = if (OverlayPainter.needsOverlay(look)) OverlayPainter.paint(framing, look, frameNumber, stampDate)
+                        ?.let { bmp -> GlWorker.uploadRgba(bmp).also { bmp.recycle() } } ?: 0 else 0
+                    fr.render(RenderRequest(
+                        input = InputImage(tex, false, Framing.bitmapUvTransform(framing.crop), sceneLinear = linear),
+                        imageWidth = framing.imageWidth, imageHeight = framing.imageHeight,
+                        framebuffer = t.framebuffer, outWidth = t.width, outHeight = t.height,
+                        imageRect = framing.imageRect, border = currentSetup?.let { Borders.color(look, it) } ?: floatArrayOf(0f, 0f, 0f),
+                        overlayTexture = overlay, original = original, seed = seed, autoEv = autoEv,
+                    ))
+                    GlUtil.deleteTexture(overlay)
+                    // the full-size intermediates are large: give them back until the next change
+                    fr.releaseTargets()
+                    GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
+                    GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, t.texture)
+                    GLES30.glGenerateMipmap(GLES30.GL_TEXTURE_2D)
+                    GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MIN_FILTER, GLES30.GL_LINEAR_MIPMAP_LINEAR)
+                    zoomKey = key
+                }
+                val t = zoomTarget ?: return false
+                GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0)
+                GLES30.glViewport(0, 0, surfaceW, surfaceH)
+                b.use()
+                b.texture("uSrc", 0, t.texture)
+                val span = 1f / zoom
+                b.set2f("uScale", span, span)
+                b.set2f("uOffset", (centerX - span / 2).coerceIn(0f, 1f - span), (centerY - span / 2).coerceIn(0f, 1f - span))
+                q.draw()
+                return true
+            } catch (e: Throwable) {
+                // not enough GPU memory for a full-size render: stay with the fitted preview
+                android.util.Log.w("SpektraPreview", "magnified view unavailable", e)
+                zoomBroken = true
+                releaseZoom()
+                runCatching { fr.releaseTargets() }
+                return false
+            }
+        }
+
+        private fun releaseZoom() {
+            zoomTarget?.release(); zoomTarget = null; zoomKey = null
+        }
+
         private fun updateOverlay(framing: Framing) {
             val key = "${look.border}/${look.dateStamp}/${look.film}/${look.format}/$surfaceW/$surfaceH"
             if (key == overlayKey) return
@@ -366,6 +476,9 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
             renderer?.release(); renderer = null
             revealTarget?.release(); revealTarget = null
             polaroid?.release(); polaroid = null
+            blit?.release(); blit = null
+            releaseZoom()
+            GlUtil.deleteTexture(fullTex); fullTex = 0
             quad?.release(); quad = null
             GlUtil.deleteTexture(photoTex); photoTex = 0
             GlUtil.deleteTexture(overlayTex); overlayTex = 0
@@ -373,5 +486,10 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
             if (oesTex != 0) GLES30.glDeleteTextures(1, intArrayOf(oesTex), 0)
             oesTex = 0
         }
+    }
+
+    companion object {
+        /** Long edge of the magnified view's render and of the source loaded for it (same as a full-size export). */
+        const val FULL_EDGE = 4096
     }
 }

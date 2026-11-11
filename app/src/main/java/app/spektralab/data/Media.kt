@@ -128,6 +128,8 @@ object Media {
         return AutoExposure.centerWeightedEv(lin, w, h).toFloat()
     }
 
+    fun name(context: Context, uri: Uri): String = displayName(context.contentResolver, uri)
+
     private fun displayName(cr: ContentResolver, uri: Uri): String =
         runCatching {
             cr.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->

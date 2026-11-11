@@ -107,6 +107,12 @@ fun CameraScreen(state: AppState) {
     var zoom by rememberSaveable { mutableFloatStateOf(1f) }
     var session by remember { mutableStateOf<CameraSession?>(null) }
     var busy by remember { mutableStateOf(false) }
+    // exposure compensation for the film exposure, set by dragging on the finder after a tap
+    var evBias by rememberSaveable { mutableFloatStateOf(0f) }
+    // focus / metering point: 0 searching, 1 in focus, 2 could not focus; locked = held until tapped again
+    var focusResult by remember { mutableIntStateOf(0) }
+    var focusLocked by remember { mutableStateOf(false) }
+    var focusTouchedAt by remember { mutableLongStateOf(0L) }
 
     // permission
     var granted by remember {
@@ -180,6 +186,8 @@ fun CameraScreen(state: AppState) {
         }
     }
     DisposableEffect(Unit) { onDispose { viewfinder.release() } }
+    LaunchedEffect(evBias) { viewfinder.evBias = evBias }
+    LaunchedEffect(front) { focusLocked = false }
     // zoom range of the bound lens (0.5x ultra-wide, tele steps)
     var zoomRange by remember { mutableStateOf(1f to 1f) }
     DisposableEffect(session) {
@@ -294,7 +302,7 @@ fun CameraScreen(state: AppState) {
         s.capture.takePicture(options, ContextCompat.getMainExecutor(context), object : ImageCapture.OnImageSavedCallback {
             override fun onImageSaved(result: ImageCapture.OutputFileResults) {
                 captured.complete(true)
-                result.savedUri?.let { state.onCaptured(it) } ?: state.say("原片没有保存下来")
+                result.savedUri?.let { state.onCaptured(it, evBias) } ?: state.say("原片没有保存下来")
             }
 
             override fun onError(e: ImageCaptureException) {
@@ -353,20 +361,51 @@ fun CameraScreen(state: AppState) {
                 val focusRing = remember { Animatable(0f) }
                 Box(Modifier.aspectRatio(aspect, matchHeightConstraintsFirst = aspect < boxAspect)
                     .pointerInput(session) {
-                        detectTapGestures { p ->
-                            val s = session ?: return@detectTapGestures
+                        // tap: focus and meter the sensor there (released after a few seconds);
+                        // long press: lock focus and exposure until the next tap
+                        fun focusOn(p: Offset, lock: Boolean) {
+                            val s = session ?: return
                             val point = previewView.meteringPointFactory.createPoint(p.x, p.y)
-                            runCatching { s.camera.cameraControl.startFocusAndMetering(FocusMeteringAction.Builder(point).build()) }
+                            val action = FocusMeteringAction.Builder(point).apply {
+                                if (lock) disableAutoCancel() else setAutoCancelDuration(4, java.util.concurrent.TimeUnit.SECONDS)
+                            }.build()
                             focusAt = p
-                            scope.launch { focusRing.snapTo(1f); focusRing.animateTo(0f, tween(900)) }
+                            focusResult = 0
+                            focusLocked = lock
+                            focusTouchedAt = System.currentTimeMillis()
+                            scope.launch { focusRing.snapTo(1f); focusRing.animateTo(if (lock) 0.6f else 0f, tween(if (lock) 300 else 1600)) }
+                            runCatching {
+                                val f = s.camera.cameraControl.startFocusAndMetering(action)
+                                f.addListener({
+                                    // the lens reports whether it actually found focus
+                                    focusResult = if (runCatching { f.get().isFocusSuccessful }.getOrDefault(false)) 1 else 2
+                                    if (focusResult == 1) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                }, ContextCompat.getMainExecutor(context))
+                            }
                         }
+                        detectTapGestures(
+                            onTap = { p ->
+                                if (focusLocked) {
+                                    // unlock: back to continuous autofocus and metering
+                                    focusLocked = false
+                                    runCatching { session?.camera?.cameraControl?.cancelFocusAndMetering() }
+                                    scope.launch { focusRing.animateTo(0f, tween(250)) }
+                                } else focusOn(p, lock = false)
+                            },
+                            onLongPress = { p -> haptics.performHapticFeedback(HapticFeedbackType.LongPress); focusOn(p, lock = true) },
+                            onDoubleTap = { evBias = 0f },
+                        )
                     }
                     .pointerInput(session, zoomRange) {
-                        // pinch to zoom
-                        detectTransformGestures { _, _, change, _ ->
+                        detectTransformGestures { _, pan, change, _ ->
                             if (change != 1f) {
+                                // pinch to zoom
                                 zoom = (zoom * change).coerceIn(zoomRange.first, zoomRange.second)
                                 session?.camera?.cameraControl?.setZoomRatio(zoom)
+                            } else if (focusLocked || System.currentTimeMillis() - focusTouchedAt < 5000) {
+                                // after choosing a point, dragging up / down brightens / darkens the exposure
+                                focusTouchedAt = System.currentTimeMillis()
+                                evBias = (evBias - pan.y / 240.dp.toPx() * 2f).coerceIn(-2f, 2f)
                             }
                         }
                     }) {
@@ -399,12 +438,33 @@ fun CameraScreen(state: AppState) {
                         }
                         // focus ring closing in on the tapped point
                         focusAt?.let { c ->
-                            if (focusRing.value > 0f) drawCircle(Pal.safelight.copy(alpha = focusRing.value),
-                                radius = (22.dp.toPx()) * (1f + 0.6f * focusRing.value * focusRing.value), center = c,
-                                style = Stroke(1.5.dp.toPx()))
+                            if (focusRing.value > 0f) {
+                                // white while searching, the roll's colour once sharp, red if the lens gave up
+                                val ringColor = when (focusResult) { 1 -> accent; 2 -> Pal.safelight; else -> Pal.text }
+                                val rad = (22.dp.toPx()) * (1f + 0.6f * ((focusRing.value - 0.6f).coerceAtLeast(0f) / 0.4f))
+                                drawCircle(ringColor.copy(alpha = focusRing.value.coerceAtMost(1f)), radius = rad, center = c,
+                                    style = Stroke((if (focusLocked) 2.5f else 1.5f).dp.toPx()))
+                                // exposure compensation marker riding next to the ring
+                                if (evBias != 0f) {
+                                    val x = c.x + rad + 12.dp.toPx()
+                                    drawLine(ringColor.copy(alpha = 0.6f), Offset(x, c.y - 26.dp.toPx()), Offset(x, c.y + 26.dp.toPx()), 1.dp.toPx())
+                                    drawCircle(ringColor, 4.dp.toPx(), Offset(x, c.y - evBias / 2f * 26.dp.toPx()))
+                                }
+                            }
                         }
                     }
                     CropCorners(Modifier.fillMaxSize(), busy)
+                    // exposure compensation and lock read-outs
+                    Column(Modifier.align(Alignment.TopEnd).padding(10.dp), horizontalAlignment = Alignment.End) {
+                        androidx.compose.animation.AnimatedVisibility(evBias != 0f, enter = fadeIn(), exit = fadeOut()) {
+                            Text(signed(((evBias * 10).toInt() / 10.0), 1, " EV"), fontFamily = Fonts.mono, fontSize = 11.sp, color = accent,
+                                modifier = Modifier.graphicsLayer { rotationZ = iconTurn }.background(Color(0x99140807)).padding(horizontal = 6.dp, vertical = 2.dp))
+                        }
+                        androidx.compose.animation.AnimatedVisibility(focusLocked, enter = fadeIn(), exit = fadeOut()) {
+                            Text("AE/AF 锁定", fontSize = 10.sp, color = Pal.dink,
+                                modifier = Modifier.padding(top = 4.dp).graphicsLayer { rotationZ = iconTurn }.background(accent, RoundedCornerShape(3.dp)).padding(horizontal = 5.dp, vertical = 1.dp))
+                        }
+                    }
                     Text(summary(look).uppercase(Locale.ROOT), fontFamily = Fonts.mono, fontSize = 9.sp, color = Pal.text,
                         modifier = Modifier.align(Alignment.TopStart).padding(10.dp).background(Color(0x99140807)).padding(horizontal = 6.dp, vertical = 2.dp))
                     // prompt while the frame is spent

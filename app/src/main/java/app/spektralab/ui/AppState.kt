@@ -60,10 +60,12 @@ class AppState(application: Application) : AndroidViewModel(application) {
      * A shot was saved to the album ([uri] is the untouched original, raw when possible):
      * put it on the lightbox with the camera's look and print it.
      */
-    fun onCaptured(uri: Uri) {
+    fun onCaptured(uri: Uri, evBias: Float = 0f) {
         val look = camLook.value
         viewModelScope.launch {
-            val item = withContext(Dispatchers.IO) { Media.importItem(app, uri, library.reserveIds(1)) }?.copy(look = look)
+            val item = withContext(Dispatchers.IO) { Media.importItem(app, uri, library.reserveIds(1)) }
+                // the exposure compensation dialled in at the viewfinder is part of the metered exposure
+                ?.let { it.copy(look = look, autoEv = it.autoEv + evBias) }
                 ?: return@launch say("拍到了，但读不回原片")
             library.add(listOf(item))
             say(if (item.isRaw) "已放上灯箱 · RAW 原片保留" else "已放上灯箱 · 原片保留")

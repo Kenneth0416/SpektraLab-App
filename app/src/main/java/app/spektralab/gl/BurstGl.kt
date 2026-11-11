@@ -119,10 +119,10 @@ object BurstGl {
             glUniform2i(program.loc("uTiles"), tilesX, tilesY)
             glUniform1f(program.loc("uOrigin"), (flow?.origin ?: 0).toFloat())
             glUniform1f(program.loc("uStride"), (flow?.stride ?: 1).toFloat())
-            val cfa = plan.frames[0].cfa
+            val cfa = plan.frames[0].cropCfa
             glUniform4i(program.loc("uCfa"), cfa[0], cfa[1], cfa[2], cfa[3])
             val black = FloatArray(Shaders.MERGE_MAX_FRAMES * 4); val scale = FloatArray(Shaders.MERGE_MAX_FRAMES * 4)
-            for (f in 0 until n) { plan.frames[f].black.copyInto(black, f * 4, 0, 4); plan.scale(f).copyInto(scale, f * 4) }
+            for (f in 0 until n) { plan.frames[f].cropBlack.copyInto(black, f * 4, 0, 4); plan.scale(f).copyInto(scale, f * 4) }
             glUniform4fv(program.loc("uBlack"), Shaders.MERGE_MAX_FRAMES, black, 0)
             glUniform4fv(program.loc("uScale"), Shaders.MERGE_MAX_FRAMES, scale, 0)
 

@@ -91,7 +91,7 @@ class DngTest {
             val a = doubleArrayOf(1.09850, 1.0, 0.35585)
             val inv = DngReader.invert(fmA)!!
             neutral = mv(cmA, a)
-            toCam = { rgb -> mv(inv, mv(srgbToXyz50, rgb)).let { c -> DoubleArray(3) { c[it] * neutral[it] } } }
+            toCam = { rgb -> mv(inv, mv(srgbToXyz50, rgb)).let { c -> DoubleArray(3) { c[it] * neutral[it] / neutral[1] } } }
             colourTags += srationals(50721, cmA); colourTags += srationals(50722, colorMatrix)
             colourTags += srationals(50964, fmA); colourTags += srationals(50965, fmD)
             colourTags += shorts(50778, 17); colourTags += shorts(50779, 21)
@@ -100,13 +100,14 @@ class DngTest {
             val fm = doubleArrayOf(0.60, 0.25, 0.11, 0.25, 0.80, -0.05, 0.02, -0.15, 0.95)
             val inv = DngReader.invert(fm)!!
             neutral = doubleArrayOf(0.52, 1.0, 0.66)
-            toCam = { rgb -> mv(inv, mv(srgbToXyz50, rgb)).let { c -> DoubleArray(3) { c[it] * neutral[it] } } }
+            toCam = { rgb -> mv(inv, mv(srgbToXyz50, rgb)).let { c -> DoubleArray(3) { c[it] * neutral[it] / neutral[1] } } }
             colourTags += srationals(50964, fm)
             colourTags += srationals(50721, colorMatrix)
             colourTags += shorts(50778, 21)
         } else {
             neutral = mv(colorMatrix, d65)
-            toCam = { rgb -> mv(colorMatrix, mv(d50ToD65, mv(srgbToXyz50, rgb))) }
+            // Green-normalised exposure, independent of the metadata matrix scale.
+            toCam = { rgb -> mv(colorMatrix, mv(d50ToD65, mv(srgbToXyz50, rgb))).let { c -> DoubleArray(3) { c[it] / neutral[1] } } }
             colourTags += srationals(50721, colorMatrix)
             colourTags += shorts(50778, 21)
         }

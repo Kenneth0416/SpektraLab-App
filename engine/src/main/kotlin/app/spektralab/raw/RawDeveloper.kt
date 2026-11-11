@@ -22,6 +22,8 @@ class LinearImage(val width: Int, val height: Int, val halfRgba: ByteBuffer) {
  * top of it), only the colour blotches that film never has are removed.
  */
 object RawDeveloper {
+    fun supports(img: RawImage): Boolean = img.linear || img.cfa.isBayer
+
     class Options(
         /** Rebuild channels that clipped from the ones that did not (about one extra stop). */
         val reconstructHighlights: Boolean = true,
@@ -33,8 +35,10 @@ object RawDeveloper {
      * @param maxLongEdge wanted long edge. When the sensor has at least twice that, 2x2
      *   Bayer cells are binned (fast, and averages noise); otherwise a full-resolution
      *   Malvar-He-Cutler demosaic runs unless [fast] is set.
+     * @throws IllegalArgumentException when [supports] is false for [img].
      */
     fun develop(img: DngImage, maxLongEdge: Int, fast: Boolean = false, options: Options = Options()): LinearImage {
+        require(supports(img)) { "Only Bayer and linear RGB frames can be developed" }
         val long = maxOf(img.cropWidth, img.cropHeight)
         if (img.linear) {
             // already demosaiced (merged burst): only reduce the size when asked for less
@@ -52,14 +56,16 @@ object RawDeveloper {
 
     // ------------------------------------------------------------------ shared
     private class Prep(val img: DngImage, val options: Options) {
-        val scale = FloatArray(4) { 1f / (img.white - img.black[it]).coerceAtLeast(1f) }
+        val cfa = IntArray(4) { img.cfa.color(img.cropY + it / 2, img.cropX + it % 2) }
+        val black = FloatArray(4) { img.blackAt(img.cropY + it / 2, img.cropX + it % 2) }
+        val scale = FloatArray(4) { 1f / (img.white - black[it]).coerceAtLeast(1f) }
         private val wb = img.wb
 
         /** Gain maps per colour (two for green on a Bayer sensor). */
         private val maps: Array<List<GainMap>> = Array(3) { c ->
             if (img.gainMaps.size == 1) img.gainMaps
             else if (img.linear) img.gainMaps.filter { it.plane == c }
-            else (0 until 4).filter { img.cfa[it] == c }.mapNotNull { pos ->
+            else (0 until 4).filter { cfa[it] == c }.mapNotNull { pos ->
                 val y = img.cropY + pos / 2; val x = img.cropX + pos % 2
                 img.gainMaps.firstOrNull { it.covers(x, y) }
             }
@@ -71,7 +77,7 @@ object RawDeveloper {
             val x = img.cropX + cx; val y = img.cropY + cy
             val pos = (cy and 1) * 2 + (cx and 1)
             val raw = (img.data[y * img.rawWidth + x].toInt() and 0xffff).toFloat()
-            return ((raw - img.black[pos]) * scale[pos]).coerceIn(0f, 1f) * wb[img.cfa[pos]]
+            return ((raw - black[pos]) * scale[pos]).coerceIn(0f, 1f) * wb[cfa[pos]]
         }
 
         /**
@@ -116,10 +122,10 @@ object RawDeveloper {
         }
     }
 
-    private class Writer(img: DngImage, val w: Int, val h: Int) {
+    private class Writer(img: RawImage, val w: Int, val h: Int) {
         private val o = img.orientation
-        val outW = if (o == 6 || o == 8) h else w
-        val outH = if (o == 6 || o == 8) w else h
+        val outW = if (o >= 5) h else w
+        val outH = if (o >= 5) w else h
         val buf: ByteBuffer = ByteBuffer.allocateDirect(outW * outH * 8).order(ByteOrder.nativeOrder())
         private val m = img.camToSrgb
         private val one = Half.fromFloat(1f)
@@ -127,8 +133,12 @@ object RawDeveloper {
         fun put(u: Int, v: Int, r: Float, g: Float, b: Float) {
             val x: Int; val y: Int
             when (o) {
+                2 -> { x = w - 1 - u; y = v }
                 3 -> { x = w - 1 - u; y = h - 1 - v }
+                4 -> { x = u; y = h - 1 - v }
+                5 -> { x = v; y = u }
                 6 -> { x = h - 1 - v; y = u }
+                7 -> { x = h - 1 - v; y = w - 1 - u }
                 8 -> { x = v; y = w - 1 - u }
                 else -> { x = u; y = v }
             }
@@ -179,7 +189,7 @@ object RawDeveloper {
             sum.fill(0f); cnt.fill(0)
             for (dy in 0 until cell) for (dx in 0 until cell) {
                 val cx = u * cell + dx; val cy = v * cell + dy
-                val c = img.cfa[(cy and 1) * 2 + (cx and 1)]
+                val c = p.cfa[(cy and 1) * 2 + (cx and 1)]
                 sum[c] += p.sample(cx, cy); cnt[c]++
             }
             for (c in 0..2) rgb[c] = sum[c] / maxOf(cnt[c], 1)
@@ -211,11 +221,11 @@ object RawDeveloper {
             val n = at(x, y - 1); val s = at(x, y + 1); val e = at(x + 1, y); val wv = at(x - 1, y)
             val nn = at(x, y - 2); val ss = at(x, y + 2); val ee = at(x + 2, y); val ww = at(x - 2, y)
             val diag = at(x - 1, y - 1) + at(x + 1, y - 1) + at(x - 1, y + 1) + at(x + 1, y + 1)
-            val color = img.cfa[(y and 1) * 2 + (x and 1)]
+            val color = p.cfa[(y and 1) * 2 + (x and 1)]
             val r: Float; val g: Float; val b: Float
             if (color == 1) {
                 // green site: which colour sits left/right of it?
-                val horiz = img.cfa[(y and 1) * 2 + ((x + 1) and 1)]
+                val horiz = p.cfa[(y and 1) * 2 + ((x + 1) and 1)]
                 val h1 = (5 * c + 4 * (e + wv) - diag - (ee + ww) + 0.5f * (nn + ss)) / 8f
                 val v1 = (5 * c + 4 * (n + s) - diag - (nn + ss) + 0.5f * (ee + ww)) / 8f
                 g = c

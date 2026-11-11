@@ -40,13 +40,13 @@ object BurstAlign {
     private fun gray(img: DngImage): Gray {
         val w = img.cropWidth / 2; val h = img.cropHeight / 2
         val out = FloatArray(w * h)
-        val scale = FloatArray(4) { 1f / (img.white - img.black[it]).coerceAtLeast(1f) }
+        val scale = FloatArray(4) { 1f / (img.white - img.cropBlack[it]).coerceAtLeast(1f) }
         IntStream.range(0, h).parallel().forEach { y ->
             for (x in 0 until w) {
                 var s = 0f
                 for (pos in 0 until 4) {
                     val i = (img.cropY + y * 2 + pos / 2) * img.rawWidth + img.cropX + x * 2 + pos % 2
-                    s += (((img.data[i].toInt() and 0xffff) - img.black[pos]) * scale[pos]).coerceIn(0f, 1f)
+                    s += (((img.data[i].toInt() and 0xffff) - img.cropBlack[pos]) * scale[pos]).coerceIn(0f, 1f)
                 }
                 out[y * w + x] = s * 0.25f
             }
@@ -57,11 +57,11 @@ object BurstAlign {
     private fun down(g: Gray, f: Int): Gray {
         val w = max(1, g.w / f); val h = max(1, g.h / f)
         val out = FloatArray(w * h)
-        val inv = 1f / (f * f)
         for (y in 0 until h) for (x in 0 until w) {
             var s = 0f
-            for (dy in 0 until f) for (dx in 0 until f) s += g.v[(y * f + dy) * g.w + x * f + dx]
-            out[y * w + x] = s * inv
+            val rows = min(f, g.h - y * f); val cols = min(f, g.w - x * f)
+            for (dy in 0 until rows) for (dx in 0 until cols) s += g.v[(y * f + dy) * g.w + x * f + dx]
+            out[y * w + x] = s / (rows * cols)
         }
         return Gray(w, h, out)
     }
@@ -223,7 +223,7 @@ object BurstMerge {
         val framesUsed: Float,
     ) {
         /** 1 / (white - black) per CFA position of frame [f]. */
-        fun scale(f: Int) = FloatArray(4) { 1f / (frames[f].white - frames[f].black[it]).coerceAtLeast(1f) }
+        fun scale(f: Int) = FloatArray(4) { 1f / (frames[f].white - frames[f].cropBlack[it]).coerceAtLeast(1f) }
     }
 
     private const val EXP_N = 16384
@@ -265,7 +265,7 @@ object BurstMerge {
         private var trust = 0.0
 
         init {
-            require(!ref.linear) { "burst frames must be Bayer raw" }
+            require(!ref.linear && ref.cfa.isBayer) { "burst frames must be Bayer raw" }
             refPyr = BurstAlign.pyramid(ref)
             refGuide = Guide(ref)
             // relative noise at mid grey decides how wide the detail kernel may be
@@ -278,7 +278,7 @@ object BurstMerge {
 
         /** Align [alt] to the reference and decide where it can be trusted; false if it does not fit the burst. */
         fun add(alt: DngImage): Boolean {
-            if (alt.linear || alt.cropWidth != w || alt.cropHeight != h || !alt.cfa.contentEquals(ref.cfa)) return false
+            if (alt.linear || !alt.cfa.isBayer || alt.cropWidth != w || alt.cropHeight != h || !alt.cropCfa.contentEquals(ref.cropCfa)) return false
             val flow = BurstAlign.align(refPyr, BurstAlign.pyramid(alt))
             val r = robustness(refGuide, Guide(alt), flow, noiseS, noiseO)
             var sum = 0L
@@ -338,8 +338,8 @@ object BurstMerge {
                             val q = ka * dx * dx + 2f * kb * dx * dy + kc * dy * dy
                             val wgt = r * expLut[min((q * (EXP_N / 50f) + 0.5f).toInt(), EXP_N)]
                             val pos = (qy and 1) * 2 + (qx and 1)
-                            val c = img.cfa[pos]
-                            val v = (((img.data[rowBase + qx].toInt() and 0xffff) - img.black[pos]) * sc[pos]).coerceIn(0f, 1f)
+                            val c = img.cropCfa[pos]
+                            val v = (((img.data[rowBase + qx].toInt() and 0xffff) - img.cropBlack[pos]) * sc[pos]).coerceIn(0f, 1f)
                             acc[c] += wgt * v; ws[c] += wgt
                         }
                     }
@@ -363,15 +363,15 @@ object BurstMerge {
         val variance = Array(3) { FloatArray(w * h) }
 
         init {
-            val scale = FloatArray(4) { 1f / (img.white - img.black[it]).coerceAtLeast(1f) }
+            val scale = FloatArray(4) { 1f / (img.white - img.cropBlack[it]).coerceAtLeast(1f) }
             val raw = Array(3) { FloatArray(w * h) }
             IntStream.range(0, h).parallel().forEach { y ->
                 for (x in 0 until w) {
                     var g = 0f
                     for (pos in 0 until 4) {
                         val i = (img.cropY + y * 2 + pos / 2) * img.rawWidth + img.cropX + x * 2 + pos % 2
-                        val v = (((img.data[i].toInt() and 0xffff) - img.black[pos]) * scale[pos]).coerceIn(0f, 1f)
-                        when (img.cfa[pos]) { 0 -> raw[0][y * w + x] = v; 2 -> raw[2][y * w + x] = v; else -> g += v * 0.5f }
+                        val v = (((img.data[i].toInt() and 0xffff) - img.cropBlack[pos]) * scale[pos]).coerceIn(0f, 1f)
+                        when (img.cropCfa[pos]) { 0 -> raw[0][y * w + x] = v; 2 -> raw[2][y * w + x] = v; else -> g += v * 0.5f }
                     }
                     raw[1][y * w + x] = g
                 }
@@ -504,7 +504,7 @@ object BurstMerge {
         if (ref.gainMaps.isEmpty()) return emptyList()
         val out = ArrayList<GainMap>()
         for (c in 0..2) {
-            val list = if (ref.gainMaps.size == 1) ref.gainMaps else (0 until 4).filter { ref.cfa[it] == c }.mapNotNull { pos ->
+            val list = if (ref.gainMaps.size == 1) ref.gainMaps else (0 until 4).filter { ref.cropCfa[it] == c }.mapNotNull { pos ->
                 ref.gainMaps.firstOrNull { it.covers(ref.cropX + pos % 2, ref.cropY + pos / 2) }
             }
             if (list.isEmpty()) continue

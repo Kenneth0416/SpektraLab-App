@@ -217,8 +217,8 @@ class BurstTest {
         bin("merge_expected.bin", rgb.size * 2) { b -> for (v in rgb) b.putShort(v) }
         val fl = p.flows[0]
         File(dir, "merge.json").writeText("""{"w":$w,"h":$h,"frames":${p.frames.size},"guide":[${p.guideW},${p.guideH}],"kern":[${p.kernW},${p.kernH}],
-"tiles":[${fl.tilesX},${fl.tilesY}],"origin":${fl.origin},"stride":${fl.stride},"cfa":[${p.frames[0].cfa.joinToString(",")}],
-"black":[${p.frames.joinToString(",") { it.black.joinToString(",") }}],"scale":[${p.frames.indices.joinToString(",") { p.scale(it).joinToString(",") }}]}""")
+"tiles":[${fl.tilesX},${fl.tilesY}],"origin":${fl.origin},"stride":${fl.stride},"cfa":[${p.frames[0].cropCfa.joinToString(",")}],
+"black":[${p.frames.joinToString(",") { it.cropBlack.joinToString(",") }}],"scale":[${p.frames.indices.joinToString(",") { p.scale(it).joinToString(",") }}]}""")
         File(dir, "merge.glsl").writeText(app.spektralab.gl.Shaders.MERGE)
     }
 

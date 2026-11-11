@@ -1,0 +1,28 @@
+{
+  "name": "spektralab-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npm run package:downloads && vite --host 0.0.0.0",
+    "build": "npm run package:downloads && tsc --noEmit && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "package:downloads": "node scripts/package-downloads.mjs",
+    "build:licenses-data": "node scripts/build-licenses-data.mjs",
+    "android:build": "node scripts/build-android.mjs"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "fflate": "^0.8.2",
+    "typescript": "~5.7.2",
+    "vite": "^6.0.5"
+  }
+}

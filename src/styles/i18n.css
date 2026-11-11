@@ -1,0 +1,95 @@
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.language-switcher {
+  position: relative;
+  height: 42px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  color: #aaa398;
+  border: 1px solid rgba(240, 237, 228, .2);
+  border-radius: 2px;
+  transition: color .2s, border-color .2s, background .2s;
+}
+.language-switcher:hover { color: var(--paper); border-color: #6e675d; background: rgba(255,255,255,.035); }
+.language-switcher select {
+  width: 55px;
+  height: 40px;
+  padding: 0 15px 0 2px;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  outline: 0;
+  color: inherit;
+  background: transparent;
+  font-family: var(--mono);
+  font-size: 9px;
+  cursor: pointer;
+}
+.language-switcher select option { color: #eee7dc; background: #171411; }
+.language-switcher > svg:last-child { position: absolute; right: 7px; pointer-events: none; }
+.language-switcher:focus-within { outline: 2px solid var(--red); outline-offset: 4px; }
+.language-switcher select:focus-visible { outline: none; }
+
+/* English uses narrower display type and controlled line lengths. */
+html[lang="en"] .hero h1 { font-size: clamp(50px, 4.9vw, 72px); letter-spacing: -.06em; }
+html[lang="en"] .hero-intro { max-width: 540px; }
+html[lang="en"] .recipe-note { right: -18px; width: 190px; }
+html[lang="en"] .craft-heading h2 { font-size: clamp(43px, 4.4vw, 60px); }
+html[lang="en"] .craft-card h3 { font-size: 28px; }
+html[lang="en"] .index-card > strong { font-size: 32px; }
+html[lang="en"] .hand-check { font-size: 18px; line-height: 1.3; }
+html[lang="en"] .workflow-heading h2 { font-size: clamp(45px, 4.7vw, 64px); }
+html[lang="en"] .workflow-step h3 { font-size: 24px; }
+html[lang="en"] .media-copy h2 { font-size: clamp(42px, 4vw, 55px); }
+html[lang="en"] .cta-inner h2 { font-size: clamp(65px, 7vw, 98px); }
+html[lang="en"] .download-intro h1 { font-size: clamp(54px, 5.2vw, 74px); }
+html[lang="en"] .download-ticket h2 { font-size: 32px; }
+html[lang="en"] .package-heading h2 { font-size: clamp(45px, 4.6vw, 62px); }
+html[lang="en"] .quickstart-copy h2 { font-size: clamp(43px, 4.2vw, 58px); }
+html[lang="en"] .honesty-card h2, html[lang="en"] .faq-list > h2 { font-size: 36px; }
+
+@media (max-width: 800px) {
+  .header-inner { gap: 12px; }
+  .language-switcher { padding: 0; }
+  .language-switcher > svg:first-child { display: none; }
+  .language-switcher select { width: 52px; padding-left: 8px; }
+  .language-switcher > svg:last-child { right: 4px; }
+}
+
+@media (max-width: 680px) {
+  html[lang="en"] .hero h1 { font-size: clamp(42px, 11.8vw, 55px); line-height: 1.08; }
+  html[lang="en"] .hero-intro { font-size: 14px; }
+  html[lang="en"] .craft-heading h2 { font-size: 38px; }
+  html[lang="en"] .craft-card h3 { font-size: 26px; }
+  html[lang="en"] .workflow-heading h2 { font-size: 41px; }
+  html[lang="en"] .media-copy h2 { font-size: 37px; }
+  html[lang="en"] .cta-inner h2 { font-size: 58px; line-height: 1.02; }
+}
+
+@media (max-width: 600px) {
+  html[lang="en"] .download-intro h1 { font-size: clamp(43px, 12vw, 52px); }
+  html[lang="en"] .download-ticket h2 { font-size: 28px; }
+  html[lang="en"] .package-heading h2 { font-size: 42px; }
+  html[lang="en"] .quickstart-copy h2 { font-size: 41px; }
+  html[lang="en"] .honesty-card h2, html[lang="en"] .faq-list > h2 { font-size: 32px; }
+}
+
+@media (max-width: 350px) {
+  .brand { gap: 7px; }
+  .brand-type strong { font-size: 12px; }
+  .brand-type small { font-size: 6px; }
+  .language-switcher select { width: 48px; font-size: 8px; }
+}

@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-enum class Sheet { NONE, IMPORT, RECIPES, EXPORT, PROGRESS }
+enum class Sheet { NONE, IMPORT, RECIPES, EXPORT, PROGRESS, ABOUT }
 enum class Filter { ALL, PHOTO, VIDEO }
 
 /** UI state of the whole app (lightbox + darkroom), following the interaction prototype. */

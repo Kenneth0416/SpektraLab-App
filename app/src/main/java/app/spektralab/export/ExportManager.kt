@@ -127,7 +127,7 @@ class ExportManager(private val app: SpektraApp) {
             val values = ContentValues().apply {
                 put(MediaStore.Video.Media.DISPLAY_NAME, "SPK_${stamp}_${item.id}_$film.mp4")
                 put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
-                put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/SpektraLab")
+                put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/Silvercam")
                 put(MediaStore.Video.Media.IS_PENDING, 1)
             }
             val cr = app.contentResolver
@@ -163,7 +163,7 @@ class ExportManager(private val app: SpektraApp) {
             val values = ContentValues().apply {
                 put(MediaStore.Images.Media.DISPLAY_NAME, "SPK_${stamp}_${item.id}_$film.${o.photoFormat.ext}")
                 put(MediaStore.Images.Media.MIME_TYPE, o.photoFormat.mime)
-                put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/SpektraLab")
+                put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Silvercam")
                 put(MediaStore.Images.Media.IS_PENDING, 1)
             }
             val cr = app.contentResolver

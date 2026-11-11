@@ -282,7 +282,7 @@ fun CameraScreen(state: AppState) {
         val values = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, "SPK_$stamp." + if (s.raw) "dng" else "jpg")
             put(MediaStore.Images.Media.MIME_TYPE, if (s.raw) "image/x-adobe-dng" else "image/jpeg")
-            put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_DCIM + "/SpektraLab")
+            put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_DCIM + "/Silvercam")
         }
         s.capture.flashMode = flash
         s.capture.targetRotation = when (deviceDeg) {

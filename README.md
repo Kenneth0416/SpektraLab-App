@@ -1,150 +1,125 @@
-# SpektraLab App
+# 銀鹽工坊 / Silvercam — 手机胶片暗房
 
-安卓原生的胶片模拟工具：照片、视频共用一套「胶片 × 相纸」参数。成像引擎是 [spektrafilm](https://github.com/andreavolpato/spektrafilm)（光谱胶片模拟）的 Kotlin + OpenGL ES 移植。
+> **名称声明**：**Silvercam**（繁体中文：**銀鹽工坊**；简体中文：**银盐工坊**）为本项目为区分上游而采用的展示品牌名，尚未进行商标检索与注册（not trademark-cleared），本项目不主张且不声明任何商标权利。源码仓库保留原路径：[Kenneth0416/SpektraLab-App](https://github.com/Kenneth0416/SpektraLab-App)。
+
+手机端胶片模拟工具的交互原型与展示网站：照片、视频、相机取景共用一套「胶片 × 相纸」参数。
+
+画面与质感以 [spektrafilm](https://github.com/andreavolpato/spektrafilm)（Andrea Volpato）和 [SpektraLab](https://github.com/JamesQiu2005/SpektraLab)（James Qiu）为参考与移植来源。本项目为**独立、非官方的下游开源项目**，未获得上游项目作者或项目的赞助、认可或背书。仓库包含完整展示与下载网站、Android 互动原型、Kotlin/GLSL 引擎与工具链。
+
+## 展示与下载网站
+
+网站基于 React、TypeScript 与 Vite，包含响应式 landing page、可交互的胶片预览和独立下载页。全站支持繁体中文、简体中文与英文，可通过页头语言选择器或 `?lang=zh-Hant`、`?lang=zh-Hans`、`?lang=en` 切换；选择会保存在 localStorage，并同步更新页面 metadata。
+
+```sh
+npm install
+npm run dev
+```
+
+打开终端输出的本地地址（默认 `http://localhost:5173`）。生产构建：
+
+```sh
+npm run build
+npm run preview
+```
+
+`npm run dev` 和 `npm run build` 会自动运行 `scripts/package-downloads.mjs`，在 `public/downloads/` 生成真实 ZIP 包（`Silvercam-App-source.zip` 完整源码包与 `Silvercam-interaction-prototype.zip` 纯交互原型包，均内嵌 LICENSE 与 NOTICE 说明）；若 APK 已构建，也会同步 `Silvercam-Android.apk` 的大小与 SHA-256 元数据。下载页直接提供这些静态文件，不依赖第三方网盘。
+
+## Android APK
+
+`android/` 是独立的 Android 互动原型，使用本地 WebView 加载内置暗房界面，支持三语、六款胶片、四个场景、曝光 / 颗粒 / 光晕、按住对比及配方。全部素材离线内置，不声明网络权限，也不访问真实相机或系统相册。
+
+构建需要 JDK 17、Android SDK，以及 `ANDROID_HOME` 或 `ANDROID_SDK_ROOT`（macOS 默认会尝试 `~/Library/Android/sdk`）：
+
+```sh
+npm run android:build
+```
+
+命令通过 Gradle wrapper 构建 debug-signed APK，并输出至 `public/downloads/Silvercam-Android.apk`（应用内部 ID 为 `app.spektralab.prototype`，版本 `0.1.0`，最低 Android 8.0 / API 26）。这是用于安装与体验的原型，不是 Play Store 正式发行版。
+
+部署时需支持 SPA 回退到 `index.html`；`public/_redirects` 已兼容使用这一规则的静态托管服务。
 
 ## 当前状态
 
-| 部分 | 状态 |
-|---|---|
-| 导入照片（相册多选 / 文件，含系统能解码的 RAW/DNG） | ✅ |
-| 编辑：实时预览、按住看原图、撤销/重做、复制/粘贴设置、配方 | ✅ |
-| 导出照片（JPEG / PNG，长边 2048 / 3400 / 全尺寸，全尺寸上限 4096 px 或 GPU 纹理上限），存相册或分享 | ✅ |
-| 视频：导入、实时预览播放、逐帧重新生成颗粒导出（1080p / 4K，音轨原样保留） | ✅ |
-| 折叠屏 / 平板适配（展开双栏、悬停与书本姿态按铰链分屏） | ✅ |
-| 相机（拍照）：实时胶片取景，原片存 RAW（DNG），不支持 RAW 的机型存 JPEG | ✅ |
-| 相机录像 | 暂未做 |
+- 这是交互原型；仓库提供可安装的 Android APK，但还不是正式发行应用。
+- 预览里的光晕、颗粒、柔焦是用 CSS 近似的占位效果。
+- 取景画面和素材是四张插画，没有接真实摄像头和系统相册。
+- 导入候选、导出进度、移除都是模拟的。
 
-没有在真机上跑过：构建环境里没有模拟器。引擎和着色器做了离线验证（见下）。
+## 流程
 
-## 构建
+图库 → 编辑 → 导出，相机是图库的一个入口。
 
-```bash
-./gradlew :app:assembleDebug        # app/build/outputs/apk/debug/app-debug.apk
-./gradlew :engine:test              # 引擎对照 spektrafilm 的测试
-./gradlew :app:testDebugUnitTest    # 折叠屏布局测试（Robolectric）
-```
+- **图库**：网格浏览，按照片 / 视频筛选；「选择」后可批量粘贴设置、套用配方、导出、移除。
+- **导入**：相册（照片和视频，可多选）或文件（RAW）；只选一项时直接进入编辑。
+- **编辑**：按住画面看原图，撤销 / 重做，复制 / 粘贴设置，配方。
+- **相机**：照片或视频，拍完带着当前设置进图库，原片保留。
+- **导出**：照片选 JPEG / HEIF / TIFF 与三档尺寸，视频选 1080p / 4K；存到相册或交给系统分享，可放到后台继续。
 
-需要 JDK 17+、Android SDK 35。最低 Android 10（API 29），GPU 需支持 OpenGL ES 3.0 和半精度浮点渲染目标。
+## 视觉方向：灯箱与暗房
 
-## 结构
+- **灯箱（图库、导入）**：乳白色发光的底，打开时像灯管一样闪亮。照片三张一条排在带齿孔和片边字的底片条上；导入候选是白色幻灯片夹。
+- **红蜡笔**：多选是手绘红圈加手写序号，改过的照片有红勾，当前筛选项下有一笔红线。
+- **暗房（编辑、相机）**：进入时亮底淡出成近黑，安全灯红点呼吸；画面四角是红色裁切角标，照片本身不染色。
+- **刻度尺**：滑杆是带刻度的尺加指针，读数用等宽数字；黄滤和品红滤的刻度带颜色，表示画面偏去的方向。
+- **强调色跟着胶卷走**：读数、选中项、导出按钮使用当前胶卷的颜色。
+- **配方**：米色索引卡，手写名字。
 
-```
-engine/        纯 Kotlin（JVM）模块：spektrafilm 运行时的移植 + GLSL 着色器源码
-app/           Android 应用（Jetpack Compose + GLES 3.0 + MediaCodec）
-  assets/spektra/   由 spektrafilm 烘焙出的胶片 / 相纸数据（*.spk）
-tools/bake/    运行 spektrafilm（Python）导出数据和参考向量的脚本
-tools/glcheck/ 在 WebGL2 里跑 app 着色器、对照 Kotlin 引擎的检查脚本
-prototype/     早先的交互原型（Claude Design 画布格式）
-```
+字体：Long Cang（手写）、Martian Mono（等宽数字）、Noto Sans SC（正文），均来自 Google Fonts。
 
-## 引擎：怎么用 spektrafilm
-
-spektrafilm 的流程是 线性 RGB → 胶片曝光 → 显影（DIR 耦合剂、颗粒）→ 放大机印相 → 相纸显影 → 扫描。移植方式：
-
-- **固定不变、依赖 colour-science 的部分由 spektrafilm 自己算好**（`tools/bake/bake_spektrafilm.py`）：每款胶片的 Hanatos 2025 光谱上采样表（含感光度适配和输入色域压缩）、CAT16 矩阵、每款相纸 / 反转片的扫描表（观看光源、CMF、CAM16-UCS 输出色域压缩）、放大机光源、分色滤镜和中性滤色数据库。
-- **所有可调的部分在手机上按 spektrafilm 的公式实时计算**（`engine/`）：胶片曝光、显影曲线与 gamma、DIR 耦合剂（含扩散）、放大机滤色与印相曝光的光谱积分、中灰归一化、相纸曲线、子层泊松-二项颗粒、乳剂散射 + 片基反射光晕、四种柔焦镜 PSF、眩光。
-- GPU 上每帧：曝光 → 高斯金字塔模糊（光晕 / 柔焦 / 耦合剂扩散拟合为若干倍频高斯）→ 显影 + 颗粒 → 「胶片密度 → 印相 → 扫描」三维表 → sRGB。印相那一段在设置变化时在 CPU 上重新算成三维表（预览 36³，导出 48³）。
-
-### 验证
-
-- `ReferenceTest`：8 组胶片 × 相纸 × 参数，逐级对照 spektrafilm 的中间结果。胶片密度误差 < 0.001，输出平均误差 0.04%（sRGB），GPU 用的折叠三维表平均 0.1%。
-- `SpatialTest`：光晕、四种柔焦镜的冲激响应（能量环曲线误差 < 1.6%）和颗粒均值 / 标准差都对照 spektrafilm 自己的空间代码。
-- `tools/glcheck`：所有着色器在严格的 WebGL2 下编译（视频用的外部纹理版本除外，WebGL 没有这种纹理）；拍立得显影着色器与 spektrafilm Python 原版逐像素一致；GPU 逐像素结果和 Kotlin 引擎相差 < 1/255；GPU 颗粒的标准差与 CPU 模型一致；金字塔模糊的 σ 和能量守恒。
-
-### 和 spektrafilm 的差异
-
-- 光晕 / 柔焦 / 耦合剂扩散用倍频高斯混合近似（拟合误差见上），亚像素的散射核心并入恒等项。
-- 颗粒在 λ > 12 时用正态近似泊松；微结构团聚（`micro_structure`）在手机分辨率下 spektrafilm 本身也不触发，未实现。
-- 眩光取均值（spektrafilm 是随机对数正态场再模糊）。
-- 未实现：预闪、扫描锐化、曲线形变（developer exhaustion 等）、黑白校正、相机 UV/IR 滤镜、Hanatos 2025 之外的上采样方法。
-- 迫冲：Portra 800 用 spektrafilm 实测的迫冲档案；其他胶片按「少曝光 N 档 + gamma ×(1+0.15N)」近似。
-
-## 相机与 RAW
-
-- **取景**：CameraX 的预览流经过同一条 GL 胶片管线再上屏（`camera/FilmViewfinderEffect.kt`），看到的就是当前胶片 × 相纸的效果；每 8 帧按 spektrafilm 的中央重点测光测一次并平滑。取景框外按画幅（135、XPan 等）遮暗。
-- **过片**：像机械相机一样，按下快门后这一格就用掉了，取景变成暗的毛玻璃，快门锁住；向右扳动过片扳手（半程会弹回，扳到底才算），计数器加一，取景重新清晰。不想每张都扳可以打开「自动过片」。
-- **布局**（参考主流手机相机）：取景框占满屏幕上部，变焦档位贴在取景框底边，可双指缩放、点击对焦，音量键是快门；底部一排是上一张、快门、翻转镜头；胶片设置收在「调整」里，点开才盖在取景框下沿。
-- **横屏**：设置在左侧一列，取景居中，过片扳手、快门、上一张在右手拇指一侧。锁定了屏幕旋转时界面不转，但按钮和提示会原地转正，照片仍按手机实际握持方向保存。
-- **快门**：保存的是没有处理过的原片，存到系统相册 `DCIM/SpektraLab`。设备支持时是感光元件的原始数据（Camera2 `RAW_SENSOR`，由系统的 DngCreator 写成 DNG）；不支持、或 RAW 无法和预览同时开流时退回最高质量 JPEG。顶栏的标记显示当前会存哪一种。
-- **进图库**：拍完带着相机当前的胶片设置进灯箱，设置之后随时可改，原片不动。每拍一张都会自动冲印，把胶片成片（JPEG）也存到相册。
-- **RAW 冲洗**（`engine/.../raw/`）：自带 DNG 读取器和线性冲洗——黑电平、镜头阴影增益图（GainMap）、白平衡、高光裁切、去马赛克（预览用 2×2 合并，导出用 Malvar-He-Cutler）、相机色彩矩阵（ForwardMatrix 或 ColorMatrix + Bradford）——输出场景线性 RGB 直接进胶片管线，这正是 spektrafilm 设计的输入。没有降噪、锐化和影调曲线。
-- 只支持未压缩的拜耳 DNG（安卓相机写出的那种）；其他 RAW 和压缩 DNG 走系统解码器（8 位，已做过影调处理）。
-- 验证：合成 DNG 还原已知场景误差 < 0.6%（两种色彩矩阵路径、四种旋转、增益图）；与 LibRaw 对照颜色差 0.0002（`tools/rawcheck.py`）。**相机本身（取景方向、RAW 开流、不同机型）没有在真机上测过。**
-- 还没有：录像、手动曝光 / 对焦、曝光补偿、参考线、多摄切换（只有变焦档位）、RAW 降噪。重装应用后，之前拍的原片需要重新从「文件」导入才能再读到。
-
-## 动效
-
-动效语言定义在 `ui/Motion.kt`：灯箱里的东西是桌上的实物（会被扔下、落稳、被蜡笔圈起来），暗房里的一切慢而精确。
-
-| 位置 | 动效 |
-|---|---|
-| 进出暗房 | 进暗房是「关灯」（经黑场淡入），回灯箱是日光灯管闪两下再亮；幕布盖在 GL 预览之上 |
-| 灯箱 | 底片条从两侧交替扔到桌面、带一点旋转后落稳；移除或筛选时其余底片条滑动补位；缩略图从相纸背面「显影」出来 |
-| 圈选 | 红蜡笔圈一笔画出，序号随后弹出；被圈的格子微微下沉；标题换成手写体，数字滚动；筛选项下划线每次重新画一笔；改过的红勾画出来 |
-| 空灯箱 | 手写提示轻轻漂浮，一支铅笔箭头自己画向导入按钮 |
-| 刻度尺滑杆 | 跟手拖动，甩动后带惯性滑行并吸附到刻度；每过一格有触感；经过指针的刻度变粗变高；双击、撤销、粘贴、套配方时刻度尺滑回对应位置 |
-| 工具面板 | 标签下划线和「已修改」小圆点弹出；面板按点击方向横向滑入；选项胶囊变色并轻弹；开关是一个小拨杆 |
-| 胶片卡 | 选中的胶卷抬起、暗盒盖转一圈并填上胶卷颜色；整个暗房的强调色渐变到新胶卷 |
-| 预览 | 红色裁切角标从外向内收拢；按住看原图时角标张开、标签像计数器一样翻转；安全灯带呼吸的光晕；撤销 / 重做箭头朝各自方向甩一下 |
-| 面板与提示 | 面板带弹性滑入，导出选项原地换成进度；配方卡像发牌一样左右交替落下；进度条是一条走片的胶片（齿孔滚动）；后台冲印的胶囊从顶部落下、红点脉动；提示条弹入 |
-| 按钮 | 所有按钮按下回弹 |
-
-系统关闭动画（无障碍）时，这些动效随系统的动画时长缩放一起关闭。`app/src/test/.../MotionSnapshotTest.kt` 把动效的关键帧渲染成 PNG（`app/build/motion-snapshots/`），不用真机也能检查。
-
-## 边框与画布（spektrafilm GUI 的样式）
-
-spektrafilm 的核心引擎不带边框，这些样式来自它的桌面 GUI，全部移植：
-
-| spektrafilm | 这里 |
-|---|---|
-| `white_padding`（默认长边 3% 白边） | 「相纸白边」：同样的宽度，颜色是所选相纸未曝光处的模拟颜色；反转片 / 直接扫描时为纯白 |
-| `gray_18_canvas`（#767676 画布） | 编辑页「18% 灰背景」（只影响观看） |
-| `virtual_photo_paper_back`（相纸背面水印） | 照片显影前、图库缩略图未生成时的占位图 |
-| `polaroid_animation`（拍立得式显影） | 打开照片时播放的显影动画（GLSL 移植，可关闭） |
-
-「片边」（胶片名与格号）和「日期后背」是原型里的设计，不来自 spektrafilm；片边颜色按片基经过整条印放链路的真实颜色。
-
-## 折叠屏
-
-用 Jetpack WindowManager 读取铰链位置和姿态，编辑页按姿态切换布局：
-
-| 状态 | 布局 |
-|---|---|
-| 外屏 / 普通手机 | 预览在上，工具面板在下 |
-| 展开（宽度 ≥ 600dp）、平板 | 预览在左，工具在右侧栏（340–460dp） |
-| 书本姿态（竖向铰链半开，或双屏） | 以铰链为界：左边预览，右边工具 |
-| 悬停 / 桌面姿态（横向铰链半开） | 铰链以上是预览，以下是操作和工具；弹出面板也只在下半屏 |
-
-- 图库每条底片在手机上排 3 张，展开后 4 张，大屏 6 张；底栏和弹出面板最宽 600dp 居中。
-- 折叠 / 展开不重建 Activity（`configChanges`），编辑进度、当前工具和视频播放位置都保留。四个区域在组合树里的位置固定，GL 预览不会因换布局被销毁；万一 EGL 上下文丢了，会自动重新上传照片、查找表，并恢复视频播放位置。
-- 预览解码分辨率跟随最大窗口尺寸（1600–3072 px），展开后的大屏依然清晰。
-- `app/src/test/.../EditorLayoutTest.kt`（Robolectric）检查四种布局下各区域的位置，包括按铰链分屏。
-
-## 交互
-
-图库 → 编辑 → 导出，沿用原型的「灯箱与暗房」：
-
-- **灯箱（图库）**：乳白发光底，三张一条排在带齿孔和片边字的底片条上，按日期分组；「选择」后红蜡笔圈选、手写序号，可批量粘贴设置、套用配方、导出、移除（只移出图库，相册原片不动）。改过的照片有红勾。
-- **暗房（编辑）**：近黑背景、安全灯红点呼吸、红色裁切角标；刻度尺滑杆（双击复位），黄 / 品红滤色刻度带颜色表示画面偏去的方向；强调色跟着胶卷走。
-- **导出**：在后台冲印，可以「后台继续」回去修图，顶部有进度胶囊。
+## 可调参数
 
 | 工具 | 选项 |
 |---|---|
-| 胶片 | spektrafilm 自带的 18 款：Portra 160/400/800、Ektar 100、Gold 200、UltraMax 400、C200、Pro 400H、X-TRA 400、Vision3 50D/250D/200T/500T、Verita 200D、Velvia 100、Provia 100F、Ektachrome 100、Kodachrome 64 |
-| 相纸 | 自动 / Portra / Supra / Ultra Endura / Endura Premier / Ektacolor Edge / Crystal Archive / 2383 / 2393 / 不印相；印相曝光、眩光。反转片直接扫描 |
-| 曝光 | 胶片曝光（亮度由印相补回）；减冲 −1 到迫冲 +2 |
-| 光晕 | 强度、范围（1.0 = 该胶片片基与防光晕层的原生值） |
-| 颗粒 | 强度、颗粒粗细（随画幅物理缩放） |
+| 胶片 | 六款胶卷（名称为示例，以引擎自带档案为准） |
+| 相纸 | 自动 / Endura / 2383 / 不印相，印相曝光，眩光 |
+| 曝光 | 胶片曝光，减冲到迫冲 +2 |
+| 光晕 | 强度、范围 |
+| 颗粒 | 强度、粗细 |
 | 柔焦 | Black Pro-Mist / Pro-Mist / Glimmerglass / CineBloom，强度 |
-| 滤色 | 放大机黄 / 品红滤色（Kodak CC） |
-| 画幅 | 半格、135、XPan、6×6、6×7；边框（无 / 相纸白边 / 片边）、日期后背；显示：18% 灰背景、显影动画 |
+| 滤色 | 黄 / 品红滤色（CC） |
+| 画幅 | 半格、135、XPan、6×6、6×7，片边，日期后背 |
 
-亮度按 spektrafilm 的中央重点测光自动定（导入时测一次）。
+暂未放入：DIR 耦合剂、分层 gamma、显影液耗尽、预闪、扫描锐化、光谱上采样。
 
-## 许可
+## 文件
 
-- 代码：GPLv3（`LICENSE`）。引擎是 spektrafilm（GPLv3）的移植。
-- `app/src/main/assets/spektra/` 下的胶片 / 相纸数据和由其生成的表：CC BY-SA 4.0，见 `SPEKTRAFILM_LICENSE.txt`。
-- 字体 Long Cang（子集）、Martian Mono：SIL OFL，见 `app/src/main/assets/licenses/`。
+- `prototype/Main.dc.html`：原型源文件（界面标记 + 交互逻辑）。
+- `prototype/canvas.json`：画布索引。
+- `prototype/assets/`：四张场景插画与颗粒纹理。
+- `android/`：可离线安装的 Android WebView 原型与 Gradle 构建配置。
+- `src/`、`public/`：三语展示网站与 APK / ZIP 下载页。
 
-Film modeling powered by [spektrafilm](https://github.com/andreavolpato/spektrafilm) by Andrea Volpato.
+`Main.dc.html` 是 Claude Design 画布的组件格式，依赖画布运行时（`support.js`），图片以 `/_blob/<id>` 引用画布里已上传的素材。直接用浏览器打开这个文件不会运行；把它当作交互规格和实现参考来读。素材与 blob 的对应关系：
+
+| 文件 | 画布内引用 |
+|---|---|
+| `scene-dusk.svg` | `/_blob/7110bff8c10e1d558b9258aa40dbaeca` |
+| `scene-window.svg` | `/_blob/14c0013cb8d226803fe222b1e3be5e23` |
+| `scene-beach.svg` | `/_blob/7b48ac6a6c161f2d37cb4ec2781c9e06` |
+| `scene-neon.svg` | `/_blob/5f39396bed078cf8ec7644d6b94352e8` |
+| `grain.svg` | `/_blob/bdbee43f1d4a21ddbdfc3d615f2302c1` |
+
+## 许可与归属 (Licensing & Attribution)
+
+本项目采用代码与光学数据分离的双轨开源许可，详见根目录 [NOTICE.md](NOTICE.md) 与 [LICENSE](LICENSE)：
+
+1. **软件代码 (GPLv3)**：
+   - 包含 Android 应用、Kotlin/JVM 引擎 (`engine/`)、GLSL 着色器、网页应用 (`src/`)、构建脚本与工具 (`tools/`)。
+   - 依据 [GNU General Public License v3.0](LICENSE) 开源。引擎与管线移植自 Andrea Volpato 的 [spektrafilm](https://github.com/andreavolpato/spektrafilm) (v0.3.4)。
+   - **GPL 对应源码 (Corresponding Source)**：分发二进制程序（如 APK）时，必须提供与该构建完全对应的实际源码。通往仓库默认 `main` 分支的通用链接并不保证与历史二进制完全一致，因此请使用随版本发布的对应源码压缩包 (`Silvercam-App-source.zip`) 或对应 commit tag。
+2. **胶片 / 相纸剖面与光学数据 (CC BY-SA 4.0)**：
+   - `app/src/main/assets/spektra/` 下由 spektrafilm 烘焙生成的配置文件、LUT 与参数数据依据 [CC BY-SA 4.0](app/src/main/assets/spektra/SPEKTRAFILM_LICENSE.txt) 授权，遵循 Andrea Volpato 的作者前言（Preamble v1.1）。
+   - **非约束性倡议说明**：作者前言中关于禁止商业 AI 训练与禁止转卖独立 LUT 包的条款，属作者公开倡议与期望（"These are not legal requirements..."），非 CC BY-SA 4.0 核心法律条款的强制限制；二进制数据包内部未逐个嵌入文本头亦不构成侵权。
+3. **输出作品自由（无 Copyleft 传染）**：
+   - 用户使用 Silvercam 处理或导出的照片、视频**不产生 Copyleft 传染**；输出成果完全归创作者所有，可自由用于个人或商业用途，无需署名或向软件作者分成。
+4. **第三方字体与资源**：
+   - Long Cang：SIL Open Font License 1.1 (Google Fonts)
+   - Martian Mono：SIL Open Font License 1.1 (Evil Martians)
+   - Noto Sans：SIL Open Font License 1.1 (Google Fonts)
+   - Lucide 图标：ISC License
+
+## 待解决
+
+- 视频实时性：倾向「LUT 实时预览 + 导出时逐帧补颗粒和光晕」。
+- 是否改成免导入（直接读系统相册）。
+- 导出面板的水印、元数据、色彩空间。

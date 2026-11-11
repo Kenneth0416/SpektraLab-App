@@ -1,0 +1,80 @@
+SILVERCAM (ANDROID WEBVIEW INTERACTION PROTOTYPE) — LICENSING & SOURCE NOTICES
+=============================================================================
+
+Application Display Names: Silvercam (English) / 银盐工坊 (Simplified Chinese) /
+                         銀鹽工坊 (Traditional Chinese)
+Application / Package ID: app.spektralab.prototype
+Version: 0.1.0 (Debug Interaction Prototype)
+Source Repository: https://github.com/Kenneth0416/SpektraLab-App
+
+Notice regarding brand name: "Silvercam" / "银盐工坊" / "銀鹽工坊" are display
+names adopted for this project to clearly distinguish it from upstream projects.
+This name is not trademark-cleared; no trademark clearance is claimed or implied.
+
+1. INDEPENDENT FORK / NON-ENDORSEMENT NOTICE
+--------------------------------------------
+Silvercam is an independent downstream project derived from and referencing
+spektrafilm. It is NOT affiliated with, sponsored by, or endorsed by Andrea
+Volpato, the upstream spektrafilm project, or the SpektraLab project.
+
+Film stock names shown in the UI (Portra, Ektar, Gold, UltraMax, Vision3,
+Double-X, Endura, 2383, XPan) are descriptive prototype references and remain
+trademarks of their respective owners.
+
+2. PROTOTYPE SCOPE & CODE VS. DATA LICENSING DISTINCTION
+--------------------------------------------------------
+(A) Application & Prototype Code — GNU GPL v3.0
+  - Scope: Android WebView wrapper (android/) and repository application/engine
+    source code (app/, engine/) derived from or referencing spektrafilm by
+    Andrea Volpato (https://github.com/andreavolpato/spektrafilm).
+  - License: GNU General Public License, Version 3 (GPLv3).
+    Full verbatim license bundled in APK: assets/licenses/GPL-3.0.txt
+  - Modified Version Notices (GPLv3 Section 5(a)):
+      * 2026-11-10 – 2026-11-11: Created offline WebView interaction prototype
+        wrapper (app.spektralab.prototype) and updated display branding to
+        Silvercam / 银盐工坊 / 銀鹽工坊, with full locally bundled licenses,
+        attribution, and source notices.
+  - NO WARRANTY (GPLv3 Sections 15–16):
+    This program is distributed WITHOUT ANY WARRANTY; without even the implied
+    warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. Licensees
+    may convey copies under the terms of GPLv3.
+
+(B) Upstream Film Profiles & LUT Data Terms — CC BY-SA 4.0
+  - Upstream Creator & Canonical Source:
+      Andrea Volpato — https://github.com/andreavolpato/spektrafilm
+  - License: Creative Commons Attribution-ShareAlike 4.0 International
+    (CC BY-SA 4.0), preserved unmodified in:
+      assets/licenses/SPEKTRAFILM_LICENSE.txt
+  - Scope Note for this Wrapper APK:
+    This WebView prototype approximates film aesthetics using local CSS filters
+    and five inline SVG illustrations (assets/grain.svg, scene-*.svg); it does
+    NOT include the baked .spk profile/LUT binaries shipped in the native
+    app/ module. Full CC BY-SA 4.0 terms and the collection changelog
+    (assets/licenses/CHANGELOG.txt) are bundled locally for full transparency.
+
+(C) User Outputs
+  - Finished images/videos produced with Silvercam or spektrafilm-based tools
+    are not copyleft per the upstream preamble and GPLv3 Section 2; no output
+    watermark is required.
+
+3. CORRESPONDING SOURCE NOTICE (GPLv3 SECTION 6)
+------------------------------------------------
+Project Repository: https://github.com/Kenneth0416/SpektraLab-App
+
+Important Note for Releases:
+Under GPLv3 Section 6, providing only a generic repository URL does not
+automatically satisfy Corresponding Source requirements for a distributed APK.
+Any public binary release must ensure the exact matching source revision,
+Gradle wrapper/build files, and assets corresponding to that APK build are
+available or packaged with the release.
+
+4. THIRD-PARTY FONTS & DEPENDENCIES (VERIFIED FOR THIS APK)
+-----------------------------------------------------------
+- Runtime Libraries: None beyond the Android platform SDK (android.app.Activity
+  and android.webkit.WebView). android/app/build.gradle declares zero external
+  third-party library dependencies.
+- Fonts: This WebView prototype uses Android system UI and monospace fonts only;
+  no third-party font binaries are bundled inside this APK.
+  (Note: The repository's native Compose module in app/ additionally bundles
+  Long Cang and Martian Mono under SIL OFL 1.1 and uses AndroidX/Jetpack and
+  Kotlin libraries under Apache-2.0 / CameraX Core BSD libyuv reference.)

@@ -1,0 +1,29 @@
+Silvercam Engine Module Notice (app.spektralab.engine / gl / raw)
+==================================================================
+
+License: GNU General Public License, Version 3 (GPLv3)
+Repository: https://github.com/Kenneth0416/SpektraLab-App
+
+This module contains a Kotlin/JVM and GLSL ES 3.00 mobile port of the
+spektrafilm film-simulation runtime and spektrafilm_gui visual helpers
+by Andrea Volpato:
+  https://github.com/andreavolpato/spektrafilm
+  Upstream commit: 3bb2c2d2801ff68b92019cf1dbcbb133d60832bc (v0.3.4)
+
+Dated Modification Record:
+  - 2026-11-10: Ported filming, DIR couplers, printing, halation/diffusion
+    Gaussian mixtures, sublayer Poisson-binomial grain, and GLSL shaders to
+    Kotlin/JVM + GLES 3.00.
+  - 2026-11-11: Ported polaroid_animation coefficients/shader and added DNG
+    Bayer reader & scene-linear raw developer; added module notice.
+
+Data Separation:
+  Baked film/paper .spk data consumed by EngineData is licensed separately
+  under CC BY-SA 4.0 (see app/src/main/assets/spektra/SPEKTRAFILM_LICENSE.txt
+  and CHANGELOG.txt).
+
+Disclaimer:
+  Distributed WITHOUT ANY WARRANTY under GPLv3 Sections 15-16.
+  Silvercam (银盐工坊 / 銀鹽工坊) is an independent downstream port/fork and is
+  not affiliated with or endorsed by Andrea Volpato, the spektrafilm project,
+  or the SpektraLab project.

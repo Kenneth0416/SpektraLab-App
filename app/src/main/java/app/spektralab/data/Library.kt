@@ -34,7 +34,7 @@ object LookJson {
         put("filmEv", l.filmEv); put("push", l.push); put("halation", l.halation); put("halationSize", l.halationSize)
         put("grain", l.grain); put("grainSize", l.grainSize); put("diffusion", l.diffusion)
         put("diffusionAmount", l.diffusionAmount); put("y", l.yFilter); put("m", l.mFilter)
-        put("format", l.format); put("edge", l.filmEdge); put("date", l.dateStamp)
+        put("format", l.format); put("border", l.border); put("date", l.dateStamp)
     }
 
     fun fromJson(o: JSONObject?): Look {
@@ -48,7 +48,9 @@ object LookJson {
             grain = o.optDouble("grain", d.grain), grainSize = o.optDouble("grainSize", d.grainSize),
             diffusion = o.optString("diffusion", d.diffusion), diffusionAmount = o.optDouble("diffusionAmount", d.diffusionAmount),
             yFilter = o.optDouble("y", d.yFilter), mFilter = o.optDouble("m", d.mFilter),
-            format = o.optString("format", d.format), filmEdge = o.optBoolean("edge", d.filmEdge),
+            format = o.optString("format", d.format),
+            // older libraries stored the film edge as a boolean
+            border = o.optString("border", if (o.optBoolean("edge", false)) "edge" else d.border),
             dateStamp = o.optBoolean("date", d.dateStamp),
         )
     }

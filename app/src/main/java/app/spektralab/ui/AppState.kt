@@ -38,6 +38,16 @@ class AppState(application: Application) : AndroidViewModel(application) {
     val exportOptions = MutableStateFlow(ExportOptions())
     val importing = MutableStateFlow(false)
 
+    // viewing preferences (spektrafilm GUI display options)
+    private val prefs = application.getSharedPreferences("display", android.content.Context.MODE_PRIVATE)
+    /** 18% grey backdrop around the print, like spektrafilm's gray_18_canvas. */
+    val gray18 = MutableStateFlow(prefs.getBoolean("gray18", false))
+    /** spektrafilm's instant-film development animation when a photo opens. */
+    val reveal = MutableStateFlow(prefs.getBoolean("reveal", true))
+
+    fun setGray18(on: Boolean) { gray18.value = on; prefs.edit().putBoolean("gray18", on).apply() }
+    fun setReveal(on: Boolean) { reveal.value = on; prefs.edit().putBoolean("reveal", on).apply() }
+
     private val _hint = MutableStateFlow("")
     val hint: StateFlow<String> = _hint
     private var hintJob: Job? = null

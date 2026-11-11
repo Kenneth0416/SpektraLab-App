@@ -19,6 +19,7 @@ import app.spektralab.engine.LookSetup
 import app.spektralab.gl.FilmRenderer
 import app.spektralab.gl.InputImage
 import app.spektralab.gl.RenderRequest
+import app.spektralab.render.Borders
 import app.spektralab.render.Framing
 import app.spektralab.render.GlWorker
 import app.spektralab.render.OverlayPainter
@@ -112,6 +113,7 @@ class VideoExporter(
         val overlayBmp = OverlayPainter.paint(framing, look, item.id.toInt() % 36 + 1, item.dateTaken)
         val overlayTex = overlayBmp?.let { GlWorker.uploadRgba(it) } ?: 0
         val stMatrix = FloatArray(16)
+        val borderColor = Borders.color(look, setup)
 
         val muxer = MediaMuxer(output, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
         var muxVideo = -1
@@ -198,7 +200,7 @@ class VideoExporter(
                             input = InputImage(oes, true, uv),
                             imageWidth = framing.imageWidth, imageHeight = framing.imageHeight,
                             framebuffer = 0, outWidth = outW, outHeight = outH,
-                            imageRect = framing.imageRect, overlayTexture = overlayTex,
+                            imageRect = framing.imageRect, border = borderColor, overlayTexture = overlayTex,
                             seed = frameIndex * 7919 + 13, autoEv = item.autoEv,
                         ))
                         egl.setPresentationTime(eglSurface, pts * 1000)

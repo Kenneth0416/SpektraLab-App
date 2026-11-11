@@ -45,6 +45,10 @@ import app.spektralab.engine.Look
 import app.spektralab.engine.LookMapper
 import app.spektralab.render.FilmPreviewView
 import app.spektralab.render.Framing
+import app.spektralab.render.PaperBack
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -61,7 +65,7 @@ private val TOOLS = listOf(
     ToolDef("grain", "颗粒") { it.copy(grain = 1.0, grainSize = 1.0) },
     ToolDef("diff", "柔焦") { it.copy(diffusion = "off", diffusionAmount = 0.5) },
     ToolDef("color", "滤色") { it.copy(yFilter = 0.0, mFilter = 0.0) },
-    ToolDef("fmt", "画幅") { it.copy(format = "135", filmEdge = false, dateStamp = false) },
+    ToolDef("fmt", "画幅") { it.copy(format = "135", border = "none", dateStamp = false) },
 )
 
 fun summary(look: Look): String {
@@ -89,6 +93,14 @@ fun EditorScreen(state: AppState, id: Long) {
     val preview = remember { FilmPreviewView(context) }
     DisposableEffect(Unit) { onDispose { preview.release() } }
     val engine = state.app.engine
+    var developed by remember(item.id) { mutableStateOf(false) }
+    val gray18 by state.gray18.collectAsState()
+    val revealOn by state.reveal.collectAsState()
+    LaunchedEffect(revealOn) { preview.revealEnabled = revealOn }
+    DisposableEffect(preview) {
+        preview.onFirstFrame = { developed = true }
+        onDispose { preview.onFirstFrame = null }
+    }
 
     // source
     LaunchedEffect(item.id) {
@@ -137,8 +149,9 @@ fun EditorScreen(state: AppState, id: Long) {
                     .clickable { state.openExport(listOf(item.id)) }.padding(horizontal = 14.dp, vertical = 6.dp))
         }
         // 1. preview
-        Box(Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 6.dp), contentAlignment = Alignment.Center) {
-            val framing = remember(item.width, item.height, look.format, look.filmEdge) {
+        Box(Modifier.fillMaxSize().background(if (gray18) Gray18 else Color.Transparent)
+            .padding(horizontal = 14.dp, vertical = 6.dp), contentAlignment = Alignment.Center) {
+            val framing = remember(item.width, item.height, look.format, look.border) {
                 Framing.compute(item.width.coerceAtLeast(1), item.height.coerceAtLeast(1), look, 2048)
             }
             val aspect = framing.outWidth.toFloat() / framing.outHeight
@@ -148,6 +161,13 @@ fun EditorScreen(state: AppState, id: Long) {
                 Box(Modifier.aspectRatio(aspect, matchHeightConstraintsFirst = aspect < boxAspect)
                     .pointerInput(Unit) { detectTapGestures(onPress = { hold = true; tryAwaitRelease(); hold = false }) }) {
                     AndroidView({ preview }, Modifier.fillMaxSize())
+                    // spektrafilm's virtual photo-paper back until the first frame is developed
+                    if (!developed) {
+                        val back = remember(item.id) {
+                            PaperBack.render(context, 540, (540 / aspect).toInt().coerceIn(120, 1600), item.id.toInt())
+                        }
+                        Image(back.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    }
                     CropCorners(Modifier.fillMaxSize())
                     Text(if (hold) "原图 ORIGINAL" else summary(look).uppercase(Locale.ROOT), fontFamily = Fonts.mono, fontSize = 9.sp,
                         color = Pal.text, modifier = Modifier.align(Alignment.BottomStart).padding(10.dp)
@@ -384,8 +404,15 @@ private fun ToolPanel(state: AppState, tool: String, item: LibraryItem, look: Lo
         }
         "fmt" -> {
             FlowRow { Catalog.formats.forEach { f -> Chip(f.label, f.id == look.format, accent) { set("fmt", look.copy(format = f.id)) } } }
-            ToggleRow("片边（胶片名与格号）", look.filmEdge, accent) { set("edge", look.copy(filmEdge = !look.filmEdge)) }
+            Text("边框", color = Pal.text, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp, bottom = 6.dp))
+            FlowRow { Catalog.borders.forEach { b -> Chip(b.label, b.id == look.border, accent) { set("border", look.copy(border = b.id)) } } }
+            Text(Catalog.border(look.border).note, color = Pal.dim, fontSize = 12.sp)
             ToggleRow("日期后背", look.dateStamp, accent) { set("date", look.copy(dateStamp = !look.dateStamp)) }
+            Text("显示（不影响导出）", color = Pal.dim, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
+            val gray18 by state.gray18.collectAsState()
+            val reveal by state.reveal.collectAsState()
+            ToggleRow("18% 灰背景", gray18, accent) { state.setGray18(!gray18) }
+            ToggleRow("显影动画（拍立得式）", reveal, accent) { state.setReveal(!reveal) }
         }
     }
 }

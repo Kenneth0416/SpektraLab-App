@@ -21,6 +21,9 @@ class Framing(
     val hasBorder get() = outWidth != imageWidth || outHeight != imageHeight
 
     companion object {
+        /** spektrafilm_gui default `white_padding` (fraction of the long edge). */
+        const val WHITE_PADDING = 0.03
+
         /**
          * [srcW]x[srcH] is the upright source size. The image is center-cropped to the
          * film format aspect and scaled so its long edge is at most [maxLongEdge].
@@ -44,7 +47,14 @@ class Framing(
             var ow = iw
             var oh = ih
             var rect = floatArrayOf(0f, 0f, 1f, 1f)
-            if (look.filmEdge) {
+            if (look.whiteBorder) {
+                // spektrafilm GUI white_padding: floor(long edge * 0.03) on every side
+                val pad = kotlin.math.floor(max(iw, ih) * WHITE_PADDING).toInt()
+                ow = iw + 2 * pad
+                oh = ih + 2 * pad
+                if (even) { ow -= ow % 2; oh -= oh % 2 }
+                rect = floatArrayOf(pad.toFloat() / ow, pad.toFloat() / oh, (pad + iw).toFloat() / ow, (pad + ih).toFloat() / oh)
+            } else if (look.filmEdge) {
                 val short = minOf(iw, ih)
                 var bx = (short * 0.035).roundToInt()
                 var by = (short * 0.09).roundToInt()

@@ -217,7 +217,12 @@ private fun Frame(state: AppState, item: LibraryItem, selecting: Boolean, order:
         .clickable { if (selecting) state.togglePick(item.id) else state.openEdit(item.id) }) {
         thumb?.let {
             Image(it.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-        } ?: Box(Modifier.fillMaxSize().alpha(0.4f).background(Brush.linearGradient(listOf(Color(0xFF5A4636), Color(0xFF2A1F18)))))
+        } ?: run {
+            // not developed yet: the back of the photo paper (spektrafilm virtual paper back)
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            val back = remember { app.spektralab.render.PaperBack.render(ctx, 240, 160) }
+            Image(back.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        }
         val tag = if (item.isVideo) mmss(item.durationMs / 1000) else if (item.isRaw) "RAW" else ""
         if (tag.isNotEmpty()) Text(tag, fontFamily = Fonts.mono, fontSize = 8.sp, color = Color.White,
             modifier = Modifier.align(Alignment.BottomEnd).padding(3.dp).background(Color(0xCC0D0B09)).padding(horizontal = 3.dp, vertical = 1.dp))

@@ -40,7 +40,8 @@ class GlWorker {
     }
 
     /** Render an upright photo through [setup]; returns an ARGB bitmap of the output canvas. */
-    fun renderPhoto(source: Bitmap, setup: LookSetup, autoEv: Float, framing: Framing, overlay: Bitmap?, seed: Int): Bitmap {
+    fun renderPhoto(source: Bitmap, setup: LookSetup, autoEv: Float, framing: Framing, overlay: Bitmap?, seed: Int,
+                    border: FloatArray = Borders.color(setup.look, setup)): Bitmap {
         val maxTex = GlUtil.maxTextureSize
         require(framing.outWidth <= maxTex && framing.outHeight <= maxTex) { "image too large for GPU" }
         val tex = uploadSrgb(source)
@@ -52,7 +53,7 @@ class GlWorker {
                 input = InputImage(tex, false, Framing.bitmapUvTransform(framing.crop)),
                 imageWidth = framing.imageWidth, imageHeight = framing.imageHeight,
                 framebuffer = out.framebuffer, outWidth = out.width, outHeight = out.height,
-                imageRect = framing.imageRect, overlayTexture = overlayTex, flipY = true,
+                imageRect = framing.imageRect, border = border, overlayTexture = overlayTex, flipY = true,
                 seed = seed, autoEv = autoEv,
             ))
             glBindFramebuffer(GL_FRAMEBUFFER, out.framebuffer)

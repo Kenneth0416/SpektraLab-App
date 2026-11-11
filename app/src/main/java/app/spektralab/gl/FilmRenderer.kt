@@ -45,16 +45,30 @@ class RenderRequest(
  * instance per GL context; call everything on that context's thread.
  */
 class FilmRenderer {
+    init {
+        // intermediates are half-float render targets
+        val ext = android.opengl.GLES30.glGetString(android.opengl.GLES30.GL_EXTENSIONS) ?: ""
+        val version = android.opengl.GLES30.glGetString(android.opengl.GLES30.GL_VERSION) ?: ""
+        val es32 = Regex("OpenGL ES (\\d+)\\.(\\d+)").find(version)?.destructured?.let { (a, b) -> a.toInt() * 10 + b.toInt() >= 32 } ?: false
+        if (!es32 && "GL_EXT_color_buffer_half_float" !in ext && "GL_EXT_color_buffer_float" !in ext) {
+            throw UnsupportedOperationException("GPU cannot render to half-float textures")
+        }
+    }
+
     private val quad = FullscreenQuad()
-    private val pExpose = Program(Shaders.VERTEX, Shaders.EXPOSE)
-    private val pExposeExt = Program(Shaders.VERTEX, Shaders.EXPOSE_EXTERNAL)
+    private val pExpose = Program(Shaders.VERTEX, Shaders.EXPOSE).bindSamplerUnits(EXPOSE_UNITS)
+    // video programs need GL_OES_EGL_image_external_essl3; compiled on first use so a GPU
+    // without it can still process photos
+    private val pExposeExtLazy = lazy { Program(Shaders.VERTEX, Shaders.EXPOSE_EXTERNAL).bindSamplerUnits(EXPOSE_UNITS) }
+    private val pExposeExt get() = pExposeExtLazy.value
     private val pDown = Program(Shaders.VERTEX, Shaders.DOWN)
     private val pBlur = Program(Shaders.VERTEX, Shaders.BLUR)
     private val pCombine = Program(Shaders.VERTEX, Shaders.COMBINE)
     private val pCorr = Program(Shaders.VERTEX, Shaders.CORR)
     private val pDevelop = Program(Shaders.VERTEX, Shaders.DEVELOP)
-    private val pFinal = Program(Shaders.VERTEX, Shaders.FINAL)
-    private val pFinalExt = Program(Shaders.VERTEX, Shaders.FINAL_EXTERNAL)
+    private val pFinal = Program(Shaders.VERTEX, Shaders.FINAL).bindSamplerUnits(FINAL_UNITS)
+    private val pFinalExtLazy = lazy { Program(Shaders.VERTEX, Shaders.FINAL_EXTERNAL).bindSamplerUnits(FINAL_UNITS) }
+    private val pFinalExt get() = pFinalExtLazy.value
 
     private val texTc = GlUtil.texture2d()
     private val texCurves = GlUtil.texture2d()
@@ -340,12 +354,17 @@ class FilmRenderer {
 
     fun release() {
         releaseTargets()
-        listOf(pExpose, pExposeExt, pDown, pBlur, pCombine, pCorr, pDevelop, pFinal, pFinalExt).forEach { it.release() }
+        listOf(pExpose, pDown, pBlur, pCombine, pCorr, pDevelop, pFinal).forEach { it.release() }
+        if (pExposeExtLazy.isInitialized()) pExposeExt.release()
+        if (pFinalExtLazy.isInitialized()) pFinalExt.release()
         listOf(texTc, texCurves, texCurves0, texLayers, texZero, texLut).forEach { GlUtil.deleteTexture(it) }
         quad.release()
     }
 
     companion object {
+        private val EXPOSE_UNITS = mapOf("uInput" to 0, "uTcLut" to 1)
+        private val FINAL_UNITS = mapOf("uInput" to 0, "uDensity" to 1, "uLut" to 2, "uOverlayTex" to 3)
+
         /** 3x3 Gaussian (center, edge, corner) weights for the grain blur. */
         fun grainBlurWeights(sigma: Double): FloatArray {
             if (sigma <= 0.0) return floatArrayOf(1f, 0f, 0f)

@@ -46,6 +46,9 @@ fun RulerSlider(
     onChange: (Double) -> Unit,
 ) {
     val current by rememberUpdatedState(value)
+    // the gesture handlers below live across recompositions; always call the latest
+    // callback, which closes over the current look (otherwise other edits get reverted)
+    val latestOnChange by rememberUpdatedState(onChange)
     var dragValue by remember { mutableStateOf<Double?>(null) }
     val shown = dragValue ?: value
     val span = range.endInclusive - range.start
@@ -59,23 +62,23 @@ fun RulerSlider(
             .semantics {
                 contentDescription = label
                 progressBarRangeInfo = ProgressBarRangeInfo(shown.toFloat(), range.start.toFloat()..range.endInclusive.toFloat())
-                setProgress { v -> onChange(snap(v.toDouble(), range, step)); true }
+                setProgress { v -> latestOnChange(snap(v.toDouble(), range, step)); true }
             }
             .pointerInput(range, step) {
-                detectTapGestures(onDoubleTap = { onChange(default) })
+                detectTapGestures(onDoubleTap = { latestOnChange(default) })
             }
             .pointerInput(range, step) {
                 // full width of the view = 60% of the range
                 val pxPerUnit = size.width / (span * 0.6)
                 detectHorizontalDragGestures(
                     onDragStart = { dragValue = current },
-                    onDragEnd = { dragValue?.let { onChange(snap(it, range, step)) }; dragValue = null },
+                    onDragEnd = { dragValue?.let { latestOnChange(snap(it, range, step)) }; dragValue = null },
                     onDragCancel = { dragValue = null },
                 ) { change, dx ->
                     change.consume()
                     val nv = ((dragValue ?: current) - dx / pxPerUnit).coerceIn(range.start, range.endInclusive)
                     dragValue = nv
-                    onChange(snap(nv, range, step))
+                    latestOnChange(snap(nv, range, step))
                 }
             }) {
             Canvas(Modifier.fillMaxSize()) {

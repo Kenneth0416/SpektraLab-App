@@ -30,6 +30,8 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
     private val r = PreviewRenderer()
 
     var onVideoState: ((playing: Boolean, positionMs: Long) -> Unit)? = null
+    /** Called on the main thread when the GPU cannot run the pipeline (message for the user). */
+    var onGpuError: ((String) -> Unit)? = null
     /** Called on the main thread once the first processed frame is on screen. */
     var onFirstFrame: (() -> Unit)? = null
     /** Play spektrafilm's instant-film development animation when a photo opens. */
@@ -49,6 +51,7 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
         r.autoEv = autoEv
         r.seed = seed
         r.video = null
+        r.revealActive = false
         r.revealPending = revealEnabled
         r.firstFrameSent = false
         requestRender()
@@ -76,10 +79,31 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
     }
 
     fun play(playing: Boolean) {
+        r.wantPlay = playing
         val p = r.player ?: return
+        // start() before onPrepared puts MediaPlayer into its error state; onPrepared starts it
+        if (!r.prepared) return
         if (playing) p.start() else p.pause()
         onVideoState?.invoke(p.isPlaying, p.currentPosition.toLong())
     }
+
+    /** Same frame number and date as the export, so the date back / edge print match. */
+    fun setFrameInfo(frameNumber: Int, date: Long) = queueEvent {
+        r.frameNumber = frameNumber
+        r.stampDate = date
+        r.invalidateOverlay()
+        requestRender()
+    }
+
+    /** Activity went to the background: stop playback (and its sound) and the GL thread. */
+    fun pauseForBackground() {
+        r.wantPlay = false
+        if (r.prepared) r.player?.takeIf { it.isPlaying }?.pause()
+        onVideoState?.invoke(false, 0)
+        onPause()
+    }
+
+    fun resumeFromBackground() = onResume()
 
     fun release() {
         r.player?.release()
@@ -105,7 +129,12 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
         var original = false
         var video: VideoRequest? = null
         var videoRequest: VideoRequest? = null
-        var player: MediaPlayer? = null
+        @Volatile var player: MediaPlayer? = null
+        @Volatile var prepared = false
+        @Volatile var wantPlay = false
+        var frameNumber = 1
+        var stampDate = System.currentTimeMillis()
+        fun invalidateOverlay() { overlayKey = "" }
         private var oesTex = 0
         private var surfaceTexture: SurfaceTexture? = null
         private val stMatrix = FloatArray(16)
@@ -128,7 +157,14 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
             // A new EGL context (first start, or the view was re-attached after a fold /
             // unfold): every GL object is gone, so re-upload what was on screen.
             val restore = renderer != null
-            renderer = FilmRenderer()
+            renderer = try {
+                FilmRenderer()
+            } catch (e: Exception) {
+                android.util.Log.e("SpektraPreview", "renderer init failed", e)
+                post { onGpuError?.invoke("这台设备的 GPU 不支持所需的半精度渲染，无法预览") }
+                null
+            }
+            if (renderer == null) return
             polaroid = Program(Shaders.VERTEX, Shaders.POLAROID)
             quad = FullscreenQuad()
             revealTarget = null
@@ -154,6 +190,20 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
         }
 
         override fun onDrawFrame(gl: GL10?) {
+            try {
+                drawFrame()
+            } catch (e: Exception) {
+                android.util.Log.e("SpektraPreview", "draw failed", e)
+                if (!errorReported) {
+                    errorReported = true
+                    post { onGpuError?.invoke(if (video != null) "这台设备的 GPU 无法处理视频帧" else "预览渲染失败") }
+                }
+            }
+        }
+
+        private var errorReported = false
+
+        private fun drawFrame() {
             val fr = renderer ?: return
             pendingSetup?.let { fr.setLook(it); pendingSetup = null }
             pendingBitmap?.let { bmp ->
@@ -181,7 +231,7 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
                 srcW = v.width; srcH = v.height
                 val framing = Framing.compute(srcW, srcH, look, maxOf(surfaceW, surfaceH))
                 input = InputImage(oesTex, true, FilmRenderer.multiply(
-                    FilmRenderer.multiply(Framing.surfaceTextureTransform(stMatrix), Framing.rotationTransform(v.rotation)),
+                    Framing.surfaceTextureTransform(stMatrix),
                     Framing.cropTransform(framing.crop)))
                 frameSeed = seed + frameCount * 7919
                 frameCount++
@@ -269,7 +319,7 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
             overlayTex = 0
             if (!OverlayPainter.needsOverlay(look)) return
             val scaled = Framing(framing.crop, framing.imageWidth, framing.imageHeight, surfaceW, surfaceH, framing.imageRect)
-            OverlayPainter.paint(scaled, look, 12, System.currentTimeMillis())?.let {
+            OverlayPainter.paint(scaled, look, frameNumber, stampDate)?.let {
                 overlayTex = GlWorker.uploadRgba(it)
                 it.recycle()
             }
@@ -290,14 +340,17 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
             video = req
             val surface = Surface(st)
             val mp = MediaPlayer()
+            prepared = false
+            wantPlay = req.resumePlaying
             try {
                 mp.setDataSource(context, req.uri)
                 mp.setSurface(surface)
                 mp.isLooping = true
                 mp.setOnPreparedListener {
+                    prepared = true
                     it.seekTo(req.resumeMs)
-                    if (req.resumePlaying) it.start()
-                    onVideoState?.invoke(req.resumePlaying, req.resumeMs.toLong())
+                    if (wantPlay) it.start()
+                    onVideoState?.invoke(wantPlay, req.resumeMs.toLong())
                 }
                 mp.setOnSeekCompleteListener { requestRender() }
                 mp.prepareAsync()

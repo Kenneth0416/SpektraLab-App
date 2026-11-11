@@ -139,6 +139,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
     fun removePicked() {
         if (picked.value.isEmpty()) return say("先圈出要移除的项目")
         val n = picked.value.size
+        app.thumbs.forget(picked.value)
         library.remove(picked.value)
         picked.value = emptyList(); selecting.value = false
         say("已移除 $n 项，相册原片不受影响")
@@ -158,9 +159,10 @@ class AppState(application: Application) : AndroidViewModel(application) {
 
     fun saveRecipe() {
         val item = currentItem() ?: return
-        val n = library.recipes.value.size + 1
-        library.addRecipe(Recipe("我的配方 $n", item.look))
-        say("已写成配方卡：我的配方 $n")
+        val used = library.recipes.value.map { it.name }.toSet()
+        val name = generateSequence(1) { it + 1 }.map { "我的配方 $it" }.first { it !in used }
+        library.addRecipe(Recipe(name, item.look))
+        say("已写成配方卡：$name")
     }
 
     // ----------------------------------------------------------- import
@@ -170,8 +172,8 @@ class AppState(application: Application) : AndroidViewModel(application) {
         importing.value = true
         viewModelScope.launch {
             val items = withContext(Dispatchers.IO) {
-                var id = library.nextId()
-                uris.mapNotNull { u -> Media.importItem(app, u, id).also { if (it != null) id++ } }
+                val first = library.reserveIds(uris.size)
+                uris.mapIndexedNotNull { i, u -> Media.importItem(app, u, first + i) }
             }
             importing.value = false
             if (items.isEmpty()) return@launch say("没有可以导入的照片或视频")
@@ -192,6 +194,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
 
     fun startExport(share: Boolean) {
         val items = exportTargets.value.mapNotNull { library.item(it) }
+        if (items.isEmpty() || exports.isRunning()) { sheet.value = Sheet.NONE; return say("没有可以导出的项目") }
         exports.start(items, exportOptions.value, share)
         sheet.value = Sheet.PROGRESS
         selecting.value = false

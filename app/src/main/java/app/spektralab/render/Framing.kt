@@ -81,7 +81,11 @@ class Framing(
             0f, 0f, 1f,
         )
 
-        /** Display uv -> encoded-frame uv for a video with clockwise rotation metadata. */
+        /**
+         * Display uv -> encoded-frame uv for a video with clockwise rotation metadata.
+         * Not needed for decoder output: MediaCodec / MediaPlayer apply KEY_ROTATION to the
+         * output surface and the SurfaceTexture transform already contains it.
+         */
         fun rotationTransform(degrees: Int): FloatArray = when ((degrees % 360 + 360) % 360) {
             90 -> floatArrayOf(0f, -1f, 1f, 1f, 0f, 0f, 0f, 0f, 1f)
             180 -> floatArrayOf(-1f, 0f, 1f, 0f, -1f, 1f, 0f, 0f, 1f)

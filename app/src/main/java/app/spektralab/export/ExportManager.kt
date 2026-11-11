@@ -20,6 +20,7 @@ import app.spektralab.R
 import app.spektralab.SpektraApp
 import app.spektralab.data.LibraryItem
 import app.spektralab.data.Media
+import app.spektralab.gl.GlUtil
 import app.spektralab.render.Framing
 import app.spektralab.render.OverlayPainter
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +28,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -59,6 +62,8 @@ class ExportManager(private val app: SpektraApp) {
     private val _state = MutableStateFlow<ExportState?>(null)
     val state: StateFlow<ExportState?> = _state
     private var job: Job? = null
+    /** Finished share exports waiting for an activity in the foreground to open the chooser. */
+    val pendingShare = MutableStateFlow<List<Uri>?>(null)
     @Volatile private var cancel = false
 
     fun isRunning() = _state.value?.running == true
@@ -81,9 +86,9 @@ class ExportManager(private val app: SpektraApp) {
                     .getOrNull()
                 if (uri != null) saved += uri else failed++
             }
+            if (share && saved.isNotEmpty()) pendingShare.value = saved
+            // the service watches [state] and stops itself once it has gone foreground
             _state.value = ExportState(items.size, items.size, 1f, false, saved, failed, share)
-            app.stopService(Intent(app, ExportService::class.java))
-            if (share && saved.isNotEmpty()) shareUris(saved)
         }
     }
 
@@ -117,10 +122,13 @@ class ExportManager(private val app: SpektraApp) {
                 throw e
             }
         } else {
-            val limit = if (o.photoLongEdge == 0) FULL_SIZE_CAP else o.photoLongEdge
+            // the GPU must hold the source and the output as single textures
+            val maxTex = app.glWorker.run { GlUtil.maxTextureSize }
+            val cap = minOf(FULL_SIZE_CAP, maxTex)
+            val limit = minOf(if (o.photoLongEdge == 0) cap else o.photoLongEdge, (maxTex / 1.07).toInt())
             val src = withContext(Dispatchers.IO) {
                 // decode a bit larger than the target so the format crop keeps resolution
-                Media.decodeImage(app, Uri.parse(item.uri), (limit * 1.5).toInt().coerceAtMost(FULL_SIZE_CAP))
+                Media.decodeImage(app, Uri.parse(item.uri), (limit * 1.5).toInt().coerceAtMost(cap))
             }
             progress(0.3f)
             val framing = Framing.compute(src.width, src.height, item.look, limit)
@@ -135,14 +143,20 @@ class ExportManager(private val app: SpektraApp) {
             }
             val cr = app.contentResolver
             val uri = cr.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return null
-            withContext(Dispatchers.IO) {
-                cr.openOutputStream(uri)!!.use { os ->
-                    when (o.photoFormat) {
-                        PhotoFormat.JPEG -> out.compress(Bitmap.CompressFormat.JPEG, 95, os)
-                        PhotoFormat.PNG -> out.compress(Bitmap.CompressFormat.PNG, 100, os)
+            try {
+                withContext(Dispatchers.IO) {
+                    val ok = cr.openOutputStream(uri)!!.use { os ->
+                        when (o.photoFormat) {
+                            PhotoFormat.JPEG -> out.compress(Bitmap.CompressFormat.JPEG, 95, os)
+                            PhotoFormat.PNG -> out.compress(Bitmap.CompressFormat.PNG, 100, os)
+                        }
                     }
+                    check(ok) { "encoding failed" }
+                    cr.update(uri, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null)
                 }
-                cr.update(uri, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null)
+            } catch (e: Throwable) {
+                runCatching { cr.delete(uri, null, null) }
+                throw e
             }
             progress(1f)
             return uri
@@ -151,21 +165,24 @@ class ExportManager(private val app: SpektraApp) {
 
     companion object {
         /** "Full size" long edge cap: keeps the half-float GPU buffers within mobile memory. */
-        const val FULL_SIZE_CAP = 5000
+        const val FULL_SIZE_CAP = 4096
     }
 
-    private fun shareUris(uris: List<Uri>) {
+    /** Open the system share sheet; call from a resumed activity. */
+    fun shareUris(context: Context, uris: List<Uri>) {
         val send = if (uris.size == 1) Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, uris[0])
         else Intent(Intent.ACTION_SEND_MULTIPLE).putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
         send.type = if (uris.size == 1) app.contentResolver.getType(uris[0]) ?: "*/*" else "*/*"
         send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        val chooser = Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        runCatching { app.startActivity(chooser) }
+        runCatching { context.startActivity(Intent.createChooser(send, null)) }
     }
 }
 
 /** Keeps the process alive while exports run in the background. */
 class ExportService : Service() {
+    private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.Main)
+    private var watching = false
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -177,9 +194,23 @@ class ExportService : Service() {
             .setOngoing(true)
             .setProgress(0, 0, true)
             .build()
-        val type = if (Build.VERSION.SDK_INT >= 29) ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC else 0
-        runCatching { ServiceCompat.startForeground(this, 7, n, type) }
+        // always go foreground first: stopping a service started with startForegroundService
+        // before this call crashes the app
+        ServiceCompat.startForeground(this, 7, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        if (!watching) {
+            watching = true
+            scope.launch {
+                (application as SpektraApp).exports.state.first { it == null || !it.running }
+                ServiceCompat.stopForeground(this@ExportService, ServiceCompat.STOP_FOREGROUND_REMOVE)
+                stopSelf()
+            }
+        }
         return START_NOT_STICKY
+    }
+
+    override fun onDestroy() {
+        scope.cancel()
+        super.onDestroy()
     }
 
     companion object { const val CHANNEL = "export" }

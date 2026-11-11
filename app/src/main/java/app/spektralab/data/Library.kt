@@ -64,6 +64,11 @@ class Library(context: Context) {
     private val _recipes = MutableStateFlow<List<Recipe>>(emptyList())
     val recipes: StateFlow<List<Recipe>> = _recipes
 
+    /** Ids are never reused, so caches keyed by id can't show a removed item. */
+    private var idCounter = 0L
+    private val saver = java.util.concurrent.Executors.newSingleThreadExecutor { Thread(it, "spektra-library") }
+    private val saveQueued = java.util.concurrent.atomic.AtomicBoolean(false)
+
     init { load() }
 
     fun item(id: Long): LibraryItem? = _items.value.firstOrNull { it.id == id }
@@ -98,13 +103,21 @@ class Library(context: Context) {
         save()
     }
 
-    fun nextId(): Long = (_items.value.maxOfOrNull { it.id } ?: 0L) + 1
+    /** Reserve [count] fresh ids. */
+    @Synchronized fun reserveIds(count: Int): Long {
+        idCounter = maxOf(idCounter, _items.value.maxOfOrNull { it.id } ?: 0L)
+        val first = idCounter + 1
+        idCounter += count
+        save()
+        return first
+    }
 
     private fun load() {
         if (!file.exists()) return
         runCatching {
             val root = JSONObject(file.readText())
             val arr = root.optJSONArray("items") ?: JSONArray()
+            idCounter = root.optLong("nextId", 0L)
             _items.value = (0 until arr.length()).map { i ->
                 val o = arr.getJSONObject(i)
                 LibraryItem(
@@ -123,8 +136,18 @@ class Library(context: Context) {
         }
     }
 
+    /** Persist off the main thread; bursts of edits (slider drags) collapse into one write. */
     private fun save() {
+        if (saveQueued.getAndSet(true)) return
+        saver.execute {
+            saveQueued.set(false)
+            writeNow()
+        }
+    }
+
+    @Synchronized private fun writeNow() {
         val root = JSONObject()
+        root.put("nextId", idCounter)
         root.put("items", JSONArray().apply {
             _items.value.forEach { it2 ->
                 put(JSONObject().apply {

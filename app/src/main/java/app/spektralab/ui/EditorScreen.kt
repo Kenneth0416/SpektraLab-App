@@ -81,7 +81,11 @@ fun summary(look: Look): String {
 @Composable
 fun EditorScreen(state: AppState, id: Long) {
     val items by state.library.items.collectAsState()
-    val item = items.firstOrNull { it.id == id } ?: run { state.back(); return }
+    val item = items.firstOrNull { it.id == id } ?: run {
+        // removed while open: leave the darkroom (state change outside composition)
+        LaunchedEffect(id) { state.back() }
+        return
+    }
     val look = item.look
     val accent = Color(Catalog.film(look.film).accent)
     val history by state.history.collectAsState()
@@ -99,8 +103,24 @@ fun EditorScreen(state: AppState, id: Long) {
     LaunchedEffect(revealOn) { preview.revealEnabled = revealOn }
     DisposableEffect(preview) {
         preview.onFirstFrame = { developed = true }
-        onDispose { preview.onFirstFrame = null }
+        preview.onVideoState = { isPlaying, _ -> playing = isPlaying }
+        preview.onGpuError = { msg -> state.say(msg) }
+        onDispose { preview.onFirstFrame = null; preview.onVideoState = null; preview.onGpuError = null }
     }
+    // pause playback and the GL thread with the activity
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
+            when (e) {
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> preview.pauseForBackground()
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> preview.resumeFromBackground()
+                else -> {}
+            }
+        }
+        lifecycle.addObserver(obs)
+        onDispose { lifecycle.removeObserver(obs) }
+    }
+    LaunchedEffect(item.id) { preview.setFrameInfo(item.id.toInt() % 36 + 1, item.dateTaken) }
 
     // source
     LaunchedEffect(item.id) {

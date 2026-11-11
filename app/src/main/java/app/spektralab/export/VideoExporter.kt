@@ -46,14 +46,25 @@ class VideoExporter(
     private val cancelled: () -> Boolean,
 ) {
     fun run() {
+        val cleanup = ArrayList<() -> Unit>()
+        try {
+            runGuarded(cleanup)
+        } finally {
+            for (c in cleanup.asReversed()) runCatching { c() }
+        }
+    }
+
+    private fun runGuarded(cleanup: MutableList<() -> Unit>) {
+        check(worker.egl.canRecord) { "no recordable EGL config: video export unsupported on this GPU" }
         val uri = Uri.parse(item.uri)
-        val extractor = MediaExtractor().apply { setDataSource(context, uri, null) }
+        val extractor = MediaExtractor()
+        cleanup += { extractor.release() }
+        extractor.setDataSource(context, uri, null)
         val videoTrack = (0 until extractor.trackCount).firstOrNull {
             extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("video/") == true
         } ?: error("no video track")
         extractor.selectTrack(videoTrack)
         val inFormat = extractor.getTrackFormat(videoTrack)
-        val rotation = if (inFormat.containsKey(MediaFormat.KEY_ROTATION)) inFormat.getInteger(MediaFormat.KEY_ROTATION) else item.rotation
         val durationUs = if (inFormat.containsKey(MediaFormat.KEY_DURATION)) inFormat.getLong(MediaFormat.KEY_DURATION) else item.durationMs * 1000
         val frameRate = if (inFormat.containsKey(MediaFormat.KEY_FRAME_RATE)) runCatching { inFormat.getInteger(MediaFormat.KEY_FRAME_RATE) }.getOrDefault(30) else 30
 
@@ -84,34 +95,45 @@ class VideoExporter(
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
         }
         val encoder = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
+        cleanup += { runCatching { encoder.stop() }; encoder.release() }
         encoder.configure(encFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
         val encSurface = encoder.createInputSurface()
+        cleanup += { encSurface.release() }
         encoder.start()
 
         val egl = worker.egl
         val eglSurface = egl.createWindowSurface(encSurface)
+        cleanup += { egl.releaseSurface(eglSurface) }
         egl.makeCurrent(eglSurface)
         val renderer: FilmRenderer = worker.renderer
+        cleanup += { renderer.releaseTargets() }
         renderer.setLook(setup)
 
         // decoder -> SurfaceTexture on this GL context
         val oes = IntArray(1).also { GLES30.glGenTextures(1, it, 0) }[0]
+        cleanup += { GLES30.glDeleteTextures(1, intArrayOf(oes), 0) }
         GLES30.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oes)
         GLES30.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES30.GL_TEXTURE_MIN_FILTER, GLES30.GL_LINEAR)
         GLES30.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES30.GL_TEXTURE_MAG_FILTER, GLES30.GL_LINEAR)
         val cbThread = HandlerThread("spektra-st").apply { start() }
+        cleanup += { cbThread.quitSafely() }
         val lock = ReentrantLock()
         val cond = lock.newCondition()
         var frameReady = false
         val st = SurfaceTexture(oes)
+        cleanup += { st.release() }
         st.setOnFrameAvailableListener({ lock.withLock { frameReady = true; cond.signalAll() } }, Handler(cbThread.looper))
         val decSurface = Surface(st)
+        cleanup += { decSurface.release() }
         val decoder = MediaCodec.createDecoderByType(inFormat.getString(MediaFormat.KEY_MIME)!!)
+        cleanup += { runCatching { decoder.stop() }; decoder.release() }
+        // KEY_ROTATION stays in the format: the decoder rotates into the SurfaceTexture
         decoder.configure(inFormat, decSurface, null, 0)
         decoder.start()
 
         val overlayBmp = OverlayPainter.paint(framing, look, item.id.toInt() % 36 + 1, item.dateTaken)
         val overlayTex = overlayBmp?.let { GlWorker.uploadRgba(it) } ?: 0
+        if (overlayTex != 0) cleanup += { GLES30.glDeleteTextures(1, intArrayOf(overlayTex), 0) }
         val stMatrix = FloatArray(16)
         val borderColor = Borders.color(look, setup)
 
@@ -119,8 +141,11 @@ class VideoExporter(
         var muxVideo = -1
         var muxAudio = -1
         var muxerStarted = false
+        cleanup += { if (muxerStarted) runCatching { muxer.stop() }; muxer.release() }
         // audio passthrough
-        val audioExtractor = MediaExtractor().apply { setDataSource(context, uri, null) }
+        val audioExtractor = MediaExtractor()
+        cleanup += { audioExtractor.release() }
+        audioExtractor.setDataSource(context, uri, null)
         val audioTrack = (0 until audioExtractor.trackCount).firstOrNull {
             audioExtractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true
         }
@@ -194,7 +219,7 @@ class VideoExporter(
                         st.updateTexImage()
                         st.getTransformMatrix(stMatrix)
                         val uv = FilmRenderer.multiply(
-                            FilmRenderer.multiply(Framing.surfaceTextureTransform(stMatrix), Framing.rotationTransform(rotation)),
+                            Framing.surfaceTextureTransform(stMatrix),
                             Framing.cropTransform(framing.crop))
                         renderer.render(RenderRequest(
                             input = InputImage(oes, true, uv),
@@ -228,17 +253,7 @@ class VideoExporter(
             }
             onProgress(1f)
         } finally {
-            runCatching { decoder.stop() }; decoder.release()
-            runCatching { encoder.stop() }; encoder.release()
-            if (muxerStarted) runCatching { muxer.stop() }
-            muxer.release()
-            extractor.release(); audioExtractor.release()
-            decSurface.release(); st.release(); cbThread.quitSafely()
-            GLES30.glDeleteTextures(1, intArrayOf(oes), 0)
-            if (overlayTex != 0) GLES30.glDeleteTextures(1, intArrayOf(overlayTex), 0)
-            egl.releaseSurface(eglSurface)
-            encSurface.release()
-            renderer.releaseTargets()
+            // resources are released by run() in reverse creation order
         }
         if (!encoderDone) error("encoder did not finish")
     }

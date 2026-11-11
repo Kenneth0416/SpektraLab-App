@@ -171,6 +171,17 @@ class Program(vertex: String, fragment: String) {
     fun setMat3RowMajor(n: String, m: FloatArray) = glUniformMatrix3fv(loc(n), 1, true, m, 0)
     fun setMat3ColumnMajor(n: String, m: FloatArray) = glUniformMatrix3fv(loc(n), 1, false, m, 0)
 
+    /**
+     * Give every sampler its own texture unit up front. Unset samplers default to unit 0,
+     * and samplers of different types (2D / 3D / external) sharing a unit make the draw
+     * fail with GL_INVALID_OPERATION.
+     */
+    fun bindSamplerUnits(units: Map<String, Int>): Program {
+        glUseProgram(id)
+        for ((n, u) in units) loc(n).takeIf { it >= 0 }?.let { glUniform1i(it, u) }
+        return this
+    }
+
     fun texture(n: String, unit: Int, tex: Int, target: Int = GL_TEXTURE_2D) {
         glActiveTexture(GL_TEXTURE0 + unit)
         glBindTexture(target, tex)

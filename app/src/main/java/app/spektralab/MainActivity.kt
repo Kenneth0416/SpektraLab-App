@@ -1,6 +1,10 @@
 package app.spektralab
 
 import android.os.Bundle
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -29,6 +33,18 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // share sheets can only be started by a foreground activity: open finished
+        // "share" exports when we are (back) on screen
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                state.exports.pendingShare.collect { uris ->
+                    if (uris != null) {
+                        state.exports.pendingShare.value = null
+                        state.exports.shareUris(this@MainActivity, uris)
+                    }
+                }
+            }
+        }
         setContent {
             val fold = rememberFoldState(this)
             MaterialTheme { CompositionLocalProvider(LocalFold provides fold) {

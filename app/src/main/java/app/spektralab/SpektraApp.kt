@@ -81,7 +81,14 @@ class Thumbnails(private val app: SpektraApp) {
     private val mutex = Mutex()
 
     private fun key(item: LibraryItem) =
-        "${item.id}_${Integer.toHexString(LookJson.toJson(item.look).toString().hashCode())}"
+        "${item.id}_${Integer.toHexString(item.uri.hashCode())}_${Integer.toHexString(LookJson.toJson(item.look).toString().hashCode())}"
+
+    /** Drop memory and disk thumbnails of removed items. */
+    fun forget(ids: Collection<Long>) {
+        val prefixes = ids.map { "${it}_" }
+        mem.snapshot().keys.filter { k -> prefixes.any { k.startsWith(it) } }.forEach { mem.remove(it) }
+        dir.listFiles()?.filter { f -> prefixes.any { f.name.startsWith(it) } }?.forEach { it.delete() }
+    }
 
     fun cached(item: LibraryItem): Bitmap? = mem.get(key(item))
 

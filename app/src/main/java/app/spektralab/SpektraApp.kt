@@ -10,6 +10,7 @@ import app.spektralab.data.Library
 import app.spektralab.data.LibraryItem
 import app.spektralab.data.LookJson
 import app.spektralab.data.Media
+import app.spektralab.data.SourceImage
 import app.spektralab.engine.EngineData
 import app.spektralab.engine.Look
 import app.spektralab.engine.LookSetup
@@ -111,8 +112,8 @@ class Thumbnails(private val app: SpektraApp) {
         val src = withContext(Dispatchers.IO) {
             val uri = Uri.parse(item.uri)
             runCatching {
-                if (item.isVideo) Media.videoFrame(app, uri, minOf(item.durationMs * 500, 1_000_000L), 640)
-                else Media.decodeImage(app, uri, 640)
+                if (item.isVideo) Media.videoFrame(app, uri, minOf(item.durationMs * 500, 1_000_000L), 640)?.let { SourceImage(it, null) }
+                else Media.loadSource(app, uri, 640, tryRaw = item.isRaw)
             }.getOrNull()
         } ?: return null
         val setup = withContext(Dispatchers.Default) { app.looks.get(item.look) }

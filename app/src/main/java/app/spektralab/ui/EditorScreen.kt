@@ -150,7 +150,7 @@ fun EditorScreen(state: AppState, id: Long) {
         playing = false
         if (item.isVideo) preview.setVideo(Uri.parse(item.uri), item.rotation, item.width, item.height, item.autoEv)
         else {
-            val bmp = withContext(Dispatchers.IO) { runCatching { Media.decodeImage(context, Uri.parse(item.uri), previewDecodeEdge(context)) }.getOrNull() }
+            val bmp = withContext(Dispatchers.IO) { runCatching { Media.loadSource(context, Uri.parse(item.uri), previewDecodeEdge(context), tryRaw = item.isRaw) }.getOrNull() }
             if (bmp != null) preview.setPhoto(bmp, item.autoEv, item.id.toInt()) else state.say("无法读取原片")
         }
     }
@@ -246,32 +246,43 @@ fun EditorScreen(state: AppState, id: Long) {
                 modifier = Modifier.springClick(0.88f) { state.pasteLook() }.padding(8.dp))
         }
         // 3. tools: tabs + panel
-        Column(Modifier.fillMaxSize().dealIn(2, fromY = 120f)) {
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp)) {
-                TOOLS.forEach { t ->
-                    val modified = t.keys(look) != look
-                    val on = t.id == tool
-                    val dot by animateFloatAsState(if (modified) 1f else 0f, Motion.settle, label = "dot")
-                    val bar by animateFloatAsState(if (on) 1f else 0f, Motion.settle, label = "bar")
-                    val ink by animateColorAsState(if (on) Pal.text else Pal.dim, tween(200), label = "tab")
-                    Column(Modifier.springClick(0.9f) { tool = t.id }.padding(horizontal = 10.dp, vertical = 6.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally) {
-                        // a dot of the roll's colour pops up when this tool has been touched
-                        Box(Modifier.size(5.dp).graphicsLayer { scaleX = dot; scaleY = dot }.clip(CircleShape).background(accent))
-                        Text(t.label, color = ink, fontSize = 14.sp)
-                        Box(Modifier.width(22.dp).height(2.dp).graphicsLayer { scaleX = bar; alpha = bar.coerceIn(0f, 1f) }.background(accent))
-                    }
+        ToolDeck(state, tool, { tool = it }, look, accent, engine.film(LookMapper.filmStock(look)).isPositive, item.isVideo,
+            onSet = { key, l -> state.setLook(key, l) }, onApply = { state.applyLook(it) })
+    }
+}
+
+/**
+ * Tool tabs + the panel of the selected tool, bound to any look (an item in the editor,
+ * or the look loaded in the camera).
+ */
+@Composable
+fun ToolDeck(state: AppState, tool: String, onTool: (String) -> Unit, look: Look, accent: Color, positive: Boolean, isVideo: Boolean,
+             onSet: (String, Look) -> Unit, onApply: (Look) -> Unit) {
+    Column(Modifier.fillMaxSize().dealIn(2, fromY = 120f)) {
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp)) {
+            TOOLS.forEach { t ->
+                val modified = t.keys(look) != look
+                val on = t.id == tool
+                val dot by animateFloatAsState(if (modified) 1f else 0f, Motion.settle, label = "dot")
+                val bar by animateFloatAsState(if (on) 1f else 0f, Motion.settle, label = "bar")
+                val ink by animateColorAsState(if (on) Pal.text else Pal.dim, tween(200), label = "tab")
+                Column(Modifier.springClick(0.9f) { onTool(t.id) }.padding(horizontal = 10.dp, vertical = 6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally) {
+                    // a dot of the roll's colour pops up when this tool has been touched
+                    Box(Modifier.size(5.dp).graphicsLayer { scaleX = dot; scaleY = dot }.clip(CircleShape).background(accent))
+                    Text(t.label, color = ink, fontSize = 14.sp)
+                    Box(Modifier.width(22.dp).height(2.dp).graphicsLayer { scaleX = bar; alpha = bar.coerceIn(0f, 1f) }.background(accent))
                 }
             }
-            // panels slide in the direction of the tab that was tapped
-            AnimatedContent(tool, Modifier.fillMaxWidth().weight(1f).background(Pal.darkPanel), label = "tool", transitionSpec = {
-                val dir = if (TOOLS.indexOfFirst { it.id == targetState } >= TOOLS.indexOfFirst { it.id == initialState }) 1 else -1
-                (slideInHorizontally(Motion.glideOffset) { dir * it / 5 } + fadeIn(tween(200, delayMillis = 60))) togetherWith
-                    (slideOutHorizontally(Motion.glideOffset) { -dir * it / 5 } + fadeOut(tween(110)))
-            }) { t ->
-                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 12.dp)) {
-                    ToolPanel(state, t, item, look, accent, engine.film(LookMapper.filmStock(look)).isPositive)
-                }
+        }
+        // panels slide in the direction of the tab that was tapped
+        AnimatedContent(tool, Modifier.fillMaxWidth().weight(1f).background(Pal.darkPanel), label = "tool", transitionSpec = {
+            val dir = if (TOOLS.indexOfFirst { it.id == targetState } >= TOOLS.indexOfFirst { it.id == initialState }) 1 else -1
+            (slideInHorizontally(Motion.glideOffset) { dir * it / 5 } + fadeIn(tween(200, delayMillis = 60))) togetherWith
+                (slideOutHorizontally(Motion.glideOffset) { -dir * it / 5 } + fadeOut(tween(110)))
+        }) { t ->
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 12.dp)) {
+                ToolPanel(state, t, isVideo, look, accent, positive, onSet, onApply)
             }
         }
     }
@@ -371,7 +382,7 @@ internal fun EditorLayout(mode: EditorMode, hinge: Rect?, modifier: Modifier, co
 
 /** Red crop marks: they close in on the frame when it appears and open up while the original is held. */
 @Composable
-private fun CropCorners(modifier: Modifier, spread: Boolean) {
+internal fun CropCorners(modifier: Modifier, spread: Boolean) {
     val enter = remember { Animatable(1f) }
     LaunchedEffect(Unit) { delay(250); enter.animateTo(0f, Motion.settle) }
     val open by animateFloatAsState(if (spread) 1f else 0f, Motion.settle, label = "corners")
@@ -391,7 +402,7 @@ private fun CropCorners(modifier: Modifier, spread: Boolean) {
 
 /** Darkroom safelight: a slowly breathing red lamp with a soft halo. */
 @Composable
-private fun Safelight(modifier: Modifier) {
+internal fun Safelight(modifier: Modifier) {
     val t = rememberInfiniteTransition(label = "safelight")
     val a by t.animateFloat(0.35f, 1f, infiniteRepeatable(tween(1800, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "a")
     Canvas(modifier.size(26.dp)) {
@@ -401,7 +412,8 @@ private fun Safelight(modifier: Modifier) {
 }
 
 @Composable
-private fun ToolPanel(state: AppState, tool: String, item: LibraryItem, look: Look, accent: Color, positive: Boolean) {
+private fun ToolPanel(state: AppState, tool: String, isVideo: Boolean, look: Look, accent: Color, positive: Boolean,
+                      onSet: (String, Look) -> Unit, onApply: (Look) -> Unit) {
     val (title, desc) = when (tool) {
         "film" -> "胶片 · ${Catalog.film(look.film).name}" to "决定色彩与影调的底子。"
         "paper" -> "相纸 · ${if (positive) "直接扫描" else Catalog.paper(look.paper).label}" to "同一卷底片，印在不同相纸上是不同的结果。"
@@ -412,7 +424,7 @@ private fun ToolPanel(state: AppState, tool: String, item: LibraryItem, look: Lo
         "color" -> "放大机滤色" to "用黄 / 品红滤色校色，或故意做偏色。"
         else -> "画幅与片边 · ${Catalog.format(look.format).label}" to "画幅决定裁切，也决定颗粒与光晕的相对大小。"
     }
-    fun set(key: String, l: Look) = state.setLook(key, l)
+    fun set(key: String, l: Look) = onSet(key, l)
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Crossfade(title, animationSpec = tween(220), label = "title") { tt ->
@@ -421,7 +433,7 @@ private fun ToolPanel(state: AppState, tool: String, item: LibraryItem, look: Lo
             Text(desc, color = Pal.dim, fontSize = 12.sp)
         }
         Text("重置", color = Pal.dim, fontSize = 13.sp, modifier = Modifier.springClick(0.85f) {
-            TOOLS.firstOrNull { it.id == tool }?.let { state.applyLook(it.keys(look)) }
+            TOOLS.firstOrNull { it.id == tool }?.let { onApply(it.keys(look)) }
         }.padding(6.dp))
     }
     Spacer(Modifier.height(10.dp))
@@ -484,7 +496,7 @@ private fun ToolPanel(state: AppState, tool: String, item: LibraryItem, look: Lo
             RulerSlider("强度", look.grain, 0.0..3.0, 0.1, 1.0, accent, { "×%.1f".format(it) }) { set("grain", look.copy(grain = it)) }
             RulerSlider("颗粒粗细", look.grainSize, 0.5..2.5, 0.1, 1.0, accent, { "×%.1f".format(it) }) { set("gran", look.copy(grainSize = it)) }
             val fmt = Catalog.format(look.format)
-            Text("当前画幅 ${fmt.label}：${fmt.note}" + if (item.isVideo) " 视频逐帧重新生成颗粒。" else "",
+            Text("当前画幅 ${fmt.label}：${fmt.note}" + if (isVideo) " 视频逐帧重新生成颗粒。" else "",
                 color = Pal.dim, fontSize = 12.sp)
         }
         "diff" -> {

@@ -58,7 +58,7 @@ import app.spektralab.export.PhotoFormat
 @Composable
 fun Sheets(state: AppState) {
     val sheet by state.sheet.collectAsState()
-    val dark = state.editId.collectAsState().value != null
+    val dark = state.editId.collectAsState().value != null || state.cameraOpen.collectAsState().value
     val fold = LocalFold.current
     val density = androidx.compose.ui.platform.LocalDensity.current
     var box by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }

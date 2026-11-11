@@ -11,6 +11,7 @@ import android.opengl.GLES30
 import android.opengl.GLSurfaceView
 import android.view.Surface
 import app.spektralab.engine.Look
+import app.spektralab.data.SourceImage
 import app.spektralab.engine.LookSetup
 import app.spektralab.gl.FilmRenderer
 import app.spektralab.gl.GlUtil
@@ -45,7 +46,7 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
         renderMode = RENDERMODE_WHEN_DIRTY
     }
 
-    fun setPhoto(bitmap: Bitmap, autoEv: Float, seed: Int) = queueEvent {
+    fun setPhoto(bitmap: SourceImage, autoEv: Float, seed: Int) = queueEvent {
         r.pendingBitmap = bitmap
         r.currentBitmap = bitmap
         r.autoEv = autoEv
@@ -118,8 +119,8 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
         var renderer: FilmRenderer? = null
         var pendingSetup: LookSetup? = null
         var look: Look = Look.DEFAULT
-        var pendingBitmap: Bitmap? = null
-        var currentBitmap: Bitmap? = null
+        var pendingBitmap: SourceImage? = null
+        var currentBitmap: SourceImage? = null
         var currentSetup: LookSetup? = null
         var photoTex = 0
         var photoW = 0
@@ -208,7 +209,7 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
             pendingSetup?.let { fr.setLook(it); pendingSetup = null }
             pendingBitmap?.let { bmp ->
                 GlUtil.deleteTexture(photoTex)
-                photoTex = GlWorker.uploadSrgb(bmp)
+                photoTex = GlWorker.upload(bmp)
                 photoW = bmp.width; photoH = bmp.height
                 pendingBitmap = null
             }
@@ -239,7 +240,7 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
             } else {
                 if (photoTex == 0) return
                 val framing = Framing.compute(photoW, photoH, look, maxOf(surfaceW, surfaceH))
-                input = InputImage(photoTex, false, Framing.bitmapUvTransform(framing.crop))
+                input = InputImage(photoTex, false, Framing.bitmapUvTransform(framing.crop), sceneLinear = currentBitmap?.linear != null)
                 if (revealPending && !original) {
                     revealPending = false
                     if (startReveal(fr, input, framing, frameSeed)) return

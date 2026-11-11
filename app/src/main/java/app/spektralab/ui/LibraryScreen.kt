@@ -156,7 +156,7 @@ fun LibraryScreen(state: AppState) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                     if (!sel) {
                         BarButton(if (importing) "导入中" + busyDots() else "＋ 导入", Pal.paper, filled = true) { if (!importing) state.sheet.value = Sheet.IMPORT }
-                        BarButton("相机", Pal.paper.copy(alpha = 0.45f)) { state.say("相机暂未开放，先从相册导入") }
+                        BarButton("相机", Pal.paper) { state.openCamera() }
                     } else {
                         BarButton("粘贴设置", if (clip != null) Pal.paper else Color(0xFF8F8A7E)) { state.pasteToPicked() }
                         BarButton("配方", Pal.paper) { state.openRecipes() }

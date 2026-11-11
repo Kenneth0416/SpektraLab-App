@@ -62,6 +62,7 @@ class ExportManager(private val app: SpektraApp) {
     private val _state = MutableStateFlow<ExportState?>(null)
     val state: StateFlow<ExportState?> = _state
     private var job: Job? = null
+    private val extra = java.util.concurrent.ConcurrentLinkedQueue<LibraryItem>()
     /** Finished share exports waiting for an activity in the foreground to open the chooser. */
     val pendingShare = MutableStateFlow<List<Uri>?>(null)
     @Volatile private var cancel = false
@@ -78,21 +79,43 @@ class ExportManager(private val app: SpektraApp) {
         job = app.appScope.launch {
             val saved = ArrayList<Uri>()
             var failed = 0
-            for ((i, item) in items.withIndex()) {
-                if (cancel) break
-                _state.value = _state.value?.copy(done = i, current = 0f)
-                val uri = runCatching { exportOne(item, options) { p -> _state.value = _state.value?.copy(current = p) } }
-                    .onFailure { android.util.Log.e("SpektraExport", "export failed", it) }
-                    .getOrNull()
-                if (uri != null) saved += uri else failed++
+            val queue = ArrayDeque(items)
+            var i = 0
+            var finished = false
+            while (!finished) {
+                while (!cancel) {
+                    // shots taken while printing join the batch
+                    val item = queue.removeFirstOrNull() ?: extra.poll() ?: break
+                    _state.value = _state.value?.copy(done = i, current = 0f)
+                    val uri = runCatching { exportOne(item, options) { p -> _state.value = _state.value?.copy(current = p) } }
+                        .onFailure { android.util.Log.e("SpektraExport", "export failed", it) }
+                        .getOrNull()
+                    if (uri != null) saved += uri else failed++
+                    i++
+                }
+                // finish under the same lock as enqueue(), so a late shot is never dropped
+                synchronized(this@ExportManager) {
+                    if (cancel || extra.isEmpty()) {
+                        val total = _state.value?.total ?: items.size
+                        if (share && saved.isNotEmpty()) pendingShare.value = saved
+                        // the service watches [state] and stops itself once it has gone foreground
+                        _state.value = ExportState(total, total, 1f, false, saved, failed, share)
+                        finished = true
+                    }
+                }
             }
-            if (share && saved.isNotEmpty()) pendingShare.value = saved
-            // the service watches [state] and stops itself once it has gone foreground
-            _state.value = ExportState(items.size, items.size, 1f, false, saved, failed, share)
         }
     }
 
-    fun cancel() { cancel = true }
+    /** Print one more item: joins the running batch, or starts one. */
+    @Synchronized fun enqueue(item: LibraryItem, options: ExportOptions) {
+        if (isRunning()) {
+            extra.add(item)
+            _state.value = _state.value?.let { it.copy(total = it.total + 1) }
+        } else start(listOf(item), options, share = false)
+    }
+
+    fun cancel() { cancel = true; extra.clear() }
 
     fun dismiss() { if (!isRunning()) _state.value = null }
 
@@ -128,7 +151,9 @@ class ExportManager(private val app: SpektraApp) {
             val limit = minOf(if (o.photoLongEdge == 0) cap else o.photoLongEdge, (maxTex / 1.07).toInt())
             val src = withContext(Dispatchers.IO) {
                 // decode a bit larger than the target so the format crop keeps resolution
-                Media.decodeImage(app, Uri.parse(item.uri), (limit * 1.5).toInt().coerceAtMost(cap))
+                // raw: full-resolution demosaic unless the sensor has pixels to spare for binning
+                Media.loadSource(app, Uri.parse(item.uri), if (item.isRaw) limit else (limit * 1.5).toInt().coerceAtMost(cap), tryRaw = item.isRaw,
+                    fast = maxOf(item.width, item.height) > maxTex)
             }
             progress(0.3f)
             val framing = Framing.compute(src.width, src.height, item.look, limit)

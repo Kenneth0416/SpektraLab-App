@@ -274,6 +274,7 @@ uniform int uOverlay;
 uniform sampler2D uOverlayTex;
 uniform int uFlipY;
 uniform int uOriginal;
+uniform float uOriginalGain;
 
 vec3 dens(vec2 uv) { return texture(uDensity, uv).rgb; }
 
@@ -286,7 +287,7 @@ void main() {
     } else {
         vec2 iuv = (p - uImageRect.xy) / (uImageRect.zw - uImageRect.xy);
         if (uOriginal == 1) {
-            col = linearToSrgb(inputLinear(iuv));
+            col = linearToSrgb(inputLinear(iuv) * uOriginalGain);
         } else {
             vec3 d = dens(iuv);
             if (uGrainBlur.x < 0.999) {

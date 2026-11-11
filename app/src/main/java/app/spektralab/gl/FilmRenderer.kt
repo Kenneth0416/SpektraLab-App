@@ -19,6 +19,8 @@ class InputImage(
     val external: Boolean,
     /** Row-major 3x3: image uv (y up, top = 1) -> texture uv. */
     val uvTransform: FloatArray,
+    /** Scene-linear data (developed raw): shown with the metered exposure in "original" mode. */
+    val sceneLinear: Boolean = false,
 )
 
 class RenderRequest(
@@ -254,6 +256,7 @@ class FilmRenderer {
             if (r.input.external) p.texture("uInput", 0, r.input.texture, GLES11Ext.GL_TEXTURE_EXTERNAL_OES)
             else p.texture("uInput", 0, r.input.texture)
             p.setMat3RowMajor("uUvTransform", r.input.uvTransform)
+            p.set1f("uOriginalGain", if (r.input.sceneLinear) 2f.pow(r.autoEv) else 1f)
         } else {
             p.texture("uDensity", 1, density)
             p.texture("uLut", 2, texLut, GL_TEXTURE_3D)

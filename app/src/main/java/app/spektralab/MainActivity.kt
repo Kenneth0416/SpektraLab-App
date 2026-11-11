@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import app.spektralab.ui.AppState
 import app.spektralab.ui.EditorScreen
+import app.spektralab.ui.CameraScreen
 import app.spektralab.ui.LibraryScreen
 import app.spektralab.ui.RoomTransition
 import app.spektralab.ui.LocalFold
@@ -50,18 +51,24 @@ class MainActivity : ComponentActivity() {
                 val editId by state.editId.collectAsState()
                 val sheet by state.sheet.collectAsState()
                 val selecting by state.selecting.collectAsState()
-                BackHandler(sheet != Sheet.NONE || editId != null || selecting) {
+                val cameraOpen by state.cameraOpen.collectAsState()
+                BackHandler(sheet != Sheet.NONE || editId != null || selecting || cameraOpen) {
                     when {
                         sheet != Sheet.NONE && sheet != Sheet.PROGRESS -> state.sheet.value = Sheet.NONE
                         sheet == Sheet.PROGRESS -> state.sheet.value = Sheet.NONE
-                        editId != null -> state.back()
+                        editId != null || cameraOpen -> state.back()
                         selecting -> state.toggleSelecting()
                     }
                 }
                 Box(Modifier.fillMaxSize()) {
                     // lightbox <-> darkroom: the bright table fades to near black
-                    RoomTransition(editId, isDark = { it != null }) { id ->
-                        if (id == null) LibraryScreen(state) else EditorScreen(state, id)
+                    // rooms: lightbox (bright), darkroom editor and camera (dark)
+                    RoomTransition(editId to cameraOpen, isDark = { it.first != null || it.second }) { (id, camera) ->
+                        when {
+                            id != null -> EditorScreen(state, id)
+                            camera -> CameraScreen(state)
+                            else -> LibraryScreen(state)
+                        }
                     }
                     Sheets(state)
                 }

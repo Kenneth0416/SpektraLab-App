@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import app.spektralab.SpektraApp
 import app.spektralab.data.LibraryItem
 import app.spektralab.data.Media
+import app.spektralab.data.LookJson
 import app.spektralab.data.Recipe
 import app.spektralab.engine.Look
 import app.spektralab.export.ExportOptions
@@ -38,6 +39,42 @@ class AppState(application: Application) : AndroidViewModel(application) {
     val exportOptions = MutableStateFlow(ExportOptions())
     val importing = MutableStateFlow(false)
 
+    // camera: the look loaded in the camera, kept between sessions
+    val cameraOpen = MutableStateFlow(false)
+    val camLook = MutableStateFlow(runCatching {
+        LookJson.fromJson(org.json.JSONObject(application.getSharedPreferences("camera", android.content.Context.MODE_PRIVATE).getString("look", "{}")!!))
+    }.getOrDefault(Look.DEFAULT))
+    /** Also save a developed film JPEG to the album right after each shot. */
+    val autoPrint = MutableStateFlow(application.getSharedPreferences("camera", android.content.Context.MODE_PRIVATE).getBoolean("autoPrint", true))
+
+    fun setCamLook(look: Look) {
+        camLook.value = look
+        app.getSharedPreferences("camera", android.content.Context.MODE_PRIVATE).edit().putString("look", LookJson.toJson(look).toString()).apply()
+    }
+
+    fun setAutoPrint(on: Boolean) {
+        autoPrint.value = on
+        app.getSharedPreferences("camera", android.content.Context.MODE_PRIVATE).edit().putBoolean("autoPrint", on).apply()
+    }
+
+    fun openCamera() { sheet.value = Sheet.NONE; selecting.value = false; picked.value = emptyList(); cameraOpen.value = true }
+    fun closeCamera() { cameraOpen.value = false; sheet.value = Sheet.NONE }
+
+    /**
+     * A shot was saved to the album ([uri] is the untouched original, raw when possible):
+     * put it on the lightbox with the camera's look, and print it if asked.
+     */
+    fun onCaptured(uri: Uri) {
+        val look = camLook.value
+        viewModelScope.launch {
+            val item = withContext(Dispatchers.IO) { Media.importItem(app, uri, library.reserveIds(1)) }?.copy(look = look)
+                ?: return@launch say("拍到了，但读不回原片")
+            library.add(listOf(item))
+            say(if (item.isRaw) "已放上灯箱 · RAW 原片保留" else "已放上灯箱 · 原片保留")
+            if (autoPrint.value) exports.enqueue(item, exportOptions.value)
+        }
+    }
+
     // viewing preferences (spektrafilm GUI display options)
     private val prefs = application.getSharedPreferences("display", android.content.Context.MODE_PRIVATE)
     /** 18% grey backdrop around the print, like spektrafilm's gray_18_canvas. */
@@ -65,6 +102,9 @@ class AppState(application: Application) : AndroidViewModel(application) {
 
     fun currentItem(): LibraryItem? = editId.value?.let { library.item(it) }
 
+    /** Recipes apply to the open item, else to the camera, else to the circled items. */
+    private val recipeTargetIsCamera get() = editId.value == null && cameraOpen.value
+
     // ----------------------------------------------------------- navigation
     fun openEdit(id: Long) {
         lastKey = null
@@ -74,6 +114,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
     }
 
     fun back() {
+        if (editId.value == null && cameraOpen.value) return closeCamera()
         editId.value = null
         sheet.value = Sheet.NONE
     }
@@ -146,22 +187,22 @@ class AppState(application: Application) : AndroidViewModel(application) {
     }
 
     fun openRecipes() {
-        if (editId.value == null && picked.value.isEmpty()) return say("先圈出要套用的项目")
+        if (editId.value == null && !cameraOpen.value && picked.value.isEmpty()) return say("先圈出要套用的项目")
         sheet.value = Sheet.RECIPES
     }
 
     fun applyRecipe(r: Recipe) {
         val full = r.look
-        applyLook(full)
+        if (recipeTargetIsCamera) setCamLook(full) else applyLook(full)
         sheet.value = Sheet.NONE
         say("已套用：${r.name}")
     }
 
     fun saveRecipe() {
-        val item = currentItem() ?: return
+        val look = currentItem()?.look ?: (if (cameraOpen.value) camLook.value else return)
         val used = library.recipes.value.map { it.name }.toSet()
         val name = generateSequence(1) { it + 1 }.map { "我的配方 $it" }.first { it !in used }
-        library.addRecipe(Recipe(name, item.look))
+        library.addRecipe(Recipe(name, look))
         say("已写成配方卡：$name")
     }
 

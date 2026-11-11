@@ -13,8 +13,17 @@ import android.provider.OpenableColumns
 import androidx.exifinterface.media.ExifInterface
 import app.spektralab.engine.AutoExposure
 import app.spektralab.engine.Look
+import app.spektralab.raw.DngReader
+import app.spektralab.raw.LinearImage
+import app.spektralab.raw.RawDeveloper
 import kotlin.math.max
 import kotlin.math.pow
+
+/** A decoded photo: either a display-referred sRGB bitmap or a scene-linear raw development. */
+class SourceImage(val bitmap: Bitmap?, val linear: LinearImage?) {
+    val width get() = bitmap?.width ?: linear!!.width
+    val height get() = bitmap?.height ?: linear!!.height
+}
 
 object Media {
     private val RAW_EXT = setOf("dng", "cr2", "cr3", "nef", "arw", "orf", "rw2", "raf", "pef", "srw")
@@ -34,6 +43,38 @@ object Media {
             decoder.setTargetColorSpace(ColorSpace.get(ColorSpace.Named.SRGB))
             decoder.memorySizePolicy = ImageDecoder.MEMORY_POLICY_DEFAULT
         }.let { if (it.config != Bitmap.Config.ARGB_8888) it.copy(Bitmap.Config.ARGB_8888, false) else it }
+    }
+
+    /**
+     * Load a photo for rendering. DNGs written by Android cameras are developed from the
+     * sensor data to scene-linear RGB (see [RawDeveloper]); everything else, and raw files
+     * we cannot parse, goes through the system decoder.
+     * @param fast prefer speed (previews, thumbnails) over full-resolution demosaicing
+     */
+    fun loadSource(context: Context, uri: Uri, maxLongEdge: Int, tryRaw: Boolean, fast: Boolean = true): SourceImage {
+        if (tryRaw) {
+            val linear = runCatching {
+                val bytes = context.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+                DngReader.read(bytes)?.let { RawDeveloper.develop(it, maxLongEdge, fast) }
+            }.getOrNull()
+            if (linear != null) return SourceImage(null, linear)
+        }
+        return SourceImage(decodeImage(context, uri, maxLongEdge), null)
+    }
+
+    /** Center-weighted auto exposure of a developed raw frame. */
+    fun autoExposure(img: LinearImage): Float {
+        val step = maxOf(1, maxOf(img.width, img.height) / 192)
+        val w = img.width / step
+        val h = img.height / step
+        val lin = FloatArray(w * h * 3)
+        for (y in 0 until h) for (x in 0 until w) {
+            val i = (y * w + x) * 3
+            lin[i] = img.red(x * step, y * step).coerceAtLeast(0f)
+            lin[i + 1] = img.green(x * step, y * step).coerceAtLeast(0f)
+            lin[i + 2] = img.blue(x * step, y * step).coerceAtLeast(0f)
+        }
+        return AutoExposure.centerWeightedEv(lin, w, h).toFloat()
     }
 
     /** A frame of a video at [timeUs], upright, long edge at most [maxLongEdge]. */
@@ -119,7 +160,21 @@ object Media {
                 LibraryItem(id, uri.toString(), true, false, if (swap) eh else ew, if (swap) ew else eh, dur, rot,
                     date ?: System.currentTimeMillis(), frame?.let { autoExposure(it) } ?: 0f, Look.DEFAULT, name)
             } else {
-                val bmp = decodeImage(context, uri, 512)
+                val src = loadSource(context, uri, 512, tryRaw = isRaw)
+                if (src.linear != null) {
+                    // developed from sensor data: size and exposure come from the raw frame
+                    var date: Long? = null
+                    runCatching {
+                        cr.openInputStream(uri)?.use { s ->
+                            val exif = ExifInterface(s)
+                            date = parseExifDate(exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL) ?: exif.getAttribute(ExifInterface.TAG_DATETIME))
+                        }
+                    }
+                    val scale = rawScale(context, uri)
+                    return LibraryItem(id, uri.toString(), false, true, scale?.first ?: src.width, scale?.second ?: src.height, 0, 0,
+                        date ?: System.currentTimeMillis(), autoExposure(src.linear), Look.DEFAULT, name)
+                }
+                val bmp = src.bitmap!!
                 var date: Long? = null
                 var w = bmp.width
                 var h = bmp.height
@@ -145,6 +200,12 @@ object Media {
             null
         }
     }
+
+    /** Full upright size of a DNG we can develop. */
+    private fun rawScale(context: Context, uri: Uri): Pair<Int, Int>? = runCatching {
+        val bytes = context.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+        DngReader.read(bytes)?.let { it.uprightWidth to it.uprightHeight }
+    }.getOrNull()
 
     private fun parseExifDate(s: String?): Long? {
         if (s.isNullOrBlank()) return null

@@ -247,17 +247,18 @@ fun EditorScreen(state: AppState, id: Long) {
         }
         // 3. tools: tabs + panel
         ToolDeck(state, tool, { tool = it }, look, accent, engine.film(LookMapper.filmStock(look)).isPositive, item.isVideo,
-            onSet = { key, l -> state.setLook(key, l) }, onApply = { state.applyLook(it) })
+            onSet = { key, l -> state.setLook(key, l) }, onApply = { state.applyLook(it) }, source = item)
     }
 }
 
 /**
  * Tool tabs + the panel of the selected tool, bound to any look (an item in the editor,
- * or the look loaded in the camera).
+ * or the look loaded in the camera). The film and paper pickers show [source] through
+ * each stock; without one (the camera) they show a built-in test scene.
  */
 @Composable
 fun ToolDeck(state: AppState, tool: String, onTool: (String) -> Unit, look: Look, accent: Color, positive: Boolean, isVideo: Boolean,
-             onSet: (String, Look) -> Unit, onApply: (Look) -> Unit) {
+             onSet: (String, Look) -> Unit, onApply: (Look) -> Unit, source: LibraryItem? = null) {
     Column(Modifier.fillMaxSize().dealIn(2, fromY = 120f)) {
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp)) {
             TOOLS.forEach { t ->
@@ -282,7 +283,7 @@ fun ToolDeck(state: AppState, tool: String, onTool: (String) -> Unit, look: Look
                 (slideOutHorizontally(Motion.glideOffset) { -dir * it / 5 } + fadeOut(tween(110)))
         }) { t ->
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 12.dp)) {
-                ToolPanel(state, t, isVideo, look, accent, positive, onSet, onApply)
+                ToolPanel(state, t, isVideo, look, accent, positive, source, onSet, onApply)
             }
         }
     }
@@ -412,7 +413,7 @@ internal fun Safelight(modifier: Modifier) {
 }
 
 @Composable
-private fun ToolPanel(state: AppState, tool: String, isVideo: Boolean, look: Look, accent: Color, positive: Boolean,
+private fun ToolPanel(state: AppState, tool: String, isVideo: Boolean, look: Look, accent: Color, positive: Boolean, source: LibraryItem?,
                       onSet: (String, Look) -> Unit, onApply: (Look) -> Unit) {
     val (title, desc) = when (tool) {
         "film" -> "胶片 · ${Catalog.film(look.film).name}" to "决定色彩与影调的底子。"
@@ -439,29 +440,8 @@ private fun ToolPanel(state: AppState, tool: String, isVideo: Boolean, look: Loo
     Spacer(Modifier.height(10.dp))
     when (tool) {
         "film" -> {
-            Row(Modifier.horizontalScroll(rememberScrollState())) {
-                Catalog.films.forEach { f ->
-                    val on = f.stock == look.film
-                    val c = Color(f.accent)
-                    // the loaded roll lifts out of the row; its canister cap fills with the roll's colour
-                    val lift by animateFloatAsState(if (on) 1f else 0f, Motion.settle, label = "lift")
-                    val cardBg by animateColorAsState(if (on) Color(0xFF24100D) else Color.Transparent, tween(250), label = "cardBg")
-                    val ring by animateColorAsState(if (on) c else Pal.line, tween(250), label = "ring")
-                    Column(Modifier.padding(end = 10.dp, top = 6.dp).width(92.dp)
-                        .graphicsLayer { translationY = -5.dp.toPx() * lift; scaleX = 1f + 0.04f * lift; scaleY = 1f + 0.04f * lift }
-                        .springClick(0.93f) { set("film", look.copy(film = f.stock)) }
-                        .clip(RoundedCornerShape(10.dp)).background(cardBg)
-                        .border(1.dp, ring, RoundedCornerShape(10.dp)).padding(8.dp)) {
-                        Box(Modifier.size(30.dp).graphicsLayer { rotationZ = 360f * lift }.clip(CircleShape)
-                            .background(c.copy(alpha = 0.22f * lift.coerceIn(0f, 1f))).border(2.dp, c, CircleShape), contentAlignment = Alignment.Center) {
-                            Text(f.iso, color = c, fontFamily = Fonts.mono, fontSize = 8.sp)
-                        }
-                        Spacer(Modifier.height(6.dp))
-                        Text(f.name, color = Pal.text, fontSize = 12.sp, maxLines = 1)
-                        Text(f.kind, color = Pal.dim, fontSize = 10.sp)
-                    }
-                }
-            }
+            // every roll as a square frame of this picture, so the choice is made by eye
+            FrameRow(state.app, source, filmChoices(look), look.film) { set("film", look.copy(film = it)) }
             Spacer(Modifier.height(8.dp))
             Crossfade(Catalog.film(look.film).note, animationSpec = tween(250), label = "note") { n ->
                 Text(n, color = Pal.dim, fontSize = 12.sp)
@@ -470,8 +450,12 @@ private fun ToolPanel(state: AppState, tool: String, isVideo: Boolean, look: Loo
         "paper" -> {
             if (positive) Text("反转片冲出来就是正像，直接扫描，不再印相。", color = Pal.dim, fontSize = 12.sp)
             else {
-                FlowRow { Catalog.papers.forEach { p -> Chip(p.label, p.id == look.paper, accent) { set("paper", look.copy(paper = p.id)) } } }
-                Text(Catalog.paper(look.paper).note, color = Pal.dim, fontSize = 12.sp)
+                // the same negative printed on each paper
+                FrameRow(state.app, source, paperChoices(look, accent), look.paper) { set("paper", look.copy(paper = it)) }
+                Spacer(Modifier.height(8.dp))
+                Crossfade(Catalog.paper(look.paper).note, animationSpec = tween(250), label = "paperNote") { n ->
+                    Text(n, color = Pal.dim, fontSize = 12.sp)
+                }
                 RulerSlider("印相曝光", look.printEv, -2.0..2.0, 0.1, 0.0, accent, { signed(it, 1, " EV") }) { set("pexp", look.copy(printEv = it)) }
                 RulerSlider("眩光", look.glare, 0.0..1.0, 0.01, 0.0, accent, { "${(it * 100).toInt()}%" }) { set("glare", look.copy(glare = it)) }
             }

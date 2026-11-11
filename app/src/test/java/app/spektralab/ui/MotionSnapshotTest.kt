@@ -13,6 +13,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -119,5 +120,28 @@ class MotionSnapshotTest {
         rule.mainClock.advanceTimeBy(1500)
         shot("lever_back")
         assertTrue("a full stroke advances the film", cocked && frame == 13)
+    }
+
+    @Test fun filmFramesShowTheLoadedRoll() {
+        rule.mainClock.autoAdvance = false
+        val spektra = rule.activity.application as app.spektralab.SpektraApp
+        val look = app.spektralab.engine.Look()
+        val scene = Swatches.testScene()
+        rule.setContent {
+            Column(Modifier.testTag("stage").background(Pal.darkPanel).padding(12.dp).width(376.dp)) {
+                FrameRow(spektra, null, filmChoices(look), look.film) {}
+                FrameRow(spektra, null, paperChoices(look, Color(0xFFE9C48A)), "kodak_2383") {}
+                androidx.compose.foundation.Image(scene.asImageBitmap(), null, Modifier.size(120.dp))
+            }
+        }
+        rule.mainClock.advanceTimeBy(1200)
+        val b = shot("film_frames")
+        // the loaded roll's frame is ringed in its own colour
+        var ring = 0
+        for (y in 0 until b.height) for (x in 0 until b.width / 3) {
+            val c = Color(b.getPixel(x, y))
+            if (kotlin.math.abs(c.red - 0.914f) < 0.03f && kotlin.math.abs(c.green - 0.769f) < 0.03f && kotlin.math.abs(c.blue - 0.541f) < 0.03f) ring++
+        }
+        assertTrue("selected frame ring ($ring px)", ring > 200)
     }
 }

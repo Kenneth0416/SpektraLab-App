@@ -525,11 +525,6 @@ private fun ToolPanel(state: AppState, tool: String, isVideo: Boolean, look: Loo
             FlowRow { Catalog.borders.forEach { b -> Chip(b.label, b.id == look.border, accent) { set("border", look.copy(border = b.id)) } } }
             Text(Catalog.border(look.border).note, color = Pal.dim, fontSize = 12.sp)
             ToggleRow("日期后背", look.dateStamp, accent) { set("date", look.copy(dateStamp = !look.dateStamp)) }
-            Text("显示（不影响导出）", color = Pal.dim, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
-            val gray18 by state.gray18.collectAsState()
-            val reveal by state.reveal.collectAsState()
-            ToggleRow("18% 灰背景", gray18, accent) { state.setGray18(!gray18) }
-            ToggleRow("显影动画（拍立得式）", reveal, accent) { state.setReveal(!reveal) }
         }
     }
 }

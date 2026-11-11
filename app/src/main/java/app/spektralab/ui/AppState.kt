@@ -5,7 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.spektralab.SpektraApp
-import app.spektralab.camera.BurstStore
+import app.spektralab.camera.RawShooter
 import app.spektralab.data.LibraryItem
 import app.spektralab.data.Media
 import app.spektralab.data.LookJson
@@ -14,6 +14,7 @@ import app.spektralab.engine.Look
 import app.spektralab.export.ExportOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -61,7 +62,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
      * A shot was saved to the album ([uri] is the untouched original, raw when possible):
      * put it on the lightbox with the camera's look and print it.
      */
-    fun onCaptured(uri: Uri, evBias: Float = 0f, framesUsed: Float = 1f) {
+    fun onCaptured(uri: Uri, evBias: Float = 0f) {
         val look = camLook.value
         viewModelScope.launch {
             val item = withContext(Dispatchers.IO) { Media.importItem(app, uri, library.reserveIds(1)) }
@@ -69,11 +70,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
                 ?.let { it.copy(look = look, autoEv = it.autoEv + evBias) }
                 ?: return@launch say("拍到了，但读不回原片")
             library.add(listOf(item))
-            say(when {
-                framesUsed >= 1.5f -> "已放上灯箱 · %.1f 帧合成 RAW".format(framesUsed)
-                item.isRaw -> "已放上灯箱 · RAW 原片保留"
-                else -> "已放上灯箱 · 原片保留"
-            })
+            say(if (item.isRaw) "已放上灯箱 · RAW 原片保留" else "已放上灯箱 · 原片保留")
             // every shot is also printed: the film picture goes to the album next to the original
             exports.enqueue(item, exportOptions.value)
         }
@@ -88,22 +85,41 @@ class AppState(application: Application) : AndroidViewModel(application) {
 
     /** Progress 0..1 of the burst being merged, null when idle. */
     val merging = MutableStateFlow<Float?>(null)
-    private val mergeLock = kotlinx.coroutines.sync.Mutex()
-    private var mergesWaiting = 0
-    init { BurstStore.clear(application) }
 
-    /** A burst was captured into [files] (cache): merge it, keep the result as the original. */
-    fun onBurstCaptured(files: List<java.io.File>, evBias: Float) {
-        mergesWaiting++
-        if (merging.value == null) merging.value = 0f
+    /** Raw capture into memory (single frames and bursts); lives as long as the app's UI state. */
+    val shooter = RawShooter(application).also { sh ->
+        sh.onProgress = { merging.value = it }
+        sh.onSaved = { uri, evBias -> onShotSaved(uri, evBias) }
+        sh.onFinished = { first, merged, used -> onShotFinished(first, merged, used) }
+    }
+    private val shots = HashMap<Uri, kotlinx.coroutines.Deferred<LibraryItem?>>()
+
+    /** The first frame of a shot is in the album: it goes on the lightbox right away. */
+    private fun onShotSaved(uri: Uri, evBias: Float) {
+        val look = camLook.value
+        shots[uri] = viewModelScope.async {
+            val item = withContext(Dispatchers.IO) { Media.importItem(app, uri, library.reserveIds(1)) }
+                ?.let { it.copy(look = look, autoEv = it.autoEv + evBias) }
+            if (item == null) say("拍到了，但读不回原片") else { library.add(listOf(item)); say("已放上灯箱 · RAW 原片保留") }
+            item
+        }
+    }
+
+    /** The shot is complete: swap in the merged original if there is one, then print it. */
+    private fun onShotFinished(first: Uri, merged: Uri?, framesUsed: Float) {
+        val pending = shots.remove(first)
         viewModelScope.launch {
-            val saved = withContext(Dispatchers.Default) {
-                mergeLock.lock()
-                try { BurstStore.mergeToAlbum(app, files) { merging.value = it } }
-                finally { files.forEach { it.delete() }; mergeLock.unlock() }
+            val id = pending?.await()?.id
+            if (merged != null) {
+                // one original per shot in the album: the merged one
+                if (id != null && library.item(id) != null) {
+                    library.setSource(id, merged.toString(), withContext(Dispatchers.IO) { Media.name(app, merged) })
+                    say("%.1f 帧合成完成".format(framesUsed))
+                }
+                withContext(Dispatchers.IO) { runCatching { app.contentResolver.delete(first, null, null) } }
             }
-            if (--mergesWaiting == 0) merging.value = null
-            if (saved != null) onCaptured(saved.uri, evBias, saved.framesUsed) else say("原片没有保存下来")
+            // every shot is also printed: the film picture goes to the album next to the original
+            id?.let { library.item(it) }?.let { exports.enqueue(it, exportOptions.value) }
         }
     }
 

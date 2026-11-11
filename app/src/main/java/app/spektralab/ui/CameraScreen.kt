@@ -71,7 +71,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import app.spektralab.camera.BurstStore
+import app.spektralab.camera.RawShooter
 import app.spektralab.camera.FilmViewfinder
 import app.spektralab.engine.Catalog
 import app.spektralab.engine.LookMapper
@@ -87,7 +87,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private class CameraSession(val camera: Camera, val capture: ImageCapture, val raw: Boolean)
+private class CameraSession(val camera: Camera, val capture: ImageCapture, val raw: Boolean,
+                            /** For raw capture into memory; null when the camera would not tell. */
+                            val chars: android.hardware.camera2.CameraCharacteristics? = null)
 
 /**
  * The camera: a live viewfinder through the loaded film, and a shutter that saves the
@@ -110,6 +112,12 @@ fun CameraScreen(state: AppState) {
     var busy by remember { mutableStateOf(false) }
     val multiFrame by state.multiFrame.collectAsState()
     val merging by state.merging.collectAsState()
+    // frames the next shot will take: follows the light (sensor gain) while multi-frame is on
+    var burstFrames by remember { mutableIntStateOf(RawShooter.MAX_FRAMES) }
+    LaunchedEffect(session, multiFrame) {
+        val chars = session?.chars ?: return@LaunchedEffect
+        while (multiFrame) { burstFrames = state.shooter.frameCount(chars); kotlinx.coroutines.delay(400) }
+    }
     // exposure compensation for the film exposure, set by dragging on the finder after a tap
     var evBias by rememberSaveable { mutableFloatStateOf(0f) }
     // focus / metering point: 0 searching, 1 in focus, 2 could not focus; locked = held until tapped again
@@ -170,11 +178,12 @@ fun CameraScreen(state: AppState) {
                             // raw: the sensor's own data (Camera2 RAW_SENSOR), written as DNG
                             if (raw) setOutputFormat(ImageCapture.OUTPUT_FORMAT_RAW)
                             else { setOutputFormat(ImageCapture.OUTPUT_FORMAT_JPEG); setResolutionSelector(fourThree) }
-                            if (raw) requestRawMetadata(this)
+                            if (raw) requestRawMetadata(this, state.shooter.results)
                         }.build()
                     val group = UseCaseGroup.Builder().addUseCase(preview).addUseCase(capture).addEffect(viewfinder.effect).build()
                     p.unbindAll()
-                    return CameraSession(p.bindToLifecycle(owner, selector, group), capture, raw)
+                    val camera = p.bindToLifecycle(owner, selector, group)
+                    return CameraSession(camera, capture, raw, if (raw) cameraCharacteristics(context, camera) else null)
                 }
                 session = runCatching { bind(rawSupported) }.recoverCatching {
                     // some devices list raw but cannot stream it next to the preview
@@ -295,53 +304,41 @@ fun CameraScreen(state: AppState) {
             90 -> android.view.Surface.ROTATION_270; 180 -> android.view.Surface.ROTATION_180
             270 -> android.view.Surface.ROTATION_90; else -> android.view.Surface.ROTATION_0
         }
-        if (multiFrame && s.raw) {
-            // a short raw burst into the cache; merged in the background into the one original
-            s.capture.flashMode = ImageCapture.FLASH_MODE_OFF
-            state.say("多帧拍摄中，请拿稳")
-            val files = ArrayList<java.io.File>()
-            val dir = BurstStore.dir(context)
-            fun finish() { captured.complete(true); state.onBurstCaptured(files, evBias) }
-            fun next(i: Int) {
-                val f = java.io.File(dir, "SPK_${stamp}_$i.dng")
-                s.capture.takePicture(ImageCapture.OutputFileOptions.Builder(f).build(), ContextCompat.getMainExecutor(context),
-                    object : ImageCapture.OnImageSavedCallback {
-                        override fun onImageSaved(result: ImageCapture.OutputFileResults) {
-                            files += f
-                            if (i + 1 < BurstStore.FRAMES) next(i + 1) else finish()
-                        }
+        // the original through CameraX's own saving: JPEG, or raw where frames cannot be taken into memory
+        fun saveThroughCameraX() {
+            val values = ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, "SPK_$stamp." + if (s.raw) "dng" else "jpg")
+                put(MediaStore.Images.Media.MIME_TYPE, if (s.raw) "image/x-adobe-dng" else "image/jpeg")
+                put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_DCIM + "/SpektraLab")
+            }
+            s.capture.flashMode = flash
+            val options = ImageCapture.OutputFileOptions.Builder(context.contentResolver, MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values).build()
+            s.capture.takePicture(options, ContextCompat.getMainExecutor(context), object : ImageCapture.OnImageSavedCallback {
+                override fun onImageSaved(result: ImageCapture.OutputFileResults) {
+                    captured.complete(true)
+                    result.savedUri?.let { state.onCaptured(it, evBias) } ?: state.say("原片没有保存下来")
+                }
 
-                        override fun onError(e: ImageCaptureException) {
-                            f.delete()
-                            // whatever was captured before the failure is still a picture
-                            if (files.isNotEmpty()) finish() else {
-                                captured.complete(false)
-                                state.say("拍摄失败：${e.message ?: e.imageCaptureError}")
-                            }
-                        }
-                    })
-            }
-            next(0)
-            return
+                override fun onError(e: ImageCaptureException) {
+                    captured.complete(false)
+                    state.say("拍摄失败：${e.message ?: e.imageCaptureError}")
+                }
+            })
         }
-        val values = ContentValues().apply {
-            put(MediaStore.Images.Media.DISPLAY_NAME, "SPK_$stamp." + if (s.raw) "dng" else "jpg")
-            put(MediaStore.Images.Media.MIME_TYPE, if (s.raw) "image/x-adobe-dng" else "image/jpeg")
-            put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_DCIM + "/SpektraLab")
-        }
-        s.capture.flashMode = flash
-        val options = ImageCapture.OutputFileOptions.Builder(context.contentResolver, MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values).build()
-        s.capture.takePicture(options, ContextCompat.getMainExecutor(context), object : ImageCapture.OnImageSavedCallback {
-            override fun onImageSaved(result: ImageCapture.OutputFileResults) {
-                captured.complete(true)
-                result.savedUri?.let { state.onCaptured(it, evBias) } ?: state.say("原片没有保存下来")
+        val chars = s.chars
+        if (s.raw && chars != null && !state.shooter.unsupported) {
+            // raw frames into memory: one, or a burst that is merged in the background
+            val frames = if (multiFrame) state.shooter.frameCount(chars) else 1
+            s.capture.flashMode = if (frames > 1) ImageCapture.FLASH_MODE_OFF else flash
+            if (frames > 1) state.say("连拍 $frames 帧，请拿稳")
+            state.shooter.shoot(s.capture, chars, frames, "SPK_$stamp", evBias) { ok, retry ->
+                when {
+                    ok -> captured.complete(true)
+                    retry && session === s -> saveThroughCameraX()
+                    else -> { captured.complete(false); state.say("拍摄失败") }
+                }
             }
-
-            override fun onError(e: ImageCaptureException) {
-                captured.complete(false)
-                state.say("拍摄失败：${e.message ?: e.imageCaptureError}")
-            }
-        })
+        } else saveThroughCameraX()
     }
     val shootNow by rememberUpdatedState(::shoot)
     LaunchedEffect(Unit) { state.shutterKey.collect { shootNow() } }
@@ -363,13 +360,13 @@ fun CameraScreen(state: AppState) {
         // what the shutter will keep as the original
         AnimatedContent(session?.raw, label = "format", transitionSpec = { fadeIn() togetherWith fadeOut() }) { raw ->
             // tapping the badge switches multi-frame capture (raw only)
-            Text(when (raw) { true -> if (multiFrame) "RAW×${BurstStore.FRAMES}" else "RAW"; false -> "JPEG"; null -> "…" },
+            Text(when (raw) { true -> if (multiFrame) "RAW×$burstFrames" else "RAW"; false -> "JPEG"; null -> "…" },
                 fontFamily = Fonts.mono, fontSize = 10.sp,
                 color = if (raw == true) accent else Pal.dim,
                 modifier = Modifier.springClick {
                     if (raw == true) {
                         state.setMultiFrame(!multiFrame)
-                        state.say(if (!multiFrame) "多帧合成：每张连拍 ${BurstStore.FRAMES} 帧 RAW，合成更干净的原片" else "单帧 RAW")
+                        state.say(if (!multiFrame) "多帧合成：按光线连拍 1–${RawShooter.MAX_FRAMES} 帧 RAW，合成更干净的原片" else "单帧 RAW")
                     }
                 }.padding(6.dp).border(1.dp, if (raw == true) accent else Pal.off, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp))
         }
@@ -682,12 +679,20 @@ fun CameraScreen(state: AppState) {
  * shading can be corrected) and hot pixel correction on the sensor data.
  */
 @androidx.annotation.OptIn(androidx.camera.camera2.interop.ExperimentalCamera2Interop::class)
-private fun requestRawMetadata(builder: ImageCapture.Builder) {
+private fun requestRawMetadata(builder: ImageCapture.Builder, results: android.hardware.camera2.CameraCaptureSession.CaptureCallback) {
     runCatching {
         androidx.camera.camera2.interop.Camera2Interop.Extender(builder)
             .setCaptureRequestOption(android.hardware.camera2.CaptureRequest.STATISTICS_LENS_SHADING_MAP_MODE,
                 android.hardware.camera2.CameraMetadata.STATISTICS_LENS_SHADING_MAP_MODE_ON)
             .setCaptureRequestOption(android.hardware.camera2.CaptureRequest.HOT_PIXEL_MODE,
                 android.hardware.camera2.CameraMetadata.HOT_PIXEL_MODE_HIGH_QUALITY)
+            // the capture result of every frame: a raw frame becomes a DNG with its own
+            .setSessionCaptureCallback(results)
     }
 }
+
+@androidx.annotation.OptIn(androidx.camera.camera2.interop.ExperimentalCamera2Interop::class)
+private fun cameraCharacteristics(context: android.content.Context, camera: Camera): android.hardware.camera2.CameraCharacteristics? = runCatching {
+    val id = androidx.camera.camera2.interop.Camera2CameraInfo.from(camera.cameraInfo).cameraId
+    context.getSystemService(android.hardware.camera2.CameraManager::class.java).getCameraCharacteristics(id)
+}.getOrNull()

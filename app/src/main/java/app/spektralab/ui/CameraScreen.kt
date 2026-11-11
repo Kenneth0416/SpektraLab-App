@@ -161,6 +161,7 @@ fun CameraScreen(state: AppState) {
                             // raw: the sensor's own data (Camera2 RAW_SENSOR), written as DNG
                             if (raw) setOutputFormat(ImageCapture.OUTPUT_FORMAT_RAW)
                             else { setOutputFormat(ImageCapture.OUTPUT_FORMAT_JPEG); setResolutionSelector(fourThree) }
+                            if (raw) requestRawMetadata(this)
                         }.build()
                     val group = UseCaseGroup.Builder().addUseCase(preview).addUseCase(capture).addEffect(viewfinder.effect).build()
                     p.unbindAll()
@@ -572,5 +573,21 @@ fun CameraScreen(state: AppState) {
                 }
             }
         }
+    }
+}
+
+/**
+ * Ask the camera for what a raw developer needs and a JPEG pipeline does itself:
+ * the lens shading map (DngCreator then embeds it as gain maps, so vignetting and colour
+ * shading can be corrected) and hot pixel correction on the sensor data.
+ */
+@androidx.annotation.OptIn(androidx.camera.camera2.interop.ExperimentalCamera2Interop::class)
+private fun requestRawMetadata(builder: ImageCapture.Builder) {
+    runCatching {
+        androidx.camera.camera2.interop.Camera2Interop.Extender(builder)
+            .setCaptureRequestOption(android.hardware.camera2.CaptureRequest.STATISTICS_LENS_SHADING_MAP_MODE,
+                android.hardware.camera2.CameraMetadata.STATISTICS_LENS_SHADING_MAP_MODE_ON)
+            .setCaptureRequestOption(android.hardware.camera2.CaptureRequest.HOT_PIXEL_MODE,
+                android.hardware.camera2.CameraMetadata.HOT_PIXEL_MODE_HIGH_QUALITY)
     }
 }

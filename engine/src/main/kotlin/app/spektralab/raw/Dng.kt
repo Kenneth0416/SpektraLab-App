@@ -51,6 +51,12 @@ class DngImage(
     val orientation: Int,
     val baselineExposure: Float,
     val gainMaps: List<GainMap>,
+    /**
+     * Sensor noise model (DNG NoiseProfile): variance = scale * x + offset for a
+     * black-subtracted sample x normalised to [0, 1]. Null when the file has none.
+     */
+    val noiseScale: Float? = null,
+    val noiseOffset: Float = 0f,
 ) {
     /** Size after applying [orientation]. */
     val uprightWidth get() = if (orientation == 6 || orientation == 8) cropHeight else cropWidth
@@ -135,8 +141,13 @@ object DngReader {
         val baseline = (doubles(b, ifd0, 50730) ?: anyD(50730))?.first()?.toFloat() ?: 0f
         val gainMaps = raw.entries[51009]?.let { parseGainMaps(b, it) } ?: emptyList()
 
+        // NoiseProfile: (scale, offset) per colour plane; one pair may stand for all
+        val noise = (doubles(b, ifd0, 51041) ?: anyD(51041))?.takeIf { it.size >= 2 && it.size % 2 == 0 }
+        val noiseScale = noise?.let { n -> (n.indices step 2).map { n[it] }.average().toFloat() }?.takeIf { it > 0f }
+        val noiseOffset = noise?.let { n -> (1 until n.size step 2).map { n[it] }.average().toFloat() }?.coerceAtLeast(0f) ?: 0f
+
         return DngImage(width, height, data, cfa, black, white, cropX, cropY, cropW, cropH,
-            wb, FloatArray(9) { camToSrgb[it].toFloat() }, orientation, baseline, gainMaps)
+            wb, FloatArray(9) { camToSrgb[it].toFloat() }, orientation, baseline, gainMaps, noiseScale, noiseOffset)
     }
 
     /**
@@ -146,17 +157,54 @@ object DngReader {
     private fun cameraToXyzD50(b: ByteBuffer, raw: Ifd, ifd0: Ifd, neutral: DoubleArray): DoubleArray? {
         fun mat(tag: Int) = (doubles(b, ifd0, tag) ?: doubles(b, raw, tag))?.takeIf { it.size == 9 }
         fun illum(tag: Int) = (ints(b, ifd0, tag) ?: ints(b, raw, tag))?.first() ?: 0
-        // prefer the daylight calibration (usually illuminant 2 = D65)
-        val second = illum(50779).let { it == 21 || it == 20 || it == 23 || it == 1 } || mat(50721) == null
-        val fm = (if (second) mat(50965) else null) ?: mat(50964) ?: mat(50965)
+        val cm1 = mat(50721); val cm2 = mat(50722)
+        val fm1 = mat(50964); val fm2 = mat(50965)
+        val t1 = illuminantKelvin(illum(50778)); val t2 = illuminantKelvin(illum(50779))
+        // Dual-illuminant profiles: weight the two calibrations by the colour temperature
+        // of the as-shot white (DNG spec, "Camera to XYZ (D50) transform"), found by
+        // iterating white -> temperature -> interpolated ColorMatrix -> white.
+        var w1 = if (cm1 != null && cm2 == null) 1.0 else 0.0
+        if (cm1 != null && cm2 != null && t1 != null && t2 != null && t1 != t2) {
+            w1 = 0.5
+            repeat(8) {
+                val cm = lerp(cm1, cm2, w1)
+                val white = invert(cm)?.let { mulVec(it, neutral) } ?: return@repeat
+                val sum = white[0] + white[1] + white[2]
+                if (sum <= 0) return@repeat
+                val kelvin = mccamy(white[0] / sum, white[1] / sum)
+                w1 = ((1.0 / kelvin - 1.0 / t2) / (1.0 / t1 - 1.0 / t2)).coerceIn(0.0, 1.0)
+            }
+        }
+        val fm = when {
+            fm1 != null && fm2 != null -> lerp(fm1, fm2, w1)
+            else -> fm2 ?: fm1
+        }
         if (fm != null) return fm
-        val cm = (if (second) mat(50722) else null) ?: mat(50721) ?: mat(50722) ?: return null
+        val cm = when {
+            cm1 != null && cm2 != null -> lerp(cm1, cm2, w1)
+            else -> cm2 ?: cm1 ?: return null
+        }
         val inv = invert(cm) ?: return null
         val whiteXyz = mulVec(inv, neutral)
         val adapt = bradford(whiteXyz, D50)
         // XYZ50 = adapt * inv(CM) * camera = adapt * inv(CM) * diag(neutral) * (camera / neutral)
         val m = mul(adapt, inv)
         return DoubleArray(9) { m[it] * neutral[it % 3] }
+    }
+
+    private fun lerp(a: DoubleArray, b: DoubleArray, wa: Double) = DoubleArray(9) { a[it] * wa + b[it] * (1 - wa) }
+
+    /** Correlated colour temperature from chromaticity (McCamy). */
+    private fun mccamy(x: Double, y: Double): Double {
+        val n = (x - 0.3320) / (0.1858 - y)
+        return (449.0 * n * n * n + 3525.0 * n * n + 6823.3 * n + 5520.33).coerceIn(1500.0, 25000.0)
+    }
+
+    /** Temperature of an EXIF LightSource / DNG CalibrationIlluminant code. */
+    private fun illuminantKelvin(code: Int): Double? = when (code) {
+        17, 3 -> 2856.0; 24 -> 3200.0; 2, 14 -> 4150.0; 13 -> 3450.0; 12 -> 6430.0; 15 -> 6500.0
+        23 -> 5003.0; 20 -> 5503.0; 1, 4, 9 -> 5500.0; 18 -> 4874.0; 19 -> 6774.0; 21 -> 6504.0; 22 -> 7504.0; 10 -> 6500.0; 11 -> 7500.0
+        else -> null
     }
 
     private fun parseGainMaps(b: ByteBuffer, e: Entry): List<GainMap> {

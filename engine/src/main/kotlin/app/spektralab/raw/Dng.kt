@@ -17,9 +17,57 @@ import java.nio.ByteOrder
  * Tile reassembly of lossless-JPEG data follows LibRaw's lossless_dng_load_raw.
  */
 object DngReader {
-    fun read(bytes: ByteArray): RawImage? = runCatching { parse(bytes) }.getOrNull()
+    fun read(bytes: ByteArray): RawImage? = runCatching {
+        parse(bytes, bytes.size.toLong()) { f -> f.decodeAll(bytes)?.let { it to null } }
+    }.getOrNull()
 
-    private fun parse(bytes: ByteArray): RawImage? {
+    /**
+     * Opens a DNG for streamed development: only the metadata is read from [source] (a
+     * few kB for the files this app and Android cameras write) and the returned image's
+     * pixels are decoded strip by strip through [RawImage.rows] while [RawDeveloper]
+     * develops it, so no whole-file or whole-frame array is ever allocated.
+     *
+     * Returns null when [source] is not a DNG this reader handles, and also for layouts
+     * that cannot be streamed (tiles, lossless JPEG): use [read] on the whole file then.
+     * The pixels of a streamed image are the same values [read] would produce.
+     */
+    fun open(source: ByteSource): RawImage? = runCatching {
+        val header = readHeader(source) ?: return null
+        parse(header, source.size) { f -> f.streamed(source)?.let { ShortArray(0) to it } }
+    }.getOrNull()
+
+    /** Where the pixels are and how they are stored; metadata already validated. */
+    private class Layout(val raw: TiffIfd, val width: Int, val height: Int, val bps: Int, val compression: Int,
+                         val linear: Boolean, val size: Long) {
+        private val table = raw.ints(TiffTags.LINEARIZATION_TABLE, 65536)
+
+        fun decodeAll(bytes: ByteArray): ShortArray? {
+            val data = (if (linear) readLinear(bytes, raw, width, height, bps, compression)
+                else readPixels(bytes, raw, width, height, bps, compression)) ?: return null
+            table?.let { linearize(it, data, 0, data.size) }
+            return data
+        }
+
+        fun streamed(source: ByteSource): RawRows? {
+            val rows = (if (linear) linearRows(source, raw, width, height, bps, compression, size)
+                else bayerRows(source, raw, width, height, bps, compression, size)) ?: return null
+            val t = table ?: return rows
+            return object : RawRows {
+                override val segmentRows get() = rows.segmentRows
+                override fun read(y0: Int, y1: Int, dst: ShortArray) {
+                    rows.read(y0, y1, dst)
+                    linearize(t, dst, 0, (y1 - y0) * width * (if (linear) 3 else 1))
+                }
+            }
+        }
+    }
+
+    private fun linearize(table: IntArray, data: ShortArray, from: Int, to: Int) {
+        val last = table.size - 1
+        for (i in from until to) data[i] = table[minOf(data[i].toInt() and 0xffff, last)].coerceIn(0, 65535).toShort()
+    }
+
+    private fun parse(bytes: ByteArray, fileSize: Long, pixels: (Layout) -> Pair<ShortArray, RawRows?>?): RawImage? {
         val tiff = Tiff.parse(bytes, 0, setOf(42)) ?: return null
         val ifd0 = tiff.ifd0
         if (TiffTags.DNG_VERSION !in ifd0) return null
@@ -52,14 +100,6 @@ object DngReader {
         if (active[0] < 0 || active[1] < 0 || active[2] > height || active[3] > width || active[2] <= active[0] || active[3] <= active[1]) return null
         val cfa = CfaPattern(cfaCols, cfaRows, colors).anchoredAt(active[0], active[1])
 
-        // pixels
-        val data = (if (linear) readLinear(bytes, raw, width, height, bps, compression)
-            else readPixels(bytes, raw, width, height, bps, compression)) ?: return null
-        raw.ints(TiffTags.LINEARIZATION_TABLE, 65536)?.let { table ->
-            val last = table.size - 1
-            for (i in data.indices) data[i] = table[minOf(data[i].toInt() and 0xffff, last)].coerceIn(0, 65535).toShort()
-        }
-
         // levels: BlackLevel repeats over BlackLevelRepeatDim (rows, cols) from the ActiveArea origin
         val blackRep = raw.ints(TiffTags.BLACK_LEVEL_REPEAT_DIM)?.takeIf { it.size == 2 && it[0] in 1..CfaPattern.MAX_DIM && it[1] in 1..CfaPattern.MAX_DIM } ?: intArrayOf(1, 1)
         val blackVals = raw.doubles(TiffTags.BLACK_LEVEL) ?: doubleArrayOf(0.0)
@@ -90,10 +130,12 @@ object DngReader {
         val noise = anyD(51041)?.takeIf { it.size >= 2 && it.size % 2 == 0 }
         val noiseScale = noise?.let { n -> (n.indices step 2).map { n[it] }.average().toFloat() }?.takeIf { it > 0f }
         val noiseOffset = noise?.let { n -> (1 until n.size step 2).map { n[it] }.average().toFloat() }?.coerceAtLeast(0f) ?: 0f
+        // pixels last: everything above is cheap and rejects files we cannot develop
+        val (data, rows) = pixels(Layout(raw, width, height, bps, compression, linear, fileSize)) ?: return null
         return RawImage(width, height, data, cfa, black, white, cropX, cropY, cropW, cropH,
             colour.wb, colour.camToSrgb, orientation, baseline, gainMaps,
             make = ifd0.string(TiffTags.MAKE) ?: "", model = ifd0.string(TiffTags.MODEL) ?: ifd0.string(TiffTags.UNIQUE_CAMERA_MODEL) ?: "",
-            noiseScale = noiseScale, noiseOffset = noiseOffset, linear = linear, tags = keepTags(ifd0, raw))
+            noiseScale = noiseScale, noiseOffset = noiseOffset, linear = linear, tags = keepTags(ifd0, raw), rows = rows)
     }
 
     /** Average black per CFA position over the common period of the CFA and black patterns. */
@@ -170,8 +212,84 @@ object DngReader {
         return data
     }
 
-    /** Linear RGB strips produced by DngWriter, including half-float predictor 3. */
-    private fun readLinear(bytes: ByteArray, raw: TiffIfd, width: Int, height: Int, bps: Int, compression: Int): ShortArray? {
+    /** Validated strip layout of a linear RGB image (as DngWriter writes it, and plain 16-bit). */
+    private class LinearStrips(val width: Int, val height: Int, val rowsPerStrip: Int, val offsets: LongArray, val counts: LongArray,
+                               val compression: Int, val predictor: Int, val float: Boolean, val littleEndian: Boolean) {
+        val n = width * 3
+        val rowBytes = n * 2
+        fun rowsIn(i: Int) = minOf(rowsPerStrip, height - i * rowsPerStrip)
+        private val inflated = Pool.bytes()
+        val compressed = Pool.bytes()
+
+        /**
+         * Rows [from, to) of strip [i] into [dst] at [dstAt]. Uncompressed: [src] holds
+         * those rows from [off]. Deflate: [src] holds the whole compressed strip
+         * [off, off + len); a strip decoded to its end must hold exactly its rows.
+         */
+        fun decode(i: Int, from: Int, to: Int, src: ByteArray, off: Int, len: Int, dst: ShortArray, dstAt: Int): Boolean {
+            val order = if (littleEndian) ByteOrder.LITTLE_ENDIAN else ByteOrder.BIG_ENDIAN
+            if (compression == 1) {
+                ByteBuffer.wrap(src, off, (to - from) * rowBytes).order(order).asShortBuffer().get(dst, dstAt, (to - from) * n)
+                return true
+            }
+            val whole = to == rowsIn(i)
+            val need = to * rowBytes
+            return inflated.use(need) { buf -> inflate(src, off, len, buf, need, whole) && unpredict(buf, from, to, dst, dstAt, order) }
+        }
+
+        private fun inflate(src: ByteArray, off: Int, len: Int, buf: ByteArray, need: Int, whole: Boolean): Boolean {
+            val inf = java.util.zip.Inflater()
+            try {
+                inf.setInput(src, off, len)
+                var got = 0
+                while (got < need && !inf.finished()) {
+                    val count = inf.inflate(buf, got, need - got)
+                    if (count == 0) return false
+                    got += count
+                }
+                if (got != need) return false
+                // Consume the trailer and reject excess decompressed samples.
+                if (whole) {
+                    if (!inf.finished() && inf.inflate(ByteArray(1)) != 0) return false
+                    if (!inf.finished()) return false
+                }
+            } finally { inf.end() }
+            return true
+        }
+
+        private fun unpredict(buf: ByteArray, from: Int, to: Int, dst: ShortArray, dstAt: Int, order: ByteOrder): Boolean {
+            if (float) {
+                val lut = HALF_TO_U16
+                for (r in from until to) {
+                    val o = r * rowBytes
+                    val d = dstAt + (r - from) * n
+                    for (k in 3 until 2 * n) buf[o + k] = (buf[o + k] + buf[o + k - 3]).toByte()
+                    for (k in 0 until n) {
+                        val v = lut[((buf[o + k].toInt() and 255) shl 8) or (buf[o + n + k].toInt() and 255)]
+                        if (v < 0) return false
+                        dst[d + k] = v.toShort()
+                    }
+                }
+            } else {
+                ByteBuffer.wrap(buf, from * rowBytes, (to - from) * rowBytes).order(order).asShortBuffer().get(dst, dstAt, (to - from) * n)
+                if (predictor == 2) for (r in 0 until to - from) {
+                    val start = dstAt + r * n
+                    for (k in 3 until n) dst[start + k] = (dst[start + k] + dst[start + k - 3]).toShort()
+                }
+            }
+            return true
+        }
+    }
+
+    /** Half-float bits -> stored 16-bit sample (clamped to 0..1), -1 for NaN / infinity. */
+    private val HALF_TO_U16: IntArray by lazy {
+        IntArray(65536) { h ->
+            val v = app.spektralab.engine.Half.toFloat(h.toShort())
+            if (!v.isFinite()) -1 else (v.coerceIn(0f, 1f) * 65535f + 0.5f).toInt()
+        }
+    }
+
+    private fun linearStrips(raw: TiffIfd, width: Int, height: Int, bps: Int, compression: Int, size: Long): LinearStrips? {
         if (bps != 16 || compression !in setOf(1, 8) || raw.int(284, 1) != 1 || TiffTags.TILE_WIDTH in raw) return null
         val predictor = raw.int(317, 1)
         val format = raw.int(339, 1)
@@ -185,60 +303,155 @@ object DngReader {
         val offsets = raw.longs(273, RawDecodeLimits.MAX_SEGMENTS) ?: return null
         val counts = raw.longs(279, RawDecodeLimits.MAX_SEGMENTS) ?: return null
         if (offsets.size != strips.toInt() || counts.size != offsets.size) return null
-        val n = width * 3
-        val rowBytes = n * 2
+        val l = LinearStrips(width, height, rowsPerStrip, offsets, counts, compression, predictor, float, raw.littleEndian)
         for (i in offsets.indices) {
             val off = offsets[i]; val len = counts[i]
-            if (off <= 0 || off >= bytes.size || len <= 0 || len > bytes.size - off) return null
-            val rows = minOf(rowsPerStrip, height - i * rowsPerStrip)
-            if (compression == 1 && len < rows.toLong() * rowBytes) return null
+            if (off <= 0 || off >= size || len <= 0 || len > size - off || len > Int.MAX_VALUE) return null
+            if (compression == 1 && len < l.rowsIn(i).toLong() * l.rowBytes) return null
         }
+        return l
+    }
+
+    /** Linear RGB strips produced by DngWriter, including half-float predictor 3. */
+    private fun readLinear(bytes: ByteArray, raw: TiffIfd, width: Int, height: Int, bps: Int, compression: Int): ShortArray? {
+        val l = linearStrips(raw, width, height, bps, compression, bytes.size.toLong()) ?: return null
         val data = ShortArray(width * height * 3)
-        for (i in offsets.indices) {
-            val rows = minOf(rowsPerStrip, height - i * rowsPerStrip)
-            val at = i * rowsPerStrip * n
-            if (compression == 1) {
-                ByteBuffer.wrap(bytes, offsets[i].toInt(), rows * rowBytes)
-                    .order(if (raw.littleEndian) ByteOrder.LITTLE_ENDIAN else ByteOrder.BIG_ENDIAN)
-                    .asShortBuffer().get(data, at, rows * n)
-                continue
-            }
-            val buf = ByteArray(rows * rowBytes)
-            val inf = java.util.zip.Inflater()
-            try {
-                inf.setInput(bytes, offsets[i].toInt(), counts[i].toInt())
-                var got = 0
-                while (got < buf.size && !inf.finished()) {
-                    val count = inf.inflate(buf, got, buf.size - got)
-                    if (count == 0) return null
-                    got += count
-                }
-                if (got != buf.size) return null
-                // Consume the trailer and reject excess decompressed samples.
-                if (!inf.finished() && inf.inflate(ByteArray(1)) != 0) return null
-                if (!inf.finished()) return null
-            } finally { inf.end() }
-            if (float) {
-                for (r in 0 until rows) {
-                    val o = r * rowBytes
-                    for (k in 3 until 2 * n) buf[o + k] = (buf[o + k] + buf[o + k - 3]).toByte()
-                    for (k in 0 until n) {
-                        val half = ((buf[o + k].toInt() and 255) shl 8) or (buf[o + n + k].toInt() and 255)
-                        val v = app.spektralab.engine.Half.toFloat(half.toShort())
-                        if (!v.isFinite()) return null
-                        data[at + r * n + k] = (v.coerceIn(0f, 1f) * 65535f + 0.5f).toInt().toShort()
+        for (i in l.offsets.indices)
+            if (!l.decode(i, 0, l.rowsIn(i), bytes, l.offsets[i].toInt(), l.counts[i].toInt(), data, i * l.rowsPerStrip * l.n)) return null
+        return data
+    }
+
+    /** Streamed linear strips: each call reads and inflates only the strips it needs. */
+    private fun linearRows(source: ByteSource, raw: TiffIfd, width: Int, height: Int, bps: Int, compression: Int, size: Long): RawRows? {
+        val l = linearStrips(raw, width, height, bps, compression, size) ?: return null
+        return object : RawRows {
+            override val segmentRows = if (compression == 1) 1 else l.rowsPerStrip
+            override fun read(y0: Int, y1: Int, dst: ShortArray) {
+                require(y0 in 0..y1 && y1 <= height)
+                var y = y0
+                while (y < y1) {
+                    val i = y / l.rowsPerStrip
+                    val r0 = i * l.rowsPerStrip
+                    val to = minOf(y1, r0 + l.rowsIn(i)) - r0
+                    val from = y - r0
+                    val (pos, len) = if (compression == 1) l.offsets[i] + from.toLong() * l.rowBytes to (to - from) * l.rowBytes
+                        else l.offsets[i] to l.counts[i].toInt()
+                    val ok = l.compressed.use(len) { buf ->
+                        source.read(pos, buf, 0, len)
+                        l.decode(i, from, to, buf, 0, len, dst, (y - y0) * l.n)
                     }
-                }
-            } else {
-                ByteBuffer.wrap(buf).order(if (raw.littleEndian) ByteOrder.LITTLE_ENDIAN else ByteOrder.BIG_ENDIAN)
-                    .asShortBuffer().get(data, at, rows * n)
-                if (predictor == 2) for (r in 0 until rows) {
-                    val start = at + r * n
-                    for (k in 3 until n) data[start + k] = (data[start + k] + data[start + k - 3]).toShort()
+                    check(ok) { "corrupt strip $i" }
+                    y = r0 + to
                 }
             }
         }
-        return data
+    }
+
+    /** Streamed uncompressed CFA strips (Android DngCreator writes these). */
+    private fun bayerRows(source: ByteSource, raw: TiffIfd, width: Int, height: Int, bps: Int, compression: Int, size: Long): RawRows? {
+        if (compression != 1 || bps !in 8..16 || TiffTags.TILE_WIDTH in raw) return null
+        val th = (raw.longs(TiffTags.ROWS_PER_STRIP, 1)?.firstOrNull() ?: height.toLong()).coerceAtMost(height.toLong()).toInt()
+        if (th <= 0) return null
+        val strips = (height.toLong() + th - 1) / th
+        if (strips !in 1..RawDecodeLimits.MAX_SEGMENTS.toLong()) return null
+        fun segments(tag: Int): LongArray? {
+            val entry = raw[tag] ?: return null
+            if (entry.count !in strips.toInt()..RawDecodeLimits.MAX_SEGMENTS) return null
+            return raw.longs(tag, RawDecodeLimits.MAX_SEGMENTS)
+        }
+        val offsets = segments(TiffTags.STRIP_OFFSETS) ?: return null
+        val counts = segments(TiffTags.STRIP_BYTE_COUNTS) ?: return null
+        val stride = Unpack.rowBytes(width, bps)
+        if (stride !in 1..Int.MAX_VALUE.toLong()) return null
+        // the same preflight as the whole-frame decode
+        for (t in 0 until strips.toInt()) {
+            val rows = minOf(th.toLong(), height - t.toLong() * th).toInt()
+            val off = offsets[t]; val len = counts[t]
+            if (off <= 0 || off >= size || len <= 0 || len > size - off) return null
+            if (rows.toLong() * stride > len) return null
+        }
+        val le = raw.littleEndian
+        val scratch = Pool.bytes()
+        return object : RawRows {
+            override val segmentRows = 1
+            override fun read(y0: Int, y1: Int, dst: ShortArray) {
+                require(y0 in 0..y1 && y1 <= height)
+                var y = y0
+                while (y < y1) {
+                    val t = y / th
+                    val to = minOf(y1, (t + 1) * th)
+                    val rows = to - y
+                    val len = (rows * stride).toInt()
+                    val at = (y - y0) * width
+                    val ok = scratch.use(len) { buf ->
+                        source.read(offsets[t] + (y - t.toLong() * th) * stride, buf, 0, len)
+                        if (bps == 16) Unpack.u16(buf, 0, stride.toInt(), width, rows, le, dst, at, width)
+                        else Unpack.packed(buf, 0, stride.toInt(), width, rows, bps, Unpack.BitOrder.MSB, dst, at, width)
+                    }
+                    check(ok) { "short strip $t" }
+                    y = to
+                }
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------- metadata only
+    private const val HEADER_GUESS = 256 shl 10
+    private const val MAX_HEADER = 16 shl 20
+
+    /**
+     * The start of the file up to the end of every IFD and tag value the reader looks
+     * at (not the pixel data they point to), or null when that is not a small prefix
+     * (the caller then reads the whole file).
+     */
+    internal fun readHeader(source: ByteSource): ByteArray? {
+        var n = minOf(source.size, HEADER_GUESS.toLong()).toInt()
+        repeat(4) {
+            val bytes = ByteArray(n).also { source.read(0, it) }
+            val need = metadataEnd(bytes) ?: return null
+            // other TIFF-based raw formats: no need to look further
+            if (n == HEADER_GUESS || n.toLong() == source.size) {
+                val ifd0 = Tiff.parse(bytes, 0, setOf(42), maxIfds = 1)?.ifd0
+                if (ifd0 != null && TiffTags.DNG_VERSION !in ifd0) return null
+            }
+            if (need <= n) return bytes
+            if (need > MAX_HEADER || need > source.size) return null
+            n = need.toInt()
+        }
+        return null
+    }
+
+    /** End of the TIFF structure the reader parses (IFD chain, SubIFDs, tag values), as far as [b] shows it. */
+    internal fun metadataEnd(b: ByteArray): Long? {
+        if (b.size < 8) return null
+        val le = when {
+            b[0] == 'I'.code.toByte() && b[1] == 'I'.code.toByte() -> true
+            b[0] == 'M'.code.toByte() && b[1] == 'M'.code.toByte() -> false
+            else -> return null
+        }
+        if (Bytes.u16(b, 2, le) != 42) return null
+        var need = 8L
+        val seen = HashSet<Long>()
+        fun ifd(abs: Long, depth: Int) {
+            if (abs <= 0 || depth > 4 || seen.size >= Tiff.MAX_IFDS || !seen.add(abs)) return
+            if (abs + 2 > b.size) { need = maxOf(need, abs + 2 + 4096 * 12 + 4); return }
+            val n = Bytes.u16(b, abs.toInt(), le)
+            val end = abs + 2 + n * 12L + 4
+            need = maxOf(need, end)
+            if (end > b.size) return
+            for (i in 0 until n) {
+                val p = (abs + 2 + i * 12).toInt()
+                val tag = Bytes.u16(b, p, le); val type = Bytes.u16(b, p + 2, le)
+                val total = Bytes.u32(b, p + 4, le) * TiffIfd.typeSize(type)
+                val data = if (total <= 4) p + 8L else Bytes.u32(b, p + 8, le)
+                if (total > 4) need = maxOf(need, data + total)
+                if (tag == TiffTags.SUB_IFDS && (type == 4 || type == 13) && data + total <= b.size)
+                    for (k in 0 until minOf(total / 4, 64L).toInt()) ifd(Bytes.u32(b, (data + 4 * k).toInt(), le), depth + 1)
+            }
+            if (depth == 0) ifd(Bytes.u32(b, (abs + 2 + n * 12L).toInt(), le), 0)
+        }
+        ifd(Bytes.u32(b, 4, le), 0)
+        return need
     }
 
     /** Decodes one lossless-JPEG tile: the sample stream fills the tile row by row, [tw] samples per row. */

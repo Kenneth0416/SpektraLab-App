@@ -163,6 +163,20 @@ class DngFormatsTest {
             assertEquals(white.toFloat(), img.white)
             assertEquals("Synth", img.make)
             assertNotNull(RawReader.read(bytes))
+            // streamed rows: same samples, for every strip layout; tiles and lossless JPEG are read whole
+            val streamed = DngReader.open(ByteArraySource(bytes))
+            if (l.tile == null && l.compression == 1) {
+                val rows = assertNotNull(streamed?.rows, "$l")
+                val got = ShortArray(w * h)
+                for (y0 in 0 until h step 9) {
+                    val y1 = minOf(h, y0 + 9)
+                    val band = ShortArray((y1 - y0) * w)
+                    rows.read(y0, y1, band)
+                    band.copyInto(got, y0 * w)
+                }
+                assertContentEquals(img.data, got, "$l")
+                assertEquals(0, streamed.data.size)
+            } else assertNull(streamed, "$l")
             // and it develops to the scene
             val e = maxSceneError(RawDeveloper.develop(img, 4096), 0, 0)
             assertTrue(e < if (storedBits <= 10) 0.03 else 0.012, "$l error $e")

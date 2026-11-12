@@ -55,6 +55,22 @@ object RawReader {
 
     fun read(bytes: ByteArray): RawImage? = readFormat(bytes)?.second
 
+    /** Bytes [mayBeRaw] needs from the start of a file. */
+    const val SNIFF_BYTES = 16
+
+    /**
+     * True when the first bytes of a file ([SNIFF_BYTES] are enough) have the container magic of a
+     * registered format: TIFF (DNG, NEF, ARW, PEF, SRW, CR2), RW2 (`IIU`), ORF (`IIRO` / `IIRS` /
+     * `MMOR`), RAF (`FUJIFILM`) or CR3 (ISO base media `ftyp` brand `crx `). For files whose name and
+     * MIME type say nothing (document providers often report `application/octet-stream`): a true
+     * result only means [read] is worth trying; plain TIFF images pass too.
+     */
+    fun mayBeRaw(head: ByteArray): Boolean {
+        fun at(i: Int, s: String) = head.size >= i + s.length && s.indices.all { head[i + it] == s[it].code.toByte() }
+        return at(0, "II*\u0000") || at(0, "MM\u0000*") || at(0, "IIU\u0000") || at(0, "IIRO") || at(0, "IIRS") ||
+            at(0, "MMOR") || at(0, "FUJIFILM") || (at(4, "ftyp") && at(8, "crx "))
+    }
+
     /** The image and the name of the [Format] that read it. */
     internal fun readFormat(bytes: ByteArray): Pair<String, RawImage>? {
         for (f in formats) {

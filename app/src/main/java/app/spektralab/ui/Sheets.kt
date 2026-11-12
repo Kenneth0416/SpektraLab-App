@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import app.spektralab.data.Library
+import app.spektralab.data.Media
 import app.spektralab.engine.Catalog
 import app.spektralab.export.PhotoFormat
 
@@ -129,11 +130,11 @@ private fun ImportSheet(state: AppState) {
             photos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
         }
         SourceCard("文件", "RAW / DNG / JPEG / 视频", Modifier.weight(1f).dealIn(2, fromY = 50f, tilt = 4f)) {
-            files.launch(arrayOf("image/*", "video/*"))
+            files.launch(Media.PICKER_TYPES)
         }
     }
     Spacer(Modifier.height(12.dp))
-    Text("只选一项会直接进暗房。RAW 文件从「文件」导入，由系统解码（取决于设备支持）。原片只读不改。", color = Pal.grey, fontSize = 12.sp)
+    Text("只选一项会直接进暗房。RAW（DNG、CR2、CR3、NEF、ARW、ORF、RW2、RAF、PEF、SRW）从「文件」导入，由应用从传感器数据显影；读不了的版本交给系统解码。原片只读不改。", color = Pal.grey, fontSize = 12.sp)
 }
 
 @Composable

@@ -103,6 +103,9 @@ class RawLoaderTest {
                 assertEquals(img.uprightWidth, got.fullWidth); assertEquals(img.uprightHeight, got.fullHeight)
                 assertSame(ref, RawFile.open(f).use { assertNotNull(RawLoader.load(it, edge, fast, o)) }.image, "file $edge $fast")
             }
+            // the caller's whole-file budget (sized to its heap) applies to the maker formats
+            assertNull(RawLoader.load(ByteArraySource(bytes), 120, maxWholeFile = bytes.size - 1L))
+            assertNotNull(RawLoader.load(ByteArraySource(bytes), 120, maxWholeFile = bytes.size.toLong()))
             assertEquals(img.cropWidth, RawDeveloper.develop(img, 4096, false).width)
             assertEquals(img.cropWidth / 3, RawDeveloper.develop(img, 4096, true).width)
         } finally { f.delete() }

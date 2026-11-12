@@ -20,11 +20,14 @@ object RawLoader {
     /**
      * The raw frame of [source] (streamed when possible), or null when no reader can read
      * it or [RawDeveloper] cannot develop it.
+     * @param maxWholeFile largest file read whole for the non-streamable formats (every maker
+     *   format); the caller sizes it to its heap, since the file and then its decoded frame
+     *   (about as large, up to about twice for compressed raws) are on the heap together
      */
-    fun open(source: ByteSource): RawImage? {
+    fun open(source: ByteSource, maxWholeFile: Long = MAX_WHOLE_FILE): RawImage? {
         val img = DngReader.open(source) ?: run {
             // Not streamable: the registered readers need the whole file.
-            if (source.size > MAX_WHOLE_FILE) return null
+            if (source.size > minOf(maxWholeFile, MAX_WHOLE_FILE)) return null
             RawReader.read(source.readAll())
         }
         return img?.takeIf { RawDeveloper.supports(it) }
@@ -34,11 +37,13 @@ object RawLoader {
      * Develops [source] to at most about [maxLongEdge] (see [RawDeveloper.develop]).
      * Returns null when the file cannot be read or developed (including corrupt pixel
      * data found while streaming); the caller falls back to the system decoder.
+     * @param maxWholeFile see [open]
      * @throws CancellationException when [cancelled] turns true (checked between bands)
      */
     fun load(source: ByteSource, maxLongEdge: Int, fast: Boolean = true,
-             options: RawDeveloper.Options = RawDeveloper.Options(), cancelled: (() -> Boolean)? = null): DevelopedRaw? {
-        val img = try { open(source) } catch (e: Exception) { null } ?: return null
+             options: RawDeveloper.Options = RawDeveloper.Options(), maxWholeFile: Long = MAX_WHOLE_FILE,
+             cancelled: (() -> Boolean)? = null): DevelopedRaw? {
+        val img = try { open(source, maxWholeFile) } catch (e: Exception) { null } ?: return null
         if (cancelled?.invoke() == true) throw CancellationException("load cancelled")
         val out = try {
             RawDeveloper.develop(img, maxLongEdge, fast, options, cancelled)
@@ -50,6 +55,6 @@ object RawLoader {
         return DevelopedRaw(out, img.uprightWidth, img.uprightHeight)
     }
 
-    /** Files larger than this are not read whole (a phone heap could not hold them next to the frame). */
+    /** Files larger than this are never read whole (a phone heap could not hold them next to the frame). */
     const val MAX_WHOLE_FILE = 192L shl 20
 }

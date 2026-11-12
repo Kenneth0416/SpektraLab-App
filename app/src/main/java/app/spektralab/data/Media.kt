@@ -19,6 +19,7 @@ import app.spektralab.raw.ChannelSource
 import app.spektralab.raw.DevelopedRaw
 import app.spektralab.raw.LinearImage
 import app.spektralab.raw.RawLoader
+import app.spektralab.raw.RawReader
 import java.util.concurrent.CancellationException
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
@@ -32,7 +33,42 @@ class SourceImage(val bitmap: Bitmap?, val linear: LinearImage?) {
 }
 
 object Media {
-    private val RAW_EXT = setOf("dng", "cr2", "cr3", "nef", "arw", "orf", "rw2", "raf", "pef", "srw")
+    /** Extensions of the raw formats the engine's readers handle (NRW is Nikon, SR2 Sony, RWL Leica's RW2). */
+    private val RAW_EXT = setOf("dng", "cr2", "cr3", "nef", "nrw", "arw", "sr2", "orf", "rw2", "rwl", "raf", "pef", "srw")
+
+    /**
+     * Raw MIME types as providers report them: `image/x-adobe-dng`, `image/x-sony-arw`,
+     * `image/x-canon-cr3`, `image/x-panasonic-raw` / `-rw2`, `image/x-fuji-raf`, `image/dng` ...
+     */
+    internal fun isRawMime(type: String): Boolean {
+        val t = type.lowercase()
+        if ("dng" in t) return true
+        if (!t.startsWith("image/x-")) return false
+        return "raw" in t || t.substringAfterLast('-') in RAW_EXT
+    }
+
+    /**
+     * MIME filter of the document picker: images and videos, plus `application/octet-stream`, which
+     * many document providers (cloud drives, USB / SD card readers) report for camera raw files they
+     * do not know, so that those files are not greyed out. Anything picked that is not a photo or a
+     * video is skipped on import.
+     */
+    val PICKER_TYPES = arrayOf("image/*", "video/*", "application/octet-stream")
+
+    /** Types that say nothing about the content, so the file's first bytes are looked at. */
+    private fun isOpaqueMime(type: String) = type.isEmpty() || type == "application/octet-stream" ||
+        type == "image/tiff" || type == "image/*" || type == "*/*" || type == "application/x-unknown"
+
+    /**
+     * Largest file the non-streamable raw readers may read whole now: it and then its decoded frame
+     * (about as large, up to about twice for compressed raws) sit on the heap together, next to what
+     * the app already holds; a third of the free heap leaves room for both and the development.
+     */
+    private fun wholeFileBudget(): Long {
+        val rt = Runtime.getRuntime()
+        val free = rt.maxMemory() - (rt.totalMemory() - rt.freeMemory())
+        return maxOf(0L, free / 3)
+    }
 
     /** Decode an upright, sRGB, software bitmap whose long edge is at most [maxLongEdge]. */
     fun decodeImage(context: Context, uri: Uri, maxLongEdge: Int): Bitmap {
@@ -52,9 +88,10 @@ object Media {
     }
 
     /**
-     * Load a photo for rendering. DNGs written by Android cameras are developed from the
-     * sensor data to scene-linear RGB (see [RawLoader]); everything else, and raw files
-     * we cannot parse, goes through the system decoder.
+     * Load a photo for rendering. Raw files (DNG and the maker formats the engine reads:
+     * CR2, CR3, NEF, ARW, ORF, RW2, RAF, PEF, SRW) are developed from the sensor data to
+     * scene-linear RGB (see [RawLoader]); everything else, and raw files we cannot parse,
+     * goes through the system decoder.
      * @param fast prefer speed (previews, thumbnails) over full-resolution demosaicing
      * @param cancelled polled while a raw file develops; when true the load stops with a
      *   [CancellationException] instead of falling back to the system decoder
@@ -86,14 +123,39 @@ object Media {
             return ParcelFileDescriptor.AutoCloseInputStream(pfd).use { stream ->
                 val channel = stream.channel
                 val seekable = runCatching { channel.size() > 0 }.getOrDefault(false)
-                // a pipe from some document providers: read it once instead
-                val source = if (seekable) ChannelSource(channel) else ByteArraySource(stream.readBytes())
-                RawLoader.load(source, maxLongEdge, fast, cancelled = cancelled)
+                val budget = wholeFileBudget()
+                // a pipe from some document providers: read it once instead, unless it is larger than the heap allows
+                val source = if (seekable) ChannelSource(channel) else ByteArraySource(readAtMost(stream, budget) ?: return null)
+                RawLoader.load(source, maxLongEdge, fast, cancelled = cancelled, maxWholeFile = budget)
             }
         } finally {
             rawGate.release()
         }
     }
+
+    /** The whole stream, or null when it is longer than [limit] bytes. */
+    private fun readAtMost(stream: java.io.InputStream, limit: Long): ByteArray? {
+        val out = java.io.ByteArrayOutputStream()
+        val buf = ByteArray(1 shl 16)
+        var total = 0L
+        while (true) {
+            val n = stream.read(buf)
+            if (n < 0) return out.toByteArray()
+            total += n
+            if (total > limit) return null
+            out.write(buf, 0, n)
+        }
+    }
+
+    /** First bytes of a file, for [RawReader.mayBeRaw]. */
+    private fun head(cr: ContentResolver, uri: Uri): ByteArray? = runCatching {
+        cr.openInputStream(uri)?.use { s ->
+            val b = ByteArray(RawReader.SNIFF_BYTES)
+            var n = 0
+            while (n < b.size) { val r = s.read(b, n, b.size - n); if (r < 0) break; n += r }
+            b.copyOf(n)
+        }
+    }.getOrNull()
 
     /** Center-weighted auto exposure of a developed raw frame. */
     fun autoExposure(img: LinearImage): Float {
@@ -178,7 +240,10 @@ object Media {
         val name = displayName(cr, uri)
         val ext = name.substringAfterLast('.', "").lowercase()
         val isVideo = type.startsWith("video/")
-        val isRaw = ext in RAW_EXT || type.contains("raw") || type.contains("dng")
+        // named as raw (extension or MIME type); else, when neither says what the file is, its magic bytes
+        val namedRaw = !isVideo && (ext in RAW_EXT || isRawMime(type))
+        val tryRaw = namedRaw || (!isVideo && (isOpaqueMime(type) || ext.isEmpty()) && !type.startsWith("image/jp") &&
+            head(cr, uri)?.let { RawReader.mayBeRaw(it) } == true)
         return try {
             if (isVideo) {
                 val r = MediaMetadataRetriever()
@@ -195,7 +260,7 @@ object Media {
                 LibraryItem(id, uri.toString(), true, false, if (swap) eh else ew, if (swap) ew else eh, dur, rot,
                     date ?: System.currentTimeMillis(), frame?.let { autoExposure(it) } ?: 0f, Look.DEFAULT, name)
             } else {
-                val raw = if (isRaw) runCatching { developRaw(context, uri, 512, fast = true) }.getOrNull() else null
+                val raw = if (tryRaw) runCatching { developRaw(context, uri, 512, fast = true) }.getOrNull() else null
                 if (raw != null) {
                     // developed from sensor data: size and exposure come from the raw frame
                     var date: Long? = null
@@ -227,7 +292,9 @@ object Media {
                     }
                 }
                 if (w <= bmp.width) { w = bmp.width; h = bmp.height }
-                LibraryItem(id, uri.toString(), false, isRaw, w, h, 0, 0, date ?: System.currentTimeMillis(),
+                // a raw the readers could not develop (unsupported variant) keeps its RAW tag; a file that
+                // was only sniffed (a plain TIFF, say) is an ordinary photo
+                LibraryItem(id, uri.toString(), false, namedRaw, w, h, 0, 0, date ?: System.currentTimeMillis(),
                     autoExposure(bmp), Look.DEFAULT, name)
             }
         } catch (e: Exception) {

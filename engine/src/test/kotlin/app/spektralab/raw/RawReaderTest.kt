@@ -159,6 +159,23 @@ class RawReaderTest {
     }
 
     @Test
+    fun containerMagicIsRecognisedFromTheFirstBytes() {
+        val head = { b: ByteArray -> b.copyOf(minOf(b.size, RawReader.SNIFF_BYTES)) }
+        assertEquals(true, RawReader.mayBeRaw(head(RawFixtures.bayerDng(64, 48, seed = 1))))
+        for (magic in listOf("IIU\u0000", "IIRO", "IIRS", "MMOR", "MM\u0000*", "FUJIFILMCCD-RAW ", "\u0000\u0000\u0000\u0018ftypcrx "))
+            assertEquals(true, RawReader.mayBeRaw(magic.toByteArray(Charsets.ISO_8859_1) + ByteArray(8)), magic)
+        for (other in listOf(byteArrayOf(-1, -40, -1, -32), "\u0089PNG\r\n".toByteArray(Charsets.ISO_8859_1),
+                "\u0000\u0000\u0000\u0018ftypheic".toByteArray(Charsets.ISO_8859_1), ByteArray(0), "II".toByteArray()))
+            assertEquals(false, RawReader.mayBeRaw(other))
+        // every real sample a reader decodes passes
+        val root = samples() ?: return
+        for (key in expected.keys) {
+            val b = java.io.FileInputStream(File(root, key)).use { it.readNBytes(RawReader.SNIFF_BYTES) }
+            assertEquals(true, RawReader.mayBeRaw(b), key)
+        }
+    }
+
+    @Test
     fun nonRawFilesAreRefusedByEveryReader() {
         for (bytes in listOf(ByteArray(0), ByteArray(16), ByteArray(4096) { it.toByte() },
                 TiffBuilder().build(TiffBuilder.Ifd().ascii(TiffTags.MAKE, "NIKON CORPORATION").long(256, 64).long(257, 48)))) {

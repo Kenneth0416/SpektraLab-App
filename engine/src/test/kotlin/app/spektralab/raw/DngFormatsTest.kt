@@ -88,6 +88,7 @@ class DngFormatsTest {
     private fun buildDng(
         stored: IntArray, l: Layout, cfa: CfaPattern = CfaPattern.RGGB, black: IntArray = intArrayOf(64), blackDim: Int = 1,
         white: Int, active: IntArray? = null, cropOrigin: IntArray? = null, cropSize: IntArray? = null, photometric: Int = 32803,
+        sampleFormat: Int? = null,
     ): ByteArray {
         val raw = TiffBuilder.Ifd()
             .long(TiffTags.NEW_SUBFILE_TYPE, 0).long(TiffTags.IMAGE_WIDTH, w).long(TiffTags.IMAGE_LENGTH, h)
@@ -97,6 +98,7 @@ class DngFormatsTest {
             .short(TiffTags.BLACK_LEVEL_REPEAT_DIM, blackDim, blackDim).long(TiffTags.BLACK_LEVEL, *black)
             .long(TiffTags.WHITE_LEVEL, white)
         active?.let { raw.long(TiffTags.ACTIVE_AREA, *it) }
+        sampleFormat?.let { raw.short(339, it) }
         cropOrigin?.let { raw.long(TiffTags.DEFAULT_CROP_ORIGIN, *it) }
         cropSize?.let { raw.long(TiffTags.DEFAULT_CROP_SIZE, *it) }
         val fileValues = if (l.linearize) {
@@ -217,6 +219,8 @@ class DngFormatsTest {
     fun unsupportedVariantsReturnNull() {
         val stored = sensor(16, CfaPattern.RGGB, intArrayOf(0), 1, 65535)
         assertNull(DngReader.read(buildDng(stored, Layout(), white = 65535, photometric = 34892)))          // LinearRaw
+        assertNull(DngReader.read(buildDng(stored, Layout(), white = 65535, sampleFormat = 3)))             // half-float mosaic
+        assertNotNull(DngReader.read(buildDng(stored, Layout(), white = 65535, sampleFormat = 1)))
         val dng = buildDng(stored, Layout(), white = 65535)
         // not a DNG without DNGVersion: patch the tag number
         val t = Tiff.parse(dng)!!

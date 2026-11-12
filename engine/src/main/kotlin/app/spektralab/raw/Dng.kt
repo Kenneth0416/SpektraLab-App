@@ -11,7 +11,7 @@ import java.nio.ByteOrder
  * DNGs written by most cameras.
  *
  * Also reads 16-bit linear RGB strips (uncompressed or deflate, including half-float).
- * Returns null for lossy JPEG / JPEG XL, unsupported layouts,
+ * Returns null for lossy JPEG / JPEG XL, floating-point mosaics, unsupported layouts,
  * non-rectangular CFA layouts and anything malformed.
  *
  * Tile reassembly of lossless-JPEG data follows LibRaw's lossless_dng_load_raw.
@@ -84,6 +84,8 @@ object DngReader {
         if (width <= 0 || height <= 0 || width.toLong() * height * (if (linear) 3 else 1) > RawDecodeLimits.MAX_SAMPLES) return null
         if (raw.int(TiffTags.SAMPLES_PER_PIXEL, 1) != (if (linear) 3 else 1)) return null
         if (raw.int(TiffTags.CFA_LAYOUT, 1) != 1) return null
+        // floating-point mosaics (HDR merges) would be read as integers: only linear RGB may be float
+        if (!linear && raw.int(339, 1) != 1) return null
         val bps = raw.int(TiffTags.BITS_PER_SAMPLE, 1)
         val compression = raw.int(TiffTags.COMPRESSION, 1)
 

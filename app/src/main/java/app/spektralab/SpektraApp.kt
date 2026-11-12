@@ -1,6 +1,8 @@
 package app.spektralab
 
+import android.app.Activity
 import android.app.Application
+import android.os.Bundle
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -40,9 +42,24 @@ class SpektraApp : Application() {
     lateinit var exports: ExportManager
         private set
 
+    /** Some activity is on screen; the export result notification is skipped then. */
+    @Volatile var inForeground = false
+        private set
+
     override fun onCreate() {
         super.onCreate()
         instance = this
+        registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
+            // counted, so a configuration change (stop + start) does not read as "backgrounded" for long
+            private var started = 0
+            override fun onActivityStarted(activity: Activity) { inForeground = ++started > 0 }
+            override fun onActivityStopped(activity: Activity) { inForeground = --started > 0 }
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
+            override fun onActivityResumed(activity: Activity) {}
+            override fun onActivityPaused(activity: Activity) {}
+            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
+            override fun onActivityDestroyed(activity: Activity) {}
+        })
         engine = EngineData { path -> assets.open("spektra/$path") }
         library = Library(this)
         looks = LookCache(engine)

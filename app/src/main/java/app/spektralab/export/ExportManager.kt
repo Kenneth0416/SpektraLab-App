@@ -2,20 +2,28 @@ package app.spektralab.export
 
 import android.app.Notification
 import android.app.NotificationChannel
+import android.Manifest
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.os.IBinder
+import android.os.SystemClock
 import android.provider.MediaStore
+import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
+import androidx.core.content.ContextCompat
+import app.spektralab.MainActivity
 import app.spektralab.HeavyWork
 import app.spektralab.R
 import app.spektralab.SpektraApp
@@ -29,7 +37,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -313,34 +321,103 @@ class ExportManager(private val app: SpektraApp) {
     }
 }
 
-/** Keeps the process alive while exports run in the background. */
+/** Keeps the process alive while exports run in the background, and shows their progress and result. */
 class ExportService : Service() {
     private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.Main)
     private var watching = false
+    private var foregrounded = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val exports = (application as SpektraApp).exports
+        if (intent?.action == ACTION_CANCEL) {
+            exports.cancel()
+            // a stale action can start a service that never went foreground (plain startService)
+            if (!foregrounded) stopSelf()
+            return START_NOT_STICKY
+        }
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.createNotificationChannel(NotificationChannel(CHANNEL, getString(R.string.export_channel), NotificationManager.IMPORTANCE_LOW))
-        val n: Notification = NotificationCompat.Builder(this, CHANNEL)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(getString(R.string.export_running))
-            .setOngoing(true)
-            .setProgress(0, 0, true)
-            .build()
         // always go foreground first: stopping a service started with startForegroundService
         // before this call crashes the app
-        ServiceCompat.startForeground(this, 7, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        ServiceCompat.startForeground(this, ID_RUNNING, progressNotification(exports.state.value), ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        foregrounded = true
         if (!watching) {
             watching = true
             scope.launch {
-                (application as SpektraApp).exports.state.first { it == null || !it.running }
+                var shownAt = 0L
+                var shownItem = -1 to -1
+                exports.state.takeWhile { it != null && it.running }.collect { s ->
+                    if (s == null) return@collect
+                    val now = SystemClock.elapsedRealtime()
+                    val item = s.done to s.total
+                    // the system drops updates that come too fast; a new item is always shown
+                    if (item != shownItem || now - shownAt >= THROTTLE_MS) {
+                        shownItem = item
+                        shownAt = now
+                        nm.notify(ID_RUNNING, progressNotification(s))
+                    }
+                }
                 ServiceCompat.stopForeground(this@ExportService, ServiceCompat.STOP_FOREGROUND_REMOVE)
+                postResult(exports.state.value)
                 stopSelf()
             }
         }
         return START_NOT_STICKY
+    }
+
+    private fun openApp(): PendingIntent {
+        // same as the launcher: brings the running task to front instead of starting a second activity
+        val open = Intent(this, MainActivity::class.java)
+            .setAction(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+        return PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+    }
+
+    private fun progressNotification(s: ExportState?): Notification {
+        val total = maxOf(s?.total ?: 0, 1)
+        val shown = ((s?.done ?: 0) + 1).coerceAtMost(total)
+        val fraction = (((s?.done ?: 0) + (s?.current ?: 0f)) / total).coerceIn(0f, 1f)
+        val cancel = PendingIntent.getService(
+            this, 1, Intent(this, ExportService::class.java).setAction(ACTION_CANCEL),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        return NotificationCompat.Builder(this, CHANNEL)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(if (s == null) getString(R.string.export_running) else getString(R.string.export_progress, shown, total))
+            .setContentIntent(openApp())
+            .addAction(0, getString(R.string.export_cancel), cancel)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+            .setProgress(1000, (fraction * 1000).toInt(), s == null)
+            .build()
+    }
+
+    /** A dismissible summary that outlives the service; the in-app UI covers the foreground case. */
+    private fun postResult(s: ExportState?) {
+        s ?: return
+        val saved = s.saved.size
+        val failed = s.failures.size
+        // a cancelled queue with nothing saved has nothing to report
+        if (saved == 0 && failed == 0) return
+        if ((application as SpektraApp).inForeground) return
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
+        val nm = NotificationManagerCompat.from(this)
+        if (!nm.areNotificationsEnabled()) return
+        nm.createNotificationChannel(
+            NotificationChannelCompat.Builder(CHANNEL_RESULT, NotificationManagerCompat.IMPORTANCE_DEFAULT)
+                .setName(getString(R.string.export_result_channel)).build()
+        )
+        val b = NotificationCompat.Builder(this, CHANNEL_RESULT)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentIntent(openApp())
+            .setAutoCancel(true)
+        if (failed == 0) b.setContentTitle(getString(R.string.export_done, saved))
+        else b.setContentTitle(getString(R.string.export_failed, failed)).setContentText(getString(R.string.export_failed_saved, saved))
+        nm.notify(ID_RESULT, b.build())
     }
 
     override fun onDestroy() {
@@ -348,5 +425,12 @@ class ExportService : Service() {
         super.onDestroy()
     }
 
-    companion object { const val CHANNEL = "export" }
+    companion object {
+        const val CHANNEL = "export"
+        const val CHANNEL_RESULT = "export_result"
+        private const val ID_RUNNING = 7
+        private const val ID_RESULT = 8
+        private const val ACTION_CANCEL = "app.spektralab.export.CANCEL"
+        private const val THROTTLE_MS = 500L
+    }
 }

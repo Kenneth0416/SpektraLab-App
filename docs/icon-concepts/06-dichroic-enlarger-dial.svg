@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="c6-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#15181C"/>
+      <stop offset="100%" stop-color="#090A0D"/>
+    </linearGradient>
+
+    <linearGradient id="c6-yellow" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#FFCA28" stop-opacity="0.24"/>
+      <stop offset="52%" stop-color="#FFD54F" stop-opacity="0.96"/>
+      <stop offset="100%" stop-color="#FFB300" stop-opacity="0.34"/>
+    </linearGradient>
+
+    <linearGradient id="c6-magenta" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#EC407A" stop-opacity="0.24"/>
+      <stop offset="58%" stop-color="#FF4081" stop-opacity="0.96"/>
+      <stop offset="100%" stop-color="#D81B60" stop-opacity="0.3"/>
+    </linearGradient>
+
+    <linearGradient id="c6-cyan" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#26C6DA" stop-opacity="0.28"/>
+      <stop offset="38%" stop-color="#00E5FF" stop-opacity="0.96"/>
+      <stop offset="100%" stop-color="#0097A7" stop-opacity="0.25"/>
+    </linearGradient>
+
+    <clipPath id="c6-squircle">
+      <rect width="512" height="512" rx="114"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#c6-squircle)">
+    <rect width="512" height="512" fill="url(#c6-bg)"/>
+
+    <!-- Precision sensitometric grid -->
+    <g stroke="#F3EFE5" stroke-opacity="0.06" stroke-width="1.5">
+      <line x1="96" y1="76" x2="96" y2="436"/>
+      <line x1="176" y1="76" x2="176" y2="436"/>
+      <line x1="256" y1="76" x2="256" y2="436"/>
+      <line x1="336" y1="76" x2="336" y2="436"/>
+      <line x1="416" y1="76" x2="416" y2="436"/>
+      <line x1="76" y1="136" x2="436" y2="136"/>
+      <line x1="76" y1="256" x2="436" y2="256"/>
+      <line x1="76" y1="376" x2="436" y2="376"/>
+    </g>
+
+    <!-- Characteristic HD D-logE S-Curves for R, G, B emulsion layers -->
+    <g fill="none" stroke-width="6" stroke-linecap="round" opacity="0.92">
+      <path d="M92,388 C168,386 204,344 254,248 C304,152 346,114 420,110" stroke="#00E5FF"/>
+      <path d="M92,400 C174,398 212,350 262,252 C312,154 352,124 420,120" stroke="#FF4081"/>
+      <path d="M92,376 C160,374 196,336 246,244 C296,152 338,102 420,98" stroke="#FFD54F"/>
+    </g>
+
+    <!-- Three Color-Head Enlarger Dichroic Filter Scale Tracks (Y / M / C) -->
+    <g transform="translate(86, 152)">
+      <rect width="340" height="52" rx="12" fill="#1E2126" stroke="#FFFFFF" stroke-opacity="0.14" stroke-width="1.5"/>
+      <rect x="6" y="6" width="328" height="40" rx="8" fill="url(#c6-yellow)"/>
+      <g stroke="#141619" stroke-width="2.5" opacity="0.68">
+        <line x1="48" y1="30" x2="48" y2="46"/><line x1="92" y1="22" x2="92" y2="46"/>
+        <line x1="136" y1="30" x2="136" y2="46"/><line x1="170" y1="16" x2="170" y2="46"/>
+        <line x1="204" y1="30" x2="204" y2="46"/><line x1="248" y1="22" x2="248" y2="46"/>
+        <line x1="292" y1="30" x2="292" y2="46"/>
+      </g>
+      <rect x="156" y="-6" width="28" height="64" rx="6" fill="#F6F3EB" stroke="#141619" stroke-width="3"/>
+      <line x1="170" y1="4" x2="170" y2="48" stroke="#EF563D" stroke-width="3.5"/>
+    </g>
+
+    <g transform="translate(86, 232)">
+      <rect width="340" height="52" rx="12" fill="#1E2126" stroke="#FFFFFF" stroke-opacity="0.14" stroke-width="1.5"/>
+      <rect x="6" y="6" width="328" height="40" rx="8" fill="url(#c6-magenta)"/>
+      <g stroke="#141619" stroke-width="2.5" opacity="0.68">
+        <line x1="48" y1="30" x2="48" y2="46"/><line x1="92" y1="22" x2="92" y2="46"/>
+        <line x1="136" y1="30" x2="136" y2="46"/><line x1="170" y1="16" x2="170" y2="46"/>
+        <line x1="204" y1="30" x2="204" y2="46"/><line x1="248" y1="22" x2="248" y2="46"/>
+        <line x1="292" y1="30" x2="292" y2="46"/>
+      </g>
+      <rect x="214" y="-6" width="28" height="64" rx="6" fill="#F6F3EB" stroke="#141619" stroke-width="3"/>
+      <line x1="228" y1="4" x2="228" y2="48" stroke="#EF563D" stroke-width="3.5"/>
+    </g>
+
+    <g transform="translate(86, 312)">
+      <rect width="340" height="52" rx="12" fill="#1E2126" stroke="#FFFFFF" stroke-opacity="0.14" stroke-width="1.5"/>
+      <rect x="6" y="6" width="328" height="40" rx="8" fill="url(#c6-cyan)"/>
+      <g stroke="#141619" stroke-width="2.5" opacity="0.68">
+        <line x1="48" y1="30" x2="48" y2="46"/><line x1="92" y1="22" x2="92" y2="46"/>
+        <line x1="136" y1="30" x2="136" y2="46"/><line x1="170" y1="16" x2="170" y2="46"/>
+        <line x1="204" y1="30" x2="204" y2="46"/><line x1="248" y1="22" x2="248" y2="46"/>
+        <line x1="292" y1="30" x2="292" y2="46"/>
+      </g>
+      <rect x="112" y="-6" width="28" height="64" rx="6" fill="#F6F3EB" stroke="#141619" stroke-width="3"/>
+      <line x1="126" y1="4" x2="126" y2="48" stroke="#EF563D" stroke-width="3.5"/>
+    </g>
+
+    <!-- Instrument Readout Pill -->
+    <rect x="160" y="400" width="192" height="38" rx="19" fill="#1C1F24" stroke="#F3EFE5" stroke-opacity="0.18" stroke-width="1.5"/>
+    <circle cx="185" cy="419" r="5.5" fill="#EF563D"/>
+    <text x="266" y="425" text-anchor="middle" fill="#F3EFE5" font-family="ui-monospace, SFMono-Regular, monospace" font-size="16" font-weight="600" letter-spacing="1.5">+0.7 EV · YMC</text>
+  </g>
+</svg>

@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Deep night velvet sky -->
+    <radialGradient id="c7-bg" cx="50%" cy="46%" r="65%">
+      <stop offset="0%" stop-color="#221116"/>
+      <stop offset="48%" stop-color="#110A0E"/>
+      <stop offset="100%" stop-color="#070507"/>
+    </radialGradient>
+
+    <!-- Primary intense white-gold photon core -->
+    <radialGradient id="c7-core" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="32%" stop-color="#FFF2D6"/>
+      <stop offset="68%" stop-color="#FF9E5E" stop-opacity="0.82"/>
+      <stop offset="100%" stop-color="#FF4726" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Film base reflection red-orange halation ring (CineStill / Remjet-free scatter) -->
+    <radialGradient id="c7-halation" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FF3B1F" stop-opacity="0"/>
+      <stop offset="48%" stop-color="#FF3B1F" stop-opacity="0.12"/>
+      <stop offset="70%" stop-color="#FF4A2B" stop-opacity="0.72"/>
+      <stop offset="84%" stop-color="#D91E14" stop-opacity="0.34"/>
+      <stop offset="100%" stop-color="#7A0908" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Anamorphic cyan/amber lens flare streak -->
+    <linearGradient id="c7-flare" x1="0" y1="0.5" x2="1" y2="0.5">
+      <stop offset="0%" stop-color="#38BDF8" stop-opacity="0"/>
+      <stop offset="28%" stop-color="#7DD3FC" stop-opacity="0.55"/>
+      <stop offset="50%" stop-color="#FFFFFF" stop-opacity="0.95"/>
+      <stop offset="72%" stop-color="#FDBA74" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#FB7185" stop-opacity="0"/>
+    </linearGradient>
+
+    <clipPath id="c7-squircle">
+      <rect width="512" height="512" rx="114"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#c7-squircle)">
+    <rect width="512" height="512" fill="url(#c7-bg)"/>
+
+    <!-- Outer multi-octave PSF energy rings -->
+    <circle cx="256" cy="246" r="228" fill="none" stroke="#FF5738" stroke-opacity="0.09" stroke-width="2"/>
+    <circle cx="256" cy="246" r="192" fill="url(#c7-halation)"/>
+
+    <!-- Crisp secondary emulsion back-scatter halo -->
+    <circle cx="256" cy="246" r="136" fill="none" stroke="#FF5E3A" stroke-opacity="0.55" stroke-width="14"/>
+    <circle cx="256" cy="246" r="136" fill="none" stroke="#FFB49A" stroke-opacity="0.4" stroke-width="2.5"/>
+
+    <!-- Subtle aperture diffraction 8-point star rays -->
+    <g transform="translate(256, 246)" stroke="#FFD5C2" stroke-linecap="round" opacity="0.48">
+      <line x1="0" y1="-174" x2="0" y2="174" stroke-width="2.5"/>
+      <line x1="-122" y1="-122" x2="122" y2="122" stroke-width="1.8"/>
+      <line x1="-122" y1="122" x2="122" y2="-122" stroke-width="1.8"/>
+    </g>
+
+    <!-- Horizontal anamorphic streak -->
+    <ellipse cx="256" cy="246" rx="224" ry="8" fill="url(#c7-flare)"/>
+
+    <!-- Glowing white-amber light source core -->
+    <circle cx="256" cy="246" r="92" fill="url(#c7-core)"/>
+
+    <!-- Foreground moody urban night silhouette (bridge / neon roof edge) -->
+    <path d="M0,418 L112,418 L154,364 L182,364 L182,418 L340,418 L378,382 L512,382 L512,512 L0,512 Z" fill="#070507"/>
+    <!-- Tiny wet-asphalt halation reflections at bottom -->
+    <ellipse cx="256" cy="452" rx="76" ry="7" fill="#FF4A2B" opacity="0.55"/>
+    <ellipse cx="256" cy="472" rx="46" ry="4.5" fill="#FFD6BA" opacity="0.45"/>
+    <ellipse cx="256" cy="488" rx="24" ry="3" fill="#FF4A2B" opacity="0.3"/>
+
+    <!-- Subtle inner border -->
+    <rect x="2" y="2" width="508" height="508" rx="112" fill="none" stroke="#FF785A" stroke-opacity="0.14" stroke-width="2"/>
+  </g>
+</svg>

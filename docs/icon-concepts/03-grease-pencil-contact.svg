@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="c3-lightbox" cx="50%" cy="48%" r="65%">
+      <stop offset="0%" stop-color="#FFFDF9"/>
+      <stop offset="68%" stop-color="#F5F0E4"/>
+      <stop offset="100%" stop-color="#E2DAC8"/>
+    </radialGradient>
+
+    <linearGradient id="c3-wax" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F44027"/>
+      <stop offset="55%" stop-color="#D92614"/>
+      <stop offset="100%" stop-color="#B51B0C"/>
+    </linearGradient>
+
+    <linearGradient id="c3-frame-sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2B4963"/>
+      <stop offset="55%" stop-color="#DC8B5E"/>
+      <stop offset="100%" stop-color="#F4CB96"/>
+    </linearGradient>
+
+    <clipPath id="c3-squircle">
+      <rect width="512" height="512" rx="114"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#c3-squircle)">
+    <rect width="512" height="512" fill="url(#c3-lightbox)"/>
+
+    <!-- Subtle lightbox grid lines -->
+    <g stroke="#1C1915" stroke-opacity="0.06" stroke-width="1.5">
+      <line x1="128" y1="0" x2="128" y2="512"/>
+      <line x1="256" y1="0" x2="256" y2="512"/>
+      <line x1="384" y1="0" x2="384" y2="512"/>
+      <line x1="0" y1="128" x2="512" y2="128"/>
+      <line x1="0" y1="256" x2="512" y2="256"/>
+      <line x1="0" y1="384" x2="512" y2="384"/>
+    </g>
+
+    <!-- Tilted 35mm film strip tossed onto the lightbox -->
+    <g transform="translate(256, 260) rotate(-8) translate(-256, -260)">
+      <rect x="-40" y="132" width="592" height="260" rx="6" fill="#2A241B" fill-opacity="0.16" transform="translate(6, 12)"/>
+      <rect x="-40" y="132" width="592" height="260" fill="#171512"/>
+
+      <!-- Sprocket holes -->
+      <g fill="#FAF6EC">
+        <rect x="18" y="146" width="22" height="28" rx="5"/>
+        <rect x="78" y="146" width="22" height="28" rx="5"/>
+        <rect x="138" y="146" width="22" height="28" rx="5"/>
+        <rect x="198" y="146" width="22" height="28" rx="5"/>
+        <rect x="258" y="146" width="22" height="28" rx="5"/>
+        <rect x="318" y="146" width="22" height="28" rx="5"/>
+        <rect x="378" y="146" width="22" height="28" rx="5"/>
+        <rect x="438" y="146" width="22" height="28" rx="5"/>
+
+        <rect x="18" y="348" width="22" height="28" rx="5"/>
+        <rect x="78" y="348" width="22" height="28" rx="5"/>
+        <rect x="138" y="348" width="22" height="28" rx="5"/>
+        <rect x="198" y="348" width="22" height="28" rx="5"/>
+        <rect x="258" y="348" width="22" height="28" rx="5"/>
+        <rect x="318" y="348" width="22" height="28" rx="5"/>
+        <rect x="378" y="348" width="22" height="28" rx="5"/>
+        <rect x="438" y="348" width="22" height="28" rx="5"/>
+      </g>
+
+      <!-- Film rebate edge codes -->
+      <text x="158" y="188" fill="#E8A948" font-family="ui-monospace, SFMono-Regular, monospace" font-size="13" font-weight="700" letter-spacing="2">SILVERCAM 400</text>
+      <text x="332" y="188" fill="#E8A948" font-family="ui-monospace, SFMono-Regular, monospace" font-size="13" font-weight="700">36A</text>
+      <text x="234" y="342" fill="#E8A948" font-family="ui-monospace, SFMono-Regular, monospace" font-size="12" font-weight="700" letter-spacing="3">▸ 36A</text>
+
+      <!-- Left & Center & Right frames -->
+      <rect x="-26" y="196" width="154" height="130" rx="3" fill="#2B3330"/>
+      <path d="M-26,294 L38,248 L88,282 L128,262 L128,326 L-26,326 Z" fill="#181D1B"/>
+
+      <rect x="144" y="196" width="224" height="130" rx="3" fill="url(#c3-frame-sky)"/>
+      <circle cx="294" cy="236" r="20" fill="#FFF4DE"/>
+      <path d="M144,326 L144,288 L206,246 L262,286 L312,258 L368,292 L368,326 Z" fill="#1E242B"/>
+
+      <rect x="384" y="196" width="154" height="130" rx="3" fill="#3B2E2A"/>
+      <circle cx="442" cy="252" r="28" fill="#E69F67" opacity="0.65"/>
+    </g>
+
+    <!-- Bold Red China-Marker / Grease Pencil Circle + Pick Checkmark (kept well within round safe zone) -->
+    <g fill="none" stroke="url(#c3-wax)" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M142,168 C218,110 382,116 404,220 C424,316 340,404 218,396 C112,388 82,290 122,202 C146,148 242,124 322,150" stroke-width="17"/>
+      <path d="M130,178 C210,118 390,126 410,226 C428,312 336,410 212,401 C106,392 88,280 132,196" stroke="#FF6B4A" stroke-width="4" stroke-dasharray="18 10" opacity="0.72"/>
+      <!-- Grease pencil darkroom pick checkmark safely inside top-right -->
+      <path d="M332,102 L354,126 L398,78" stroke-width="14"/>
+    </g>
+
+    <rect x="1" y="1" width="510" height="510" rx="113" fill="none" stroke="#171512" stroke-opacity="0.1" stroke-width="2"/>
+  </g>
+</svg>

@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="c4-body" cx="35%" cy="30%" r="75%">
+      <stop offset="0%" stop-color="#2B2A28"/>
+      <stop offset="55%" stop-color="#171615"/>
+      <stop offset="100%" stop-color="#0B0A09"/>
+    </radialGradient>
+
+    <linearGradient id="c4-chrome-dial" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F7F5F0"/>
+      <stop offset="28%" stop-color="#C8C4BC"/>
+      <stop offset="52%" stop-color="#7D7972"/>
+      <stop offset="76%" stop-color="#E5E1D8"/>
+      <stop offset="100%" stop-color="#5C5852"/>
+    </linearGradient>
+
+    <linearGradient id="c4-brass-edge" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#DFB976"/>
+      <stop offset="50%" stop-color="#9E793B"/>
+      <stop offset="100%" stop-color="#F0CF92"/>
+    </linearGradient>
+
+    <linearGradient id="c4-lever" x1="0" y1="0" x2="1" y2="0.6">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="42%" stop-color="#D2CEC6"/>
+      <stop offset="78%" stop-color="#8A857D"/>
+      <stop offset="100%" stop-color="#4F4C47"/>
+    </linearGradient>
+
+    <clipPath id="c4-squircle">
+      <rect width="512" height="512" rx="114"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#c4-squircle)">
+    <rect width="512" height="512" fill="url(#c4-body)"/>
+
+    <!-- Engraved camera top-plate seam line -->
+    <path d="M0,144 L334,144 C376,144 410,178 410,220 L410,512" fill="none" stroke="#3A3835" stroke-width="3"/>
+    <path d="M0,147 L334,147 C374,147 407,180 407,220 L407,512" fill="none" stroke="#070706" stroke-width="2"/>
+
+    <!-- Frame Counter Window ("36") tucked cleanly inside circular safe zone -->
+    <g transform="translate(136, 134)">
+      <circle cx="0" cy="0" r="44" fill="#0A0908" stroke="url(#c4-chrome-dial)" stroke-width="6"/>
+      <circle cx="0" cy="0" r="35" fill="#141311"/>
+      <path d="M-24,-15 A30,30 0 0,1 20,-19" fill="none" stroke="#FFFFFF" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+      <text x="0" y="9" text-anchor="middle" fill="#F25438" font-family="ui-monospace, SFMono-Regular, monospace" font-size="27" font-weight="700">36</text>
+      <polygon points="0,-34 -5,-24 5,-24" fill="#F25438"/>
+    </g>
+
+    <!-- Film plane symbol ⌀ engraved on top plate -->
+    <g transform="translate(136, 384)" stroke="#B8B2A6" stroke-width="4.5" fill="none" opacity="0.78">
+      <line x1="-32" y1="0" x2="32" y2="0"/>
+      <circle cx="0" cy="0" r="15"/>
+    </g>
+
+    <!-- Main Pivot Hub Shadow -->
+    <circle cx="264" cy="278" r="132" fill="#050504" opacity="0.72"/>
+
+    <!-- Outer Knurled Bezel Ring -->
+    <circle cx="258" cy="268" r="128" fill="#2A2825" stroke="url(#c4-brass-edge)" stroke-width="5"/>
+    <circle cx="258" cy="268" r="116" fill="url(#c4-chrome-dial)" stroke="#181715" stroke-width="3"/>
+
+    <!-- Knurling ticks around dial -->
+    <g transform="translate(258, 268)" stroke="#23211E" stroke-width="3" opacity="0.65">
+      <line x1="0" y1="-126" x2="0" y2="-117"/>
+      <line x1="63" y1="-109" x2="58" y2="-101"/>
+      <line x1="109" y1="-63" x2="101" y2="-58"/>
+      <line x1="126" y1="0" x2="117" y2="0"/>
+      <line x1="109" y1="63" x2="101" y2="58"/>
+      <line x1="63" y1="109" x2="58" y2="101"/>
+      <line x1="0" y1="126" x2="0" y2="117"/>
+      <line x1="-63" y1="109" x2="-58" y2="101"/>
+      <line x1="-109" y1="63" x2="-101" y2="58"/>
+      <line x1="-126" y1="0" x2="-117" y2="0"/>
+      <line x1="-109" y1="-63" x2="-101" y2="-58"/>
+      <line x1="-63" y1="-109" x2="-58" y2="-101"/>
+    </g>
+
+    <!-- Mechanical Film Advance Lever -->
+    <g transform="translate(258, 268) rotate(-28)">
+      <path d="M-36,-42 L162,-26 C192,-24 212,-6 212,20 C212,44 190,56 162,50 L-36,42 Z" fill="#060605" opacity="0.65" transform="translate(4, 12)"/>
+      <path d="M-38,-40 L152,-25 C182,-23 206,-7 206,18 C206,40 184,50 154,44 L-38,40 Z" fill="url(#c4-lever)" stroke="#3D3A36" stroke-width="2"/>
+      <path d="M124,-27 L162,-24 C190,-21 208,-4 208,18 C208,40 186,52 156,45 L120,42 C134,21 134,-4 124,-27 Z" fill="#181715" stroke="#47433E" stroke-width="2"/>
+      <path d="M154,-11 C160,4 160,21 154,32" fill="none" stroke="#3A3733" stroke-width="3.5" stroke-linecap="round"/>
+      <path d="M172,-7 C177,6 177,19 172,29" fill="none" stroke="#3A3733" stroke-width="3.5" stroke-linecap="round"/>
+    </g>
+
+    <!-- Center Shutter Collar & Soft-Release Red Button -->
+    <circle cx="258" cy="268" r="64" fill="#1F1E1C" stroke="#D8D3C8" stroke-width="4"/>
+    <circle cx="258" cy="268" r="45" fill="url(#c4-chrome-dial)"/>
+    <circle cx="258" cy="268" r="27" fill="#D9321C" stroke="#FF7A63" stroke-width="2"/>
+    <circle cx="250" cy="260" r="9.5" fill="#FF8F7A" opacity="0.48"/>
+
+    <!-- Motion arc showing advance throw -->
+    <path d="M394,122 A184,184 0 0,1 436,216" fill="none" stroke="#F25438" stroke-width="5" stroke-linecap="round" stroke-dasharray="10 10" opacity="0.88"/>
+  </g>
+</svg>

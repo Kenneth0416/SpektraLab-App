@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="c10-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#191715"/>
+      <stop offset="100%" stop-color="#0A0908"/>
+    </linearGradient>
+
+    <linearGradient id="c10-silver-top" x1="0" y1="0" x2="1" y2="0.6">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="48%" stop-color="#EBE6DC"/>
+      <stop offset="100%" stop-color="#A6A096"/>
+    </linearGradient>
+
+    <linearGradient id="c10-emulsion-btm" x1="0" y1="0" x2="1" y2="0.8">
+      <stop offset="0%" stop-color="#FF684C"/>
+      <stop offset="55%" stop-color="#EF4D35"/>
+      <stop offset="100%" stop-color="#C8321B"/>
+    </linearGradient>
+
+    <clipPath id="c10-squircle">
+      <rect width="512" height="512" rx="114"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#c10-squircle)">
+    <rect width="512" height="512" fill="url(#c10-bg)"/>
+
+    <circle cx="256" cy="256" r="194" fill="none" stroke="#F3EFE5" stroke-opacity="0.07" stroke-width="2"/>
+
+    <!-- Swiss Bauhaus Continuous Film-Loop "S" Monogram + Central Lens Aperture -->
+    <path d="M366,154 C342,106 292,84 236,84 C156,84 106,132 106,198 C106,258 152,292 228,302 L262,238 C206,230 182,216 182,194 C182,168 206,152 242,152 C276,152 302,166 316,192 Z" fill="url(#c10-silver-top)"/>
+
+    <path d="M146,358 C170,406 220,428 276,428 C356,428 406,380 406,314 C406,254 360,220 284,210 L250,274 C306,282 330,296 330,318 C330,344 306,360 270,360 C236,360 210,346 196,320 Z" fill="url(#c10-emulsion-btm)"/>
+
+    <!-- Central Negative-Space Optical Iris / Shutter Eye -->
+    <circle cx="256" cy="256" r="46" fill="#0E0D0C" stroke="#F3EFE5" stroke-width="6"/>
+    <circle cx="256" cy="256" r="18" fill="#F3EFE5"/>
+
+    <!-- Minimalist Sprocket Cutouts -->
+    <g fill="#0F0E0D">
+      <rect x="126" y="176" width="16" height="22" rx="4"/>
+      <rect x="132" y="210" width="16" height="22" rx="4" transform="rotate(-18 140 221)"/>
+      <rect x="370" y="314" width="16" height="22" rx="4"/>
+      <rect x="364" y="280" width="16" height="22" rx="4" transform="rotate(-18 372 291)"/>
+    </g>
+
+    <!-- Darkroom Crop Corner Ticks tucked inside circular safe zone -->
+    <g stroke="#F3EFE5" stroke-opacity="0.32" stroke-width="4" stroke-linecap="square" fill="none">
+      <path d="M104,132 L104,104 L132,104"/>
+      <path d="M380,104 L408,104 L408,132"/>
+      <path d="M104,380 L104,408 L132,408"/>
+      <path d="M380,408 L408,408 L408,380"/>
+    </g>
+  </g>
+</svg>

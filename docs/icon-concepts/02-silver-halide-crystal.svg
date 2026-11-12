@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Pure metallic silver gradient -->
+    <linearGradient id="c2-ag-main" x1="0.1" y1="0.05" x2="0.9" y2="0.95">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="28%" stop-color="#DCE2EA"/>
+      <stop offset="56%" stop-color="#8C95A4"/>
+      <stop offset="82%" stop-color="#D8DFE8"/>
+      <stop offset="100%" stop-color="#535B68"/>
+    </linearGradient>
+
+    <linearGradient id="c2-ag-facet-dark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4A5260"/>
+      <stop offset="50%" stop-color="#232832"/>
+      <stop offset="100%" stop-color="#12151B"/>
+    </linearGradient>
+
+    <linearGradient id="c2-ag-facet-warm" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#7B8494"/>
+      <stop offset="60%" stop-color="#CFD6E0"/>
+      <stop offset="100%" stop-color="#FFF5EA"/>
+    </linearGradient>
+
+    <radialGradient id="c2-bg" cx="50%" cy="45%" r="68%">
+      <stop offset="0%" stop-color="#1B2029"/>
+      <stop offset="65%" stop-color="#0D1015"/>
+      <stop offset="100%" stop-color="#06070A"/>
+    </radialGradient>
+
+    <!-- Spectral CMY/RGB Dispersion Beams -->
+    <linearGradient id="c2-beam-r" x1="0" y1="0.3" x2="1" y2="0.8">
+      <stop offset="0%" stop-color="#FF4D36" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#FF4D36" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="c2-beam-a" x1="0" y1="0.5" x2="1" y2="0.5">
+      <stop offset="0%" stop-color="#FFB627" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#FFB627" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="c2-beam-g" x1="0" y1="0.6" x2="1" y2="0.3">
+      <stop offset="0%" stop-color="#2CEAA3" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#2CEAA3" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="c2-beam-b" x1="0" y1="0.8" x2="1" y2="0.1">
+      <stop offset="0%" stop-color="#3B82F6" stop-opacity="0.92"/>
+      <stop offset="100%" stop-color="#6366F1" stop-opacity="0"/>
+    </linearGradient>
+
+    <clipPath id="c2-squircle">
+      <rect width="512" height="512" rx="114"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#c2-squircle)">
+    <rect width="512" height="512" fill="url(#c2-bg)"/>
+
+    <!-- Subtle laboratory coordinate rings -->
+    <circle cx="256" cy="256" r="192" fill="none" stroke="#94A3B8" stroke-opacity="0.08" stroke-width="1.5" stroke-dasharray="4 8"/>
+    <circle cx="256" cy="256" r="142" fill="none" stroke="#94A3B8" stroke-opacity="0.06" stroke-width="1"/>
+
+    <!-- Incoming pure white photon beam (top-left) -->
+    <polygon points="-10,126 178,224 166,246 -10,168" fill="#FFFDF7" opacity="0.88"/>
+    <line x1="0" y1="147" x2="174" y2="235" stroke="#FFFFFF" stroke-width="4" opacity="0.95"/>
+
+    <!-- Outgoing dispersed spectral beams (Hanatos 2025 spectral upsampling) -->
+    <polygon points="334,242 522,162 522,216 340,262" fill="url(#c2-beam-b)"/>
+    <polygon points="342,258 522,224 522,278 342,276" fill="url(#c2-beam-g)"/>
+    <polygon points="340,272 522,282 522,338 330,290" fill="url(#c2-beam-a)"/>
+    <polygon points="328,286 522,340 522,406 312,306" fill="url(#c2-beam-r)"/>
+
+    <!-- Tabular T-Grain Hexagonal/Octahedral Silver Halide Crystal (AgBr) -->
+    <!-- Outer shadow -->
+    <polygon points="256,88 386,164 386,348 256,424 126,348 126,164" fill="#040507" opacity="0.65" transform="translate(0, 14)"/>
+
+    <!-- Crystal facets -->
+    <!-- Top-left bright silver facet -->
+    <polygon points="256,84 128,160 256,256" fill="url(#c2-ag-main)"/>
+    <!-- Top-right satin facet -->
+    <polygon points="256,84 384,160 256,256" fill="url(#c2-ag-facet-warm)"/>
+    <!-- Left middle facet -->
+    <polygon points="128,160 128,352 256,256" fill="#9AA4B4"/>
+    <!-- Right dark chrome facet -->
+    <polygon points="384,160 384,352 256,256" fill="url(#c2-ag-facet-dark)"/>
+    <!-- Bottom-left facet -->
+    <polygon points="128,352 256,428 256,256" fill="#464E5C"/>
+    <!-- Bottom-right facet -->
+    <polygon points="384,352 256,428 256,256" fill="#1C2028"/>
+
+    <!-- Inner elevated crystal table (Tabular grain plateau) -->
+    <polygon points="256,140 336,188 336,324 256,372 176,324 176,188" fill="url(#c2-ag-main)" stroke="#FFFFFF" stroke-width="2" stroke-opacity="0.75"/>
+
+    <!-- Internal optical caustic refraction inside AgBr -->
+    <polygon points="176,234 256,210 336,258 256,298" fill="#FFFFFF" fill-opacity="0.32"/>
+    <line x1="176" y1="234" x2="336" y2="272" stroke="#FFE4D6" stroke-width="3" opacity="0.85"/>
+
+    <!-- Crisp specular facet ridges -->
+    <g stroke="#FFFFFF" stroke-linecap="round" fill="none">
+      <line x1="256" y1="84" x2="256" y2="140" stroke-width="2.5" stroke-opacity="0.9"/>
+      <line x1="128" y1="160" x2="176" y2="188" stroke-width="2" stroke-opacity="0.8"/>
+      <line x1="384" y1="160" x2="336" y2="188" stroke-width="1.5" stroke-opacity="0.45"/>
+      <polygon points="256,84 384,160 384,352 256,428 128,352 128,160" stroke-width="2.5" stroke-opacity="0.55"/>
+    </g>
+
+    <!-- Photolytic silver speck (latent image center Ag⁰) -->
+    <circle cx="256" cy="256" r="11" fill="#FF4D36"/>
+    <circle cx="256" cy="256" r="5" fill="#FFF7ED"/>
+
+    <!-- Subtle Ag-47 periodic stamp -->
+    <text x="256" y="472" text-anchor="middle" fill="#94A3B8" fill-opacity="0.55" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" font-weight="600" letter-spacing="5">47 · AgBr</text>
+  </g>
+</svg>

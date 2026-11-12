@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="c1-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#181412"/>
+      <stop offset="55%" stop-color="#0C0A09"/>
+      <stop offset="100%" stop-color="#050404"/>
+    </linearGradient>
+
+    <radialGradient id="c1-safe-glow" cx="50%" cy="34%" r="56%" fx="50%" fy="30%">
+      <stop offset="0%" stop-color="#FF3B1F" stop-opacity="0.95"/>
+      <stop offset="30%" stop-color="#D91E14" stop-opacity="0.5"/>
+      <stop offset="68%" stop-color="#6E0A06" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#0C0A09" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="c1-bulb" x1="0.25" y1="0" x2="0.75" y2="1">
+      <stop offset="0%" stop-color="#FF9478"/>
+      <stop offset="36%" stop-color="#F2351B"/>
+      <stop offset="78%" stop-color="#9E110A"/>
+      <stop offset="100%" stop-color="#4A0604"/>
+    </linearGradient>
+
+    <linearGradient id="c1-cone" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#FF5E3A" stop-opacity="0.55"/>
+      <stop offset="58%" stop-color="#E62B17" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#E62B17" stop-opacity="0"/>
+    </linearGradient>
+
+    <linearGradient id="c1-paper" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FAF6EE"/>
+      <stop offset="65%" stop-color="#EAE2D3"/>
+      <stop offset="100%" stop-color="#CFC4B2"/>
+    </linearGradient>
+
+    <linearGradient id="c1-emerge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#261F1D"/>
+      <stop offset="52%" stop-color="#70231A"/>
+      <stop offset="100%" stop-color="#D84A2F"/>
+    </linearGradient>
+
+    <linearGradient id="c1-brass" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#5E492C"/>
+      <stop offset="35%" stop-color="#DEC089"/>
+      <stop offset="65%" stop-color="#9A7846"/>
+      <stop offset="100%" stop-color="#3E2F1B"/>
+    </linearGradient>
+
+    <clipPath id="c1-squircle">
+      <rect x="0" y="0" width="512" height="512" rx="114"/>
+    </clipPath>
+
+    <clipPath id="c1-print-inner">
+      <polygon points="166,304 346,304 372,388 140,388"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#c1-squircle)">
+    <rect width="512" height="512" fill="url(#c1-bg)"/>
+    <rect x="3" y="3" width="506" height="506" rx="111" fill="none" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="2"/>
+
+    <!-- Ambient safelight bloom -->
+    <circle cx="256" cy="184" r="250" fill="url(#c1-safe-glow)"/>
+
+    <!-- Projected light beam onto darkroom easel -->
+    <polygon points="204,202 308,202 406,408 106,408" fill="url(#c1-cone)"/>
+
+    <!-- Top cord & brass mount -->
+    <rect x="249" y="0" width="14" height="72" fill="#1F1B18"/>
+    <rect x="216" y="68" width="80" height="22" rx="6" fill="url(#c1-brass)"/>
+    <rect x="196" y="86" width="120" height="18" rx="9" fill="#2A231E" stroke="#7A6042" stroke-width="1.5"/>
+
+    <!-- Ruby safelight dome -->
+    <path d="M188,104 C188,168 212,216 256,216 C300,216 324,168 324,104 Z" fill="url(#c1-bulb)" stroke="#FF856B" stroke-opacity="0.48" stroke-width="2"/>
+
+    <!-- Glowing tungsten filament -->
+    <path d="M232,108 L238,154 C242,168 270,168 274,154 L280,108" fill="none" stroke="#FFDCC2" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+    <circle cx="256" cy="156" r="18" fill="#FFE7D1" opacity="0.48"/>
+    <path d="M204,116 C205,152 218,186 238,200" fill="none" stroke="#FFC4B2" stroke-width="5" stroke-linecap="round" opacity="0.58"/>
+
+    <!-- Developer tray rim (centered safely for both squircle & circle masks) -->
+    <polygon points="134,290 378,290 416,412 96,412" fill="#181412" stroke="#523830" stroke-width="3"/>
+    <polygon points="144,298 368,298 400,402 112,402" fill="#260F0C"/>
+
+    <!-- Photo paper floating in chemical bath -->
+    <polygon points="154,296 358,296 388,396 124,396" fill="url(#c1-paper)"/>
+
+    <!-- Emerging silver halide image inside paper border -->
+    <g clip-path="url(#c1-print-inner)">
+      <rect x="136" y="300" width="240" height="92" fill="url(#c1-emerge)"/>
+      <circle cx="288" cy="332" r="19" fill="#FFF2DF" opacity="0.95"/>
+      <circle cx="288" cy="332" r="27" fill="none" stroke="#FF7556" stroke-width="2.5" opacity="0.55"/>
+      <path d="M136,392 L198,340 L248,370 L292,350 L376,392 Z" fill="#120E0D"/>
+      <path d="M136,366 Q208,350 262,368 T376,358 L376,394 L136,394 Z" fill="#F5EFE4" fill-opacity="0.22"/>
+    </g>
+
+    <!-- Red darkroom crop L-corners hovering above easel -->
+    <g stroke="#FF4A2E" stroke-width="4.5" stroke-linecap="round" fill="none" opacity="0.92">
+      <path d="M142,276 L164,276 M142,276 L142,292"/>
+      <path d="M370,276 L348,276 M370,276 L370,292"/>
+      <path d="M108,424 L132,424 M108,424 L114,408"/>
+      <path d="M404,424 L380,424 M404,424 L398,408"/>
+    </g>
+  </g>
+</svg>

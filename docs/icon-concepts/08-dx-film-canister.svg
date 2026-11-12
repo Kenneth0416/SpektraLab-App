@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Studio charcoal desk backdrop -->
+    <radialGradient id="c8-bg" cx="50%" cy="40%" r="70%">
+      <stop offset="0%" stop-color="#292623"/>
+      <stop offset="100%" stop-color="#12100E"/>
+    </radialGradient>
+
+    <!-- Cylindrical steel cassette body -->
+    <linearGradient id="c8-canister" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#1A1917"/>
+      <stop offset="22%" stop-color="#3A3733"/>
+      <stop offset="48%" stop-color="#1F1D1A"/>
+      <stop offset="78%" stop-color="#0E0D0C"/>
+      <stop offset="100%" stop-color="#292724"/>
+    </linearGradient>
+
+    <!-- Warm Kodak/Portra-inspired craft gold band -->
+    <linearGradient id="c8-gold-band" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#C98A2C"/>
+      <stop offset="28%" stop-color="#F6CA6E"/>
+      <stop offset="62%" stop-color="#E5A93C"/>
+      <stop offset="100%" stop-color="#9A6619"/>
+    </linearGradient>
+
+    <!-- Translucent amber-brown film leader curling into light -->
+    <linearGradient id="c8-leader" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#5C2812"/>
+      <stop offset="45%" stop-color="#C85A28"/>
+      <stop offset="78%" stop-color="#F29F4B"/>
+      <stop offset="100%" stop-color="#7ABF9E"/>
+    </linearGradient>
+
+    <clipPath id="c8-squircle">
+      <rect width="512" height="512" rx="114"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#c8-squircle)">
+    <rect width="512" height="512" fill="url(#c8-bg)"/>
+
+    <!-- Ambient warm glow behind film tongue -->
+    <circle cx="352" cy="278" r="148" fill="#F0713E" fill-opacity="0.16"/>
+
+    <!-- Flowing 35mm Film Tongue emerging from velvet light-trap -->
+    <g>
+      <!-- Drop shadow of curling film -->
+      <path d="M248,186 C338,176 438,208 446,294 C452,368 386,422 302,414 L248,368 Z" fill="#070605" opacity="0.55" transform="translate(8, 14)"/>
+
+      <!-- Main S-curved film leader ribbon -->
+      <path d="M242,174 C344,166 446,204 452,292 C458,376 382,424 294,404 C338,382 356,342 352,298 C348,252 302,232 242,236 Z" fill="url(#c8-leader)" stroke="#FFE3BA" stroke-opacity="0.45" stroke-width="2"/>
+
+      <!-- Die-cut classic 35mm leader tongue step & sprockets along outer curve -->
+      <g fill="#1B1815" opacity="0.82">
+        <rect x="282" y="182" width="14" height="18" rx="3" transform="rotate(8 289 191)"/>
+        <rect x="318" y="190" width="14" height="18" rx="3" transform="rotate(18 325 199)"/>
+        <rect x="352" y="204" width="14" height="18" rx="3" transform="rotate(30 359 213)"/>
+        <rect x="382" y="226" width="14" height="18" rx="3" transform="rotate(44 389 235)"/>
+        <rect x="404" y="256" width="14" height="18" rx="3" transform="rotate(62 411 265)"/>
+        <rect x="416" y="290" width="14" height="18" rx="3" transform="rotate(82 423 299)"/>
+        <rect x="412" y="326" width="14" height="18" rx="3" transform="rotate(104 419 335)"/>
+      </g>
+    </g>
+
+    <!-- 135 Film Canister (Left-center hero) -->
+    <g transform="translate(88, 96)">
+      <!-- Floor shadow -->
+      <ellipse cx="96" cy="338" rx="88" ry="20" fill="#050404" opacity="0.7"/>
+
+      <!-- Top plastic spool spindle -->
+      <rect x="64" y="0" width="64" height="38" rx="8" fill="#2A2825" stroke="#57524B" stroke-width="2"/>
+      <rect x="76" y="8" width="10" height="22" rx="2" fill="#121110"/>
+      <rect x="106" y="8" width="10" height="22" rx="2" fill="#121110"/>
+
+      <!-- Crimped top steel cap -->
+      <rect x="8" y="34" width="176" height="22" rx="8" fill="#4A4640" stroke="#141311" stroke-width="2"/>
+
+      <!-- Cylindrical canister body -->
+      <rect x="14" y="54" width="164" height="252" rx="6" fill="url(#c8-canister)"/>
+
+      <!-- Color stock band (Warm Amber + Cinnabar stripe) -->
+      <rect x="14" y="92" width="164" height="96" fill="url(#c8-gold-band)"/>
+      <rect x="14" y="188" width="164" height="18" fill="#EF563D"/>
+
+      <!-- Silver DX Auto-Sensing Conductive Checkerboard -->
+      <g transform="translate(32, 224)">
+        <rect x="0" y="0" width="28" height="28" fill="#D8DDE6"/>
+        <rect x="28" y="0" width="28" height="28" fill="#1B1A18"/>
+        <rect x="56" y="0" width="28" height="28" fill="#D8DDE6"/>
+        <rect x="84" y="0" width="28" height="28" fill="#D8DDE6"/>
+
+        <rect x="0" y="28" width="28" height="28" fill="#1B1A18"/>
+        <rect x="28" y="28" width="28" height="28" fill="#D8DDE6"/>
+        <rect x="56" y="28" width="28" height="28" fill="#1B1A18"/>
+        <rect x="84" y="28" width="28" height="28" fill="#D8DDE6"/>
+      </g>
+
+      <!-- Bold ISO / Brand typography on canister -->
+      <text x="32" y="138" fill="#171411" font-family="system-ui, -apple-system, sans-serif" font-size="34" font-weight="900" letter-spacing="-1">400</text>
+      <text x="32" y="166" fill="#2B241B" font-family="ui-monospace, SFMono-Regular, monospace" font-size="15" font-weight="700" letter-spacing="1.5">SILVER</text>
+
+      <!-- Velvet light-trap lip on right side of canister -->
+      <rect x="172" y="62" width="16" height="236" rx="4" fill="#0B0A09" stroke="#3D3934" stroke-width="1.5"/>
+
+      <!-- Crimped bottom steel cap -->
+      <rect x="8" y="302" width="176" height="22" rx="8" fill="#4A4640" stroke="#141311" stroke-width="2"/>
+    </g>
+  </g>
+</svg>

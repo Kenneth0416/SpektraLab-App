@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="c5-paper" cx="50%" cy="45%" r="72%">
+      <stop offset="0%" stop-color="#FBF7EE"/>
+      <stop offset="68%" stop-color="#EFE7D6"/>
+      <stop offset="100%" stop-color="#DDD1BA"/>
+    </radialGradient>
+
+    <linearGradient id="c5-cinnabar" x1="0.15" y1="0.05" x2="0.85" y2="0.95">
+      <stop offset="0%" stop-color="#DF3720"/>
+      <stop offset="52%" stop-color="#C42512"/>
+      <stop offset="100%" stop-color="#9A1809"/>
+    </linearGradient>
+
+    <clipPath id="c5-squircle">
+      <rect width="512" height="512" rx="114"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#c5-squircle)">
+    <rect width="512" height="512" fill="url(#c5-paper)"/>
+
+    <!-- Subtle deckle-edge fiber marks -->
+    <g stroke="#C5B69C" stroke-width="1.4" opacity="0.38">
+      <path d="M72,82 Q156,76 226,86"/>
+      <path d="M298,74 Q374,82 436,70"/>
+      <path d="M84,434 Q174,442 248,430"/>
+      <path d="M312,440 Q392,432 442,442"/>
+    </g>
+
+    <circle cx="256" cy="256" r="218" fill="none" stroke="#D5C7AE" stroke-width="2"/>
+
+    <!-- Carved Cinnabar Stone Seal (朱白相間印) -->
+    <path d="M104,102 C154,99 358,100 408,103 C413,154 414,358 409,408 C356,412 156,411 103,407 C98,354 99,152 104,102 Z" fill="url(#c5-cinnabar)"/>
+
+    <!-- Inner carved negative-space border -->
+    <rect x="122" y="120" width="268" height="272" rx="4" fill="none" stroke="#FBF7EE" stroke-width="7.5"/>
+
+    <!-- 35mm film sprocket notches carved into Left & Right seal borders -->
+    <g fill="#FBF7EE">
+      <rect x="134" y="142" width="16" height="24" rx="2.5"/>
+      <rect x="134" y="186" width="16" height="24" rx="2.5"/>
+      <rect x="134" y="230" width="16" height="24" rx="2.5"/>
+      <rect x="134" y="274" width="16" height="24" rx="2.5"/>
+      <rect x="134" y="318" width="16" height="24" rx="2.5"/>
+
+      <rect x="362" y="142" width="16" height="24" rx="2.5"/>
+      <rect x="362" y="186" width="16" height="24" rx="2.5"/>
+      <rect x="362" y="230" width="16" height="24" rx="2.5"/>
+      <rect x="362" y="274" width="16" height="24" rx="2.5"/>
+      <rect x="362" y="318" width="16" height="24" rx="2.5"/>
+    </g>
+
+    <!-- Classical Seal-Script Glyph: Left radical「金」(Silver/Metal) + Right radical「艮/目」(Optical Lens & Silver) -->
+    <g stroke="#FBF7EE" stroke-width="12.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+      <!-- Left side: Small-seal 金 (Metal / Ag) -->
+      <path d="M170,192 L208,144 L246,192"/>
+      <line x1="178" y1="204" x2="238" y2="204"/>
+      <line x1="174" y1="244" x2="242" y2="244"/>
+      <line x1="208" y1="204" x2="208" y2="356"/>
+      <path d="M178,284 L192,324"/>
+      <path d="M238,284 L224,324"/>
+      <line x1="170" y1="356" x2="246" y2="356"/>
+
+      <!-- Right side: Small-seal 艮 stylized with Camera Aperture Eye -->
+      <rect x="264" y="152" width="76" height="92" rx="14"/>
+      <circle cx="302" cy="198" r="16" fill="#FBF7EE" stroke="none"/>
+      <circle cx="302" cy="198" r="6.5" fill="#C42512" stroke="none"/>
+      <!-- Seal-script curved legs of 艮 -->
+      <path d="M266,244 L266,356 C284,352 304,342 318,328"/>
+      <path d="M272,278 C294,302 316,334 342,356"/>
+    </g>
+
+    <!-- Authentic stone-carving knife nicks (金石刀味) -->
+    <g fill="#FBF7EE">
+      <polygon points="101,184 114,188 102,197"/>
+      <polygon points="411,264 397,269 410,279"/>
+      <polygon points="228,100 236,112 246,100"/>
+      <polygon points="304,410 313,398 324,410"/>
+      <circle cx="160" cy="132" r="3"/>
+      <circle cx="348" cy="378" r="3.5"/>
+    </g>
+  </g>
+</svg>

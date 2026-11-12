@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clipboard, Copy, Download, FileArchive, FolderOpen, Github, Image, ShieldCheck, SlidersHorizontal, Smartphone, Terminal } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { consumeAutostart, resolveApk } from '../support/gate';
 import { downloadMeta } from '../generated/download-meta';
 import { Reveal } from '../components/Reveal';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -36,7 +37,8 @@ export function DownloadPage() {
   const { messages } = useLanguage();
   const m = messages.download;
   const apk = downloadMeta.android;
-  const hasApk = Boolean(apk);
+  const choice = resolveApk(apk?.href);
+  const hasApk = choice.available;
   const [copied, setCopied] = useState<CopyTarget | null>(null);
   const [copyFailed, setCopyFailed] = useState<CopyTarget | null>(null);
   const [downloaded, setDownloaded] = useState(false);
@@ -45,6 +47,17 @@ export function DownloadPage() {
   useEffect(() => () => {
     if (timer.current) clearTimeout(timer.current);
   }, []);
+
+  useEffect(() => {
+    if (!choice.href || !consumeAutostart()) return;
+    const link = document.createElement('a');
+    link.href = choice.href;
+    link.download = apk?.filename ?? '';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setDownloaded(true);
+  }, [apk, choice.href]);
 
   const handleCopy = async (target: CopyTarget, value: string) => {
     if (timer.current) clearTimeout(timer.current);
@@ -96,8 +109,8 @@ export function DownloadPage() {
               <div><span>{m.stats[1]}</span><strong>Android {apk?.minAndroid ?? '8.0+'}</strong></div>
               <div><span>{m.stats[2]}</span><strong>.APK</strong></div>
             </div>
-            {hasApk ? (
-              <a className="ticket-download" href={apk?.href} download={apk?.filename} onClick={() => setDownloaded(true)}>
+            {choice.href ? (
+              <a className="ticket-download" href={choice.href} download={apk?.filename} onClick={() => setDownloaded(true)}>
                 <Download size={21} /><span>{m.downloadFull}<small>{apk?.filename}</small></span><ArrowRight size={20} />
               </a>
             ) : (
@@ -195,7 +208,7 @@ export function DownloadPage() {
           <FolderOpen size={35} strokeWidth={1.4} />
           <h2>{m.bottomTitle}</h2>
           <p>{apk?.size ?? '—'} · {m.bottomMeta}</p>
-          {hasApk && <a className="button button-light" href={apk?.href} download={apk?.filename}><Download size={18} />{m.downloadPrefix} {apk?.filename}</a>}
+          {choice.href && <a className="button button-light" href={choice.href} download={apk?.filename}><Download size={18} />{m.downloadPrefix} {apk?.filename}</a>}
           <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '10px' }}>
             <Link to="/">{m.backHome}<ArrowRight size={16} /></Link>
             <Link to="/credits" style={{ color: '#bbb3a6', textDecoration: 'underline' }}>{m.viewCredits}</Link>

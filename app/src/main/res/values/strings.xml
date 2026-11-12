@@ -200,6 +200,15 @@
     <string name="recipe_saved">Saved recipe card: %1$s</string>
     <string name="no_importable_media">No photos or videos could be imported</string>
     <string name="items_imported">Imported %1$d items</string>
+    <string name="coffee_title">Buy me a coffee</string>
+    <string name="coffee_body">You\u2019ve brought 10 photos into the darkroom. Silvercam stays free \u2014 if it\u2019s worth keeping, \u00a59.90 is a coffee. Entirely optional.</string>
+    <string name="coffee_wechat">WeChat Pay</string>
+    <string name="coffee_alipay">Alipay</string>
+    <string name="coffee_open">Open Alipay</string>
+    <string name="coffee_open_hint">Tap a code to open it in its payment app. If that app is not installed, another phone can scan the code.</string>
+    <string name="coffee_open_failed">That payment app is not available on this phone. Scan the code with another phone instead.</string>
+    <string name="coffee_later">Maybe later</string>
+    <string name="coffee_dismiss">Don\u2019t ask again</string>
     <string name="items_import_skipped">%1$d unreadable items were skipped</string>
     <string name="select_items_to_export">Circle the items you want to export first</string>
     <string name="nothing_to_export">There are no items to export</string>

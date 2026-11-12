@@ -199,6 +199,15 @@
     <string name="recipe_saved">已写成配方卡：%1$s</string>
     <string name="no_importable_media">没有可以导入的照片或视频</string>
     <string name="items_imported">已导入 %1$d 项</string>
+    <string name="coffee_title">请我喝一杯</string>
+    <string name="coffee_body">你已经把 10 张照片放进暗房。银盐工坊依然免费，如果它值得留下，可以用 ¥9.90 请我喝一杯。完全自愿。</string>
+    <string name="coffee_wechat">微信支付</string>
+    <string name="coffee_alipay">支付宝</string>
+    <string name="coffee_open">打开支付宝</string>
+    <string name="coffee_open_hint">点一下二维码，就会尝试用对应的支付 App 打开。如果这台手机没有安装，可以换一台手机扫描。</string>
+    <string name="coffee_open_failed">这台手机打不开对应的支付 App。请改用另一台手机扫描二维码。</string>
+    <string name="coffee_later">下次再说</string>
+    <string name="coffee_dismiss">不再提醒</string>
     <string name="items_import_skipped">有 %1$d 项无法读取，已跳过</string>
     <string name="select_items_to_export">先圈出要导出的项目</string>
     <string name="nothing_to_export">没有可以导出的项目</string>

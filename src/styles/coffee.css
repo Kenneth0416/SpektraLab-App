@@ -1,0 +1,98 @@
+.coffee-page {
+  min-height: 100svh;
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 128px 24px 72px;
+  text-align: center;
+}
+.coffee-eyebrow {
+  margin: 0 0 14px;
+  color: var(--red);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+.coffee-page h1 {
+  margin: 0;
+  font-size: clamp(40px, 7vw, 72px);
+  line-height: .95;
+  font-weight: 560;
+}
+.coffee-lead {
+  max-width: 36rem;
+  margin: 18px auto 0;
+  color: var(--paper-dim);
+  font-size: 16px;
+  line-height: 1.7;
+}
+.coffee-amount {
+  margin: 22px 0 28px;
+  font-family: var(--mono);
+  font-size: 42px;
+  letter-spacing: .04em;
+}
+.pay-jump, .pay-codes { margin: 0 auto; }
+.pay-codes { display: none; }
+.pay-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(100%, 420px);
+  min-height: 52px;
+  margin: 0 auto 12px;
+  border: 0;
+  border-radius: 4px;
+  color: #fff;
+  font: inherit;
+  font-size: 16px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.pay-button.wechat { background: #1aad19; }
+.pay-button.alipay { background: #1677ff; }
+.pay-hint {
+  max-width: 420px;
+  margin: 8px auto 18px;
+  color: #8f887d;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.pay-fallback {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  width: min(100%, 420px);
+  margin: 0 auto;
+}
+.pay-fallback img, .pay-codes img { width: 100%; height: auto; }
+.pay-codes p { color: var(--paper-dim); }
+.pay-codes > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-top: 16px;
+}
+.pay-codes figure { margin: 0; }
+.pay-codes figcaption { margin-top: 8px; color: var(--paper-dim); font-size: 13px; }
+.coffee-refuse {
+  margin-top: 28px;
+  padding: 8px;
+  border: 0;
+  background: transparent;
+  color: #8f887d;
+  font: inherit;
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.coffee-back { display: block; margin-top: 18px; color: #6f685e; font-size: 13px; }
+.thanks-page .pay-button { margin-top: 28px; background: var(--red); }
+@media (min-width: 801px) {
+  .pay-jump { display: none; }
+  .pay-codes { display: block; }
+}
+@media (max-width: 360px) {
+  .coffee-page { padding: 108px 16px 48px; }
+}

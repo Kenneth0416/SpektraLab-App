@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import app.spektralab.ui.AppState
 import app.spektralab.ui.EditorScreen
 import app.spektralab.ui.CameraScreen
+import app.spektralab.ui.CoffeePromptDialog
 import app.spektralab.ui.LibraryScreen
 import app.spektralab.ui.RoomTransition
 import app.spektralab.ui.LocalFold
@@ -66,8 +67,10 @@ class MainActivity : AppCompatActivity() {
                 val selecting by state.selecting.collectAsState()
                 val cameraOpen by state.cameraOpen.collectAsState()
                 val settingsOpen by state.settingsOpen.collectAsState()
-                BackHandler(sheet != Sheet.NONE || editId != null || selecting || cameraOpen || settingsOpen) {
+                val coffeePrompt by state.coffeePrompt.collectAsState()
+                BackHandler(coffeePrompt || sheet != Sheet.NONE || editId != null || selecting || cameraOpen || settingsOpen) {
                     when {
+                        coffeePrompt -> state.snoozeCoffeePrompt()
                         sheet != Sheet.NONE && sheet != Sheet.PROGRESS -> state.sheet.value = Sheet.NONE
                         sheet == Sheet.PROGRESS -> state.sheet.value = Sheet.NONE
                         settingsOpen -> state.closeSettings()
@@ -87,6 +90,10 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                     Sheets(state)
+                    if (coffeePrompt) CoffeePromptDialog(
+                        onLater = state::snoozeCoffeePrompt,
+                        onDismissForever = state::dismissCoffeePrompt,
+                    )
                 }
             } }
         }

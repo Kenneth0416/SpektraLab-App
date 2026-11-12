@@ -44,6 +44,18 @@ class AppState(application: Application) : AndroidViewModel(application) {
     val exportOptions = MutableStateFlow(ExportOptions())
     val importing = MutableStateFlow(false)
     val settingsOpen = MutableStateFlow(false)
+    /** One-time optional coffee prompt after ten imported photos. */
+    val coffeePrompt = MutableStateFlow(false)
+    private val coffee = CoffeePromptStore(application)
+
+    /** Hide this appearance only. The next imported photo can show it again. */
+    fun snoozeCoffeePrompt() { coffeePrompt.value = false }
+
+    /** Retire the prompt for good. */
+    fun dismissCoffeePrompt() {
+        coffee.markPrompted()
+        coffeePrompt.value = false
+    }
 
     private val languagePreferences = LanguagePreferences(application)
     val language = MutableStateFlow(languagePreferences.load())
@@ -305,7 +317,12 @@ class AppState(application: Application) : AndroidViewModel(application) {
             if (items.isEmpty()) return@launch say(R.string.no_importable_media)
             library.add(items)
             filter.value = Filter.ALL
-            if (items.size == 1) openEdit(items[0].id) else say(R.string.items_imported, items.size)
+            val photos = items.count { !it.isVideo }
+            val showCoffee = coffee.recordImportedPhotos(photos)
+            // A single imported photo normally opens the darkroom. Keep that frame on the
+            // lightbox while the optional prompt is up, so the two screens do not stack.
+            if (showCoffee) coffeePrompt.value = true
+            if (items.size == 1 && !showCoffee) openEdit(items[0].id) else say(R.string.items_imported, items.size)
             if (items.size < uris.size) say(R.string.items_import_skipped, uris.size - items.size)
         }
     }

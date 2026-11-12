@@ -40,7 +40,7 @@ export function SiteHeader() {
         </nav>
         <div className="header-actions">
           <LanguageSwitcher />
-          <NavLink className={({ isActive }) => `header-download ${isActive ? 'active' : ''}`} to="/download">
+          <NavLink className={() => `header-download ${['/coffee', '/thanks', '/download'].includes(location.pathname) ? 'active' : ''}`} to="/download">
             <Download size={16} strokeWidth={1.8} />
             <span>{messages.nav.download}</span>
           </NavLink>

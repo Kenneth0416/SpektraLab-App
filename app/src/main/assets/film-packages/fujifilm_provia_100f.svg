@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="168" viewBox="0 0 160 168">
+  <title>FUJIFILM PROVIA 100F</title>
+  <path d="M20 22L130 22L146 36L146 151L36 151L20 137Z" fill="#000000" opacity=".16"/>
+  <path d="M16 18L126 18L142 30L32 30Z" fill="#E8E8DB"/>
+  <path d="M126 18L142 30L142 146L126 134Z" fill="#3764A1"/>
+  <path d="M126 18L142 30L142 146L126 134Z" fill="#000000" opacity=".23"/>
+  <rect x="16" y="18" width="110" height="128" rx="2" fill="#E8E8DB"/>
+  <rect x="16" y="18" width="110" height="27" rx="2" fill="#F5EAD0"/>
+  <text x="24" y="36" font-family="sans-serif" font-size="13" font-weight="bold" fill="#21653D">FUJIFILM</text>
+  <path d="M16 47H126" stroke="#313A35" stroke-opacity=".18"/>
+  <text x="24" y="61" font-family="sans-serif" font-size="6" letter-spacing="1" fill="#313A35">COLOR REVERSAL</text>
+  <text x="24" y="86" font-family="sans-serif" font-size="25" font-weight="bold" fill="#313A35">PROVIA</text>
+  <text x="24" y="123" font-family="sans-serif" font-size="36" font-weight="bold" fill="#313A35">100F</text>
+  <rect x="16" y="132" width="110" height="14" fill="#3764A1"/>
+  <text x="24" y="142" font-family="sans-serif" font-size="7" font-weight="bold" fill="#FFFFFF">135 / 36 EXP</text>
+  <path d="M134 42V123" stroke="#FFFFFF" stroke-opacity=".3" stroke-width="2"/>
+  <path d="M16 19H125" stroke="#FFFFFF" stroke-opacity=".4"/>
+</svg>

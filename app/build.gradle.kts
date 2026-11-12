@@ -57,6 +57,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.exifinterface:exifinterface:1.4.1")
     implementation("androidx.window:window:1.3.0")
+    implementation("com.caverock:androidsvg-aar:1.4")
     val camerax = "1.5.3"
     implementation("androidx.camera:camera-core:$camerax")
     implementation("androidx.camera:camera-camera2:$camerax")

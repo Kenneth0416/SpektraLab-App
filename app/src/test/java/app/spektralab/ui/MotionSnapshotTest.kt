@@ -13,10 +13,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
@@ -159,16 +161,30 @@ class MotionSnapshotTest {
         assertTrue("a full stroke advances the film", cocked && frame == 13)
     }
 
+    @Test fun everyFilmHasALocalCachedPackageSvg() {
+        val films = app.spektralab.engine.Catalog.films
+        val sheet = Bitmap.createBitmap(160 * 6, 168 * 3, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(sheet)
+        canvas.drawColor(android.graphics.Color.rgb(30, 24, 20))
+        films.forEachIndexed { index, film ->
+            val picture = FilmPackagePictures.get(rule.activity.assets, film.stock)
+            assertTrue("valid SVG for ${film.stock}", picture.width == 160 && picture.height == 168)
+            assertTrue("reuse parsed drawing", picture === FilmPackagePictures.get(rule.activity.assets, film.stock))
+            canvas.save()
+            canvas.translate((index % 6 * 160).toFloat(), (index / 6 * 168).toFloat())
+            canvas.drawPicture(picture)
+            canvas.restore()
+        }
+        File(out, "film_packages_all.png").outputStream().use { sheet.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
     @Test fun filmFramesShowTheLoadedRoll() {
         rule.mainClock.autoAdvance = false
-        val spektra = rule.activity.application as app.spektralab.SpektraApp
         val look = app.spektralab.engine.Look()
-        val scene = Swatches.testScene()
+        var selected by mutableStateOf(look.film)
         rule.setContent {
             Column(Modifier.testTag("stage").background(Pal.darkPanel).padding(12.dp).width(376.dp)) {
-                FrameRow(spektra, null, filmChoices(look), look.film) {}
-                FrameRow(spektra, null, paperChoices(look, Color(0xFFE9C48A)), "kodak_2383") {}
-                androidx.compose.foundation.Image(scene.asImageBitmap(), null, Modifier.size(120.dp))
+                FilmPackageRow(selected) { selected = it }
             }
         }
         rule.mainClock.advanceTimeBy(1200)
@@ -180,5 +196,9 @@ class MotionSnapshotTest {
             if (kotlin.math.abs(c.red - 0.914f) < 0.03f && kotlin.math.abs(c.green - 0.769f) < 0.03f && kotlin.math.abs(c.blue - 0.541f) < 0.03f) ring++
         }
         assertTrue("selected frame ring ($ring px)", ring > 200)
+        rule.onNodeWithContentDescription("Portra 160，ISO 160，彩色负片").performClick()
+        rule.mainClock.advanceTimeBy(400)
+        assertTrue("select the intended stock", selected == "kodak_portra_160")
+        rule.onNodeWithContentDescription("Portra 160，ISO 160，彩色负片").assertIsSelected()
     }
 }

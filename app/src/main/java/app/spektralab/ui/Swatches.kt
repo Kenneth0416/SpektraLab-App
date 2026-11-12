@@ -71,9 +71,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
- * Square swatches for the film / paper pickers: one picture (the frame on the easel, or
- * a built-in test scene in the camera) printed through every stock, so a roll is chosen
- * by what it does to the picture rather than by its name.
+ * Square swatches for the paper picker: the frame on the easel (or a built-in
+ * camera test scene) printed through each paper. Film choices use local SVG packages.
  */
 class Swatches(private val app: SpektraApp) {
     private val mem = LruCache<String, Bitmap>(160)
@@ -177,10 +176,6 @@ class Swatches(private val app: SpektraApp) {
 
 /** One choice in a [FrameRow]. */
 class FrameChoice(val id: String, val name: String, val sub: String, val edge: String, val accent: Color, val look: Look)
-
-fun filmChoices(look: Look): List<FrameChoice> = Catalog.films.map { f ->
-    FrameChoice(f.stock, f.name, "ISO ${f.iso} · ${f.kind}", f.iso, Color(f.accent), Swatches.look(f.stock, look.paper))
-}
 
 fun paperChoices(look: Look, accent: Color): List<FrameChoice> = Catalog.papers.map { p ->
     val sub = when {

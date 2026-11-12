@@ -493,8 +493,7 @@ private fun ToolPanel(state: AppState, tool: String, isVideo: Boolean, look: Loo
     Spacer(Modifier.height(10.dp))
     when (tool) {
         "film" -> {
-            // every roll as a square frame of this picture, so the choice is made by eye
-            FrameRow(state.app, source, filmChoices(look), look.film) { set("film", look.copy(film = it)) }
+            FilmPackageRow(look.film) { set("film", look.copy(film = it)) }
             Spacer(Modifier.height(8.dp))
             Crossfade(Catalog.film(look.film).note, animationSpec = tween(250), label = "note") { n ->
                 Text(n, color = Pal.dim, fontSize = 12.sp)

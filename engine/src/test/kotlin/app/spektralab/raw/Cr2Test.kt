@@ -159,6 +159,7 @@ class Cr2Test {
         val bytes = build(s, m)
         val d = assertNotNull(Cr2Reader.decode(bytes))
         val img = d.image
+        RawFormatCheck.claims("CR2", bytes, img)
         assertEquals(1504, img.rawWidth); assertEquals(1000, img.rawHeight)
         assertContentEquals(m, IntArray(m.size) { img.data[it].toInt() and 0xffff })
         assertEquals("CfaPattern(2x2, RGGB)", img.cfa.toString())
@@ -173,7 +174,7 @@ class Cr2Test {
         assertNeutral(img, s)
 
         // an EXIF orientation other than 1 wins over CameraInfo (LibRaw: only when tiff_flip == 0)
-        val rotated = assertNotNull(Cr2Reader.read(build(Spec(s.rawWidth, s.rawHeight, 4, s.slices, s.model, s.modelId, 14,
+        val rotated = assertNotNull(RawFormatCheck.read("CR2", build(Spec(s.rawWidth, s.rawHeight, 4, s.slices, s.model, s.modelId, 14,
             s.colorDataLength, 6, s.asShotAt, s.asShot, s.blackAt, s.channelBlack, s.sensorCrop, orientation = 8,
             cameraInfoFlipAt = 0x31, cameraInfoRotation = 1), m)))
         assertEquals(8, rotated.orientation)
@@ -186,8 +187,10 @@ class Cr2Test {
         val m = mosaic(s, { y, x -> borderBlack[(y and 1) * 2 + (x and 1)] }, 3600, 48, clipAt = 3900)
         // make sure something reaches the clip level
         for (x in 1000 until 1010) m[700 * s.rawWidth + x] = 3900
-        val d = assertNotNull(Cr2Reader.decode(build(s, m)))
+        val file = build(s, m)
+        val d = assertNotNull(Cr2Reader.decode(file))
         val img = d.image
+        RawFormatCheck.claims("CR2", file, img)
         assertContentEquals(m, IntArray(m.size) { img.data[it].toInt() and 0xffff })
         // LibRaw: margins from the table, odd top (6 is even here) -> visible (48, 6) 2176 x 1448, RGGB there
         assertEquals("CfaPattern(2x2, RGGB)", img.cfa.toString())
@@ -233,7 +236,7 @@ class Cr2Test {
         val s = table2
         val m = mosaic(s, { _, _ -> 128 }, 3600, 48)
         val good = build(s, m)
-        assertNotNull(Cr2Reader.read(good))
+        assertNotNull(RawFormatCheck.read("CR2", good))
         // plain TIFF (no "CR\2" marker)
         assertNull(Cr2Reader.read(good.copyOf().also { it[8] = 0; it[9] = 0 }))
         // not Canon
@@ -315,6 +318,7 @@ class Cr2Test {
             Cr2Reader.decode(bytes)                                               // warm-up
             val t0 = System.nanoTime()
             val d = assertNotNull(Cr2Reader.decode(bytes), e.name)
+            RawFormatCheck.claims("CR2", bytes, d.image)
             println("${e.name}: decoded in %.0f ms".format((System.nanoTime() - t0) / 1e6))
             val img = d.image
             assertEquals(e.rawWidth, img.rawWidth); assertEquals(e.rawHeight, img.rawHeight)

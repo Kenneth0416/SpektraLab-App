@@ -26,15 +26,40 @@ package app.spektralab.raw
  * - pass the EXIF orientation (1..8), `make` and `model`.
  */
 object RawReader {
-    /** Registered readers, most specific first. To add a format, add one line here. */
-    private val readers: List<(ByteArray) -> RawImage?> = listOf(
-        DngReader::read,
+    /** A registered format: [name] is the usual file extension, upper case. */
+    internal class Format(val name: String, val read: (ByteArray) -> RawImage?)
+
+    /**
+     * Registered readers. To add a format, add one line here.
+     *
+     * Order: readers whose files are told apart by a cheap, unique magic come first (CR3 `ftypcrx `,
+     * RAF `FUJIFILM`, RW2 TIFF magic 0x55, ORF TIFF magic `RO` / `RS`, CR2 `CR\2` at byte 8), then
+     * DNG (any TIFF with DNGVersion), then the makers whose raws are plain TIFF (magic 42) told apart
+     * only by Make. Every maker reader also refuses files with a DNGVersion tag, so a camera's own
+     * DNG (Pentax, Leica, Samsung / Ricoh phones ...) is always read as DNG, and the DNG reader
+     * refuses anything without DNGVersion; the order is therefore for speed, not for correctness
+     * (checked by RawReaderTest: every sample and fixture is claimed by its own reader only).
+     */
+    internal val formats: List<Format> = listOf(
+        Format("CR3", Cr3Reader::read),
+        Format("RAF", RafReader::read),
+        Format("RW2", Rw2Reader::read),
+        Format("ORF", OrfReader::read),
+        Format("CR2", Cr2Reader::read),
+        Format("DNG", DngReader::read),
+        Format("NEF", NefReader::read),
+        Format("ARW", ArwReader::read),
+        Format("PEF", PefReader::read),
+        Format("SRW", SrwReader::read),
     )
 
-    fun read(bytes: ByteArray): RawImage? {
-        for (r in readers) {
-            val img = try { r(bytes) } catch (e: Exception) { null } catch (e: OutOfMemoryError) { null }
-            if (img != null) return img
+    fun read(bytes: ByteArray): RawImage? = readFormat(bytes)?.second
+
+    /** The image and the name of the [Format] that read it. */
+    internal fun readFormat(bytes: ByteArray): Pair<String, RawImage>? {
+        for (f in formats) {
+            val img = try { f.read(bytes) } catch (e: Exception) { null } catch (e: OutOfMemoryError) { null }
+            if (img != null) return f.name to img
         }
         return null
     }

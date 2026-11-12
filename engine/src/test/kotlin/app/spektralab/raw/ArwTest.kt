@@ -157,7 +157,7 @@ class ArwTest {
 
     @Test fun arw2Lossy() {
         val e = arw2File(crop = intArrayOf(8, 4, 224, 30))
-        val img = assertNotNull(ArwReader.read(e.file))
+        val img = assertNotNull(RawFormatCheck.read("ARW", e.file))
         assertContentEquals(e.mosaic, img.data)
         assertEquals(256, img.rawWidth); assertEquals(40, img.rawHeight)
         assertEquals(listOf(8, 4, 224, 30), listOf(img.cropX, img.cropY, img.cropWidth, img.cropHeight))
@@ -170,7 +170,7 @@ class ArwTest {
 
     @Test fun encryptedSr2LevelsOverridePlainTags() {
         val e = arw2File(sr2 = true)
-        val img = assertNotNull(ArwReader.read(e.file))
+        val img = assertNotNull(RawFormatCheck.read("ARW", e.file))
         assertContentEquals(e.mosaic, img.data)
         assertContentEquals(floatArrayOf(600f, 604f, 604f, 608f), img.black)
         assertEquals(2004f / 1024, img.wb[0], 1e-5f); assertEquals(2212f / 1024, img.wb[2], 1e-5f)
@@ -184,7 +184,7 @@ class ArwTest {
             val px = ShortArray(w * h) { (scene(it / w, it % w, 16384, rnd)).toShort() }
             val blob = ByteArray(w * h * 2).also { b -> for (i in px.indices) { b[2 * i] = px[i].toByte(); b[2 * i + 1] = (px[i].toInt() ushr 8).toByte() } }
             val file = sonyFile("ILCE-7SM2", w, h, comp, 14, listOf(blob), orientation = 6)
-            val img = assertNotNull(ArwReader.read(file), "compression $comp")
+            val img = assertNotNull(RawFormatCheck.read("ARW", file), "compression $comp")
             assertContentEquals(px, img.data)
             assertEquals(6, img.orientation)
             assertEquals(16383f, img.white)
@@ -198,7 +198,7 @@ class ArwTest {
         val px = IntArray(w * h) { scene(it / w, it % w, 4096, rnd) }
         val blob = Pack.pack(px, 12, Unpack.BitOrder.LSB, w, w * 3 / 2).copyOf(w * h * 3 / 2)
         val file = sonyFile("DSLR-A700", w, h, 32767, 12, listOf(blob))
-        val img = assertNotNull(ArwReader.read(file))
+        val img = assertNotNull(RawFormatCheck.read("ARW", file))
         assertContentEquals(px.map { it.toShort() }.toShortArray(), img.data)
         assertEquals(4095f, img.white)
         // the plain 0x7310 levels (510..516) are 14-bit: divided by 4 like LibRaw
@@ -225,7 +225,7 @@ class ArwTest {
             blobs += LjpegEncoder.encode(s, tw / 2, th / 2, 4, 14, 1, tableFor = intArrayOf(0, 1, 1, 1))
         }
         val file = sonyFile("ILCE-7M4", w, h, 7, 14, blobs, tile = tw to th)
-        val img = assertNotNull(ArwReader.read(file))
+        val img = assertNotNull(RawFormatCheck.read("ARW", file))
         assertContentEquals(px.map { it.toShort() }.toShortArray(), img.data)
         libRaw(file, img, "ljpeg")
     }
@@ -314,7 +314,7 @@ class ArwTest {
     private fun check(name: String, e: Expect) {
         val bytes = sample(name)
         val t0 = System.nanoTime()
-        val img = assertNotNull(ArwReader.read(bytes), name)
+        val img = assertNotNull(RawFormatCheck.read("ARW", bytes), name)
         val ms = (System.nanoTime() - t0) / 1_000_000
         println("$name decoded in $ms ms")
         assertEquals(e.rawW, img.rawWidth); assertEquals(e.rawH, img.rawHeight)

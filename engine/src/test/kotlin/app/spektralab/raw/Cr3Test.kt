@@ -63,7 +63,7 @@ class Cr3Test {
         val meta = Cr3TestBuilder.Meta(orientation = 6, area = intArrayOf(5, 3, 199, 120))
         val bytes = Cr3TestBuilder.file(spec, meta)
         dump("lossless_v100_1tile", bytes)
-        val img = assertNotNull(Cr3Reader.read(bytes))
+        val img = assertNotNull(RawFormatCheck.read("CR3", bytes))
         assertEquals(202, img.rawWidth); assertEquals(122, img.rawHeight)
         assertContentEquals(raw.flatMap { it.toList() }.map { it.toShort() }.toShortArray(), img.data)
         assertEquals(0xd019fad9L, crc(img.data))                       // LibRaw raw_image
@@ -85,7 +85,7 @@ class Cr3Test {
         val spec = losslessSpec(0x100, raw, 64, 52, 12, 1, booleanArrayOf(true, false, true, false))
         val bytes = Cr3TestBuilder.file(spec)
         dump("lossless_v100_4tiles", bytes)
-        val img = assertNotNull(Cr3Reader.read(bytes))
+        val img = assertNotNull(RawFormatCheck.read("CR3", bytes))
         assertContentEquals(raw.flatMap { it.toList() }.map { it.toShort() }.toShortArray(), img.data)
         assertEquals(0xe418249bL, crc(img.data))                       // LibRaw raw_image
         assertEquals(CfaPattern.GRBG.colors.toList(), img.cfa.colors.toList())
@@ -99,7 +99,7 @@ class Cr3Test {
         val spec = losslessSpec(0x200, raw, 64, 60, 14, 3, booleanArrayOf(false, true, false, true))
         val bytes = Cr3TestBuilder.file(spec, Cr3TestBuilder.Meta(colourInCtmd = true, wb = intArrayOf(1900, 1030, 1018, 1600)))
         dump("lossless_v200_2tiles_bggr", bytes)
-        val img = assertNotNull(Cr3Reader.read(bytes))
+        val img = assertNotNull(RawFormatCheck.read("CR3", bytes))
         assertContentEquals(raw.flatMap { it.toList() }.map { it.toShort() }.toShortArray(), img.data)
         assertEquals(0xb161d167L, crc(img.data))                       // LibRaw raw_image
         assertEquals(CfaPattern.BGGR.colors.toList(), img.cfa.colors.toList())
@@ -122,7 +122,7 @@ class Cr3Test {
     private fun checkAgainstLibRaw(name: String, spec: CrxTestEncoder.Spec, expectedCrc: Long) {
         val bytes = Cr3TestBuilder.file(spec)
         dump(name, bytes)
-        val img = assertNotNull(Cr3Reader.read(bytes), name)
+        val img = assertNotNull(RawFormatCheck.read("CR3", bytes), name)
         System.getenv("SPEKTRA_CR3_SYNTH_OUT")?.let { dir ->
             val b = ByteArray(img.data.size * 2)
             for (i in img.data.indices) { b[2 * i] = img.data[i].toByte(); b[2 * i + 1] = (img.data[i].toInt() shr 8).toByte() }
@@ -196,7 +196,7 @@ class Cr3Test {
         val px = obImage(112, 0, w)
         val bytes = Cr3TestBuilder.file(functionSpec(w, h, 2016, 0, px), Cr3TestBuilder.Meta(model = "Canon EOS RP"))
         dump("table_4032x2656", bytes)
-        val img = assertNotNull(Cr3Reader.read(bytes))
+        val img = assertNotNull(RawFormatCheck.read("CR3", bytes))
         for (y in listOf(0, 1, 1000, h - 1)) for (x in listOf(0, 1, 111, 112, 2015, 2016, w - 1)) assertEquals(px(x, y), img.data[y * w + x].toInt())
         assertEquals(0xdc906ca5L, crc(img.data))                       // LibRaw raw_image
         assertEquals(listOf(112, 44, 3910, 2612), listOf(img.cropX, img.cropY, img.cropWidth, img.cropHeight))
@@ -214,7 +214,7 @@ class Cr3Test {
         val px = obImage(96, 8, w)
         val bytes = Cr3TestBuilder.file(functionSpec(w, h, w, 0, px), Cr3TestBuilder.Meta(model = "Canon PowerShot SX50 HS"))
         dump("table_4176x3062", bytes)
-        val img = assertNotNull(Cr3Reader.read(bytes))
+        val img = assertNotNull(RawFormatCheck.read("CR3", bytes))
         assertEquals(0xfe12d771L, crc(img.data))                       // LibRaw raw_image
         assertEquals(CfaPattern.RGGB.colors.toList(), img.cfa.colors.toList())   // LibRaw raw_pattern at row 18: RGGB
         assertEquals(listOf(96, 18, 4072, 3044), listOf(img.cropX, img.cropY, img.cropWidth, img.cropHeight))
@@ -237,14 +237,14 @@ class Cr3Test {
         val raw = image(7, 64, 48, 16383)
         val spec = losslessSpec(0x100, raw, 64, 48, 14, 0, booleanArrayOf(true, true, true, true))
         assertNull(Cr3Reader.read(Cr3TestBuilder.file(spec, Cr3TestBuilder.Meta(model = "Canon EOS Imaginary"))))
-        assertNotNull(Cr3Reader.read(Cr3TestBuilder.file(spec)))
+        assertNotNull(RawFormatCheck.read("CR3", Cr3TestBuilder.file(spec)))
     }
 
     @Test
     fun corruptOrTruncatedInputNeverThrows() {
         val spec = cRawSpec(0x100, 170, 140, 96, 80, 3, 0, 1)
         val good = Cr3TestBuilder.file(spec)
-        assertNotNull(Cr3Reader.read(good))
+        assertNotNull(RawFormatCheck.read("CR3", good))
         val r = kotlin.random.Random(42)
         for (cut in listOf(16, 100, good.size / 3, good.size / 2, good.size - 200, good.size - 1))
             assertNull(Cr3Reader.read(good.copyOf(cut)), "truncated to $cut")

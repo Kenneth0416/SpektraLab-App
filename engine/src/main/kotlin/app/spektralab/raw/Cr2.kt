@@ -40,7 +40,6 @@ object Cr2Reader {
 
     internal fun decode(bytes: ByteArray): Decoded? = try { parse(bytes) } catch (e: Exception) { null } catch (e: OutOfMemoryError) { null }
 
-    private const val MAX_PIXELS = 160_000_000L
     private const val TAG_CR2_SLICE = 0xC640
 
     private fun parse(bytes: ByteArray): Decoded? {
@@ -49,6 +48,7 @@ object Cr2Reader {
         val ifd0 = tiff.ifd0
         val make = ifd0.string(TiffTags.MAKE) ?: return null
         if (!make.startsWith("Canon", ignoreCase = true)) return null
+        if (TiffTags.DNG_VERSION in ifd0) return null
         val model = ifd0.string(TiffTags.MODEL) ?: ""
 
         // ---- raw frame: the largest lossless-JPEG strip in the IFD chain (normally IFD3)
@@ -76,7 +76,7 @@ object Cr2Reader {
         var rawWidth = h.width * h.components
         var rawHeight = h.height
         if (rawWidth > 4 * rawHeight) { rawWidth /= 2; rawHeight *= 2 }                     // LibRaw apply_tiff
-        if (rawWidth < 22 || rawHeight < 22 || rawWidth.toLong() * rawHeight > MAX_PIXELS) return null
+        if (rawWidth < 22 || rawHeight < 22 || rawWidth.toLong() * rawHeight > RawDecodeLimits.MAX_SAMPLES) return null
 
         val slices = rawIfd.ints(TAG_CR2_SLICE, 3)?.takeIf { it.size == 3 } ?: intArrayOf(0, 0, 0)
         if (slices[0] != 0 && (slices[1] <= 0 || slices[2] <= 0)) return null

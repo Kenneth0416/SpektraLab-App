@@ -67,6 +67,7 @@ object SrwReader {
         val make = ifd0.string(TiffTags.MAKE) ?: return null
         val model = ifd0.string(TiffTags.MODEL) ?: return null
         if (!make.startsWith("SAMSUNG", ignoreCase = true)) return null
+        if (TiffTags.DNG_VERSION in ifd0) return null                    // Galaxy phone / NX DNGs are DngReader's
 
         // the raw IFD: a Samsung compression value, one strip
         val raw = tiff.allIfds().filter { it.int(TiffTags.COMPRESSION) in setOf(32769, 32770, 32772, 32773) }

@@ -160,7 +160,7 @@ class RafTest {
     fun xTransUncompressedLittleEndian() {
         val w = 120; val h = 72
         val m = scene(w, h, 16383, 1023)
-        val img = assertNotNull(RafReader.read(RafBuilder(w, h, m, visible = 96 to 72, inset = intArrayOf(4, 16, 64, 88)).build()))
+        val img = assertNotNull(RawFormatCheck.read("RAF", RafBuilder(w, h, m, visible = 96 to 72, inset = intArrayOf(4, 16, 64, 88)).build()))
         assertMosaic(m, img)
         assertContentEquals(RafBuilder.XT2, img.cfa.colors)
         assertEquals(16383f, img.white)
@@ -176,7 +176,7 @@ class RafTest {
     fun bigEndianWordsFollowTheExifByteOrder() {
         val w = 120; val h = 72
         val m = scene(w, h, 16383, 1023)
-        val img = assertNotNull(RafReader.read(RafBuilder(w, h, m, exifLittleEndian = false, visible = 96 to 72).build()))
+        val img = assertNotNull(RawFormatCheck.read("RAF", RafBuilder(w, h, m, exifLittleEndian = false, visible = 96 to 72).build()))
         assertMosaic(m, img)
         assertEquals(listOf(12, 0, 96, 72), listOf(img.cropX, img.cropY, img.cropWidth, img.cropHeight))
     }
@@ -186,13 +186,13 @@ class RafTest {
         val w = 128; val h = 36
         val m = scene(w, h, 16383, 1023)
         val b = RafBuilder(w, h, m, layout = RafReader.Layout.PACKED14, visible = 120 to 36)
-        val img = assertNotNull(RafReader.read(b.build()))
+        val img = assertNotNull(RawFormatCheck.read("RAF", b.build()))
         assertEquals(w * h * 7 / 4, b.pixelData!!.size)
         assertMosaic(m, img)
         // widths that are not a multiple of 16 use the plain 7-byte groups (no 28-byte blocks)
         val w2 = 100
         val m2 = scene(w2, h, 16383, 1023)
-        assertMosaic(m2, assertNotNull(RafReader.read(RafBuilder(w2, h, m2, layout = RafReader.Layout.PACKED14, visible = 96 to 36).build())))
+        assertMosaic(m2, assertNotNull(RawFormatCheck.read("RAF", RafBuilder(w2, h, m2, layout = RafReader.Layout.PACKED14, visible = 96 to 36).build())))
     }
 
     @Test
@@ -200,7 +200,7 @@ class RafTest {
         val w = 96; val h = 64
         val m = scene(w, h, 16383, 512)
         // visible 90 x 60 -> margins (64-60)>>2<<1 = 2 rows, (96-90)>>2<<1 = 2 columns; filters 0x94949494 relative to them
-        val img = assertNotNull(RafReader.read(RafBuilder(w, h, m, model = "X-A5", xtrans = null, black = IntArray(4) { 512 }, visible = 90 to 60).build()))
+        val img = assertNotNull(RawFormatCheck.read("RAF", RafBuilder(w, h, m, model = "X-A5", xtrans = null, black = IntArray(4) { 512 }, visible = 90 to 60).build()))
         assertMosaic(m, img)
         assertTrue(img.cfa.isBayer)
         assertEquals(CfaPattern.fromDcrawFilters(0x94949494.toInt()).anchoredAt(2, 2).colors.toList(),
@@ -215,7 +215,7 @@ class RafTest {
     fun orientationAndCropMode() {
         val w = 120; val h = 72
         val m = scene(w, h, 16383, 1023)
-        val img = assertNotNull(RafReader.read(RafBuilder(w, h, m, orientation = 6, visible = 96 to 72).build()))
+        val img = assertNotNull(RawFormatCheck.read("RAF", RafBuilder(w, h, m, orientation = 6, visible = 96 to 72).build()))
         assertEquals(6, img.orientation)
         // crop mode 1 (GFX full frame): the visible area is the whole raw frame, not the RAFData size
         val info = assertNotNull(RafReader.parse(RafBuilder(w, h, m, visible = 96 to 72, cropMode = 1).build()))
@@ -265,7 +265,7 @@ class RafTest {
         for ((name, pair) in cases) {
             val (bytes, mosaic) = pair
             dump?.let { File(it, "$name.RAF").writeBytes(bytes) }
-            val img = assertNotNull(RafReader.read(bytes), name)
+            val img = assertNotNull(RawFormatCheck.read("RAF", bytes), name)
             assertMosaic(mosaic, img)
             val expected = LIBRAW_SYNTHETIC[name]
             if (expected != null) {

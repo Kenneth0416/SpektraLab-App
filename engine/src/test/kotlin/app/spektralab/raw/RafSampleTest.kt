@@ -39,7 +39,7 @@ class RafSampleTest {
     private fun check(name: String, crc: Long, black: Float, wb: DoubleArray) {
         val bytes = sample(name)
         val t0 = System.nanoTime()
-        val img = assertNotNull(RafReader.read(bytes))
+        val img = assertNotNull(RawFormatCheck.read("RAF", bytes))
         val ms = (System.nanoTime() - t0) / 1e6
         println("RAF $name decoded in ${"%.0f".format(ms)} ms")
         assertEquals(6160, img.rawWidth); assertEquals(4032, img.rawHeight)
@@ -69,7 +69,7 @@ class RafSampleTest {
      * LibRaw render (tools/raf_compare.py).
      */
     @Test fun xt2Develop() {
-        val img = assertNotNull(RafReader.read(sample("00001_00_10s.RAF")))
+        val img = assertNotNull(RawFormatCheck.read("RAF", sample("00001_00_10s.RAF")))
         assertTrue(RawDeveloper.supports(img))
         val opts = RawDeveloper.Options(reconstructHighlights = false)
         RawDeveloper.develop(img, 1000, options = opts)            // warm-up

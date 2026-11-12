@@ -54,14 +54,15 @@ object RawFixtures {
         1f + (1.6f + 0.1f * c) * (dx * dx + dy * dy)
     }
 
-    private fun bayerIfd(w: Int, h: Int, strips: List<ByteArray>, rowsPerStrip: Int, privateData: ByteArray? = null): TiffBuilder.Ifd {
+    private fun bayerIfd(w: Int, h: Int, strips: List<ByteArray>, rowsPerStrip: Int, privateData: ByteArray? = null,
+                         make: String = "TestMaker", model: String = "Phone 1"): TiffBuilder.Ifd {
         val maps = (0 until 4).map { pos ->
             GainMap(pos / 2, pos % 2, h, w, 2, 2, 13, 17, 1.0 / 12, 1.0 / 16, 0.0, 0.0, shading(13, 17, pos), 0)
         }
         return TiffBuilder.Ifd().long(254, 0).long(256, w).long(257, h).short(258, 16).short(259, 1)
             .short(262, 32803).short(274, 6).short(277, 1).long(278, rowsPerStrip).short(284, 1)
             .short(33421, 2, 2).byte(33422, 0, 1, 1, 2).byte(50706, 1, 4, 0, 0).byte(50707, 1, 3, 0, 0)
-            .ascii(271, "TestMaker").ascii(272, "Phone 1").ascii(50708, "TestMaker Phone 1")
+            .ascii(271, make).ascii(272, model).ascii(50708, "$make $model")
             .short(50713, 2, 2).long(50714, BLACK, BLACK, BLACK, BLACK).long(50717, WHITE)
             .long(50719, 0, 0).long(50720, w, h)
             .srational(50721, *cm).srational(50722, *cm).short(50778, 17).short(50779, 21)
@@ -73,7 +74,8 @@ object RawFixtures {
     }
 
     /** A DngCreator-style 12 MP Bayer DNG (24.8 MB); [privateData] adds a DNGPrivateData tag. */
-    fun bayerDng(w: Int = PHONE_W, h: Int = PHONE_H, seed: Long = 1, privateData: ByteArray? = null): ByteArray {
+    fun bayerDng(w: Int = PHONE_W, h: Int = PHONE_H, seed: Long = 1, privateData: ByteArray? = null,
+                 make: String = "TestMaker", model: String = "Phone 1"): ByteArray {
         val rnd = java.util.Random(seed)
         val px = ByteBuffer.allocate(w * h * 2).order(ByteOrder.LITTLE_ENDIAN)
         val cfa = intArrayOf(0, 1, 1, 2)
@@ -83,7 +85,7 @@ object RawFixtures {
             val v = n + rnd.nextGaussian() * kotlin.math.sqrt(1.5e-4 * n + 2e-6)
             px.putShort(Math.round(v.coerceIn(0.0, 1.0) * (WHITE - BLACK) + BLACK).toInt().toShort())
         }
-        return TiffBuilder().build(bayerIfd(w, h, listOf(px.array()), h, privateData))
+        return TiffBuilder().build(bayerIfd(w, h, listOf(px.array()), h, privateData, make, model))
     }
 
     /** The frame a merged DNG takes its metadata from (tiny pixel data, real tags). */

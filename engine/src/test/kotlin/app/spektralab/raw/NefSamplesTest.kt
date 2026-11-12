@@ -55,7 +55,7 @@ class NefSamplesTest {
         for (e in expected) {
             val bytes = sample(e.file).readBytes()
             val t0 = System.nanoTime()
-            val img = assertNotNull(NefReader.read(bytes), e.file)
+            val img = assertNotNull(RawFormatCheck.read("NEF", bytes), e.file)
             val ms = (System.nanoTime() - t0) / 1_000_000
             println("${e.file}: decoded in $ms ms")
             assertEquals(e.w, img.rawWidth, e.file); assertEquals(e.h, img.rawHeight, e.file)
@@ -90,7 +90,7 @@ class NefSamplesTest {
             "imagut_001.nef" to (0.7594 to 0.8680),
         )
         for ((name, rg) in ref) {
-            val img = assertNotNull(NefReader.read(sample(name).readBytes()))
+            val img = assertNotNull(RawFormatCheck.read("NEF", sample(name).readBytes()))
             val out = RawDeveloper.develop(img, maxLongEdge = maxOf(img.cropWidth, img.cropHeight) / 2, fast = true,
                 options = RawDeveloper.Options(reconstructHighlights = false, chromaDenoise = false))
             var r = 0.0; var g = 0.0; var b = 0.0

@@ -330,7 +330,7 @@ class SrwTest {
                 File(d, s.name + ".srw").writeBytes(built.file)
                 File(d, s.name + ".raw16").writeBytes(ByteArray(built.mosaic.size * 2) { i -> (built.mosaic[i / 2].toInt() shr (8 * (i % 2))).toByte() })
             }
-            val img = assertNotNull(SrwReader.read(built.file), s.name)
+            val img = assertNotNull(RawFormatCheck.read("SRW", built.file), s.name)
             if (s.name == "srw2_neutral") dumpDir()?.let { d ->
                 val dev = RawDeveloper.develop(img, 8192)
                 File(d, s.name + ".developed.txt").printWriter().use { p ->
@@ -374,7 +374,7 @@ class SrwTest {
     fun blackLevelsAndWhiteBalanceFollowTheMakerNote() {
         // levels 2500 / 1024 / 1024 / 1900 (R, G1, G2, B), black 7 / 9 / 11 / 13 (LibRaw: black_level_per_channel [7, 9, 13, 11])
         val s = specs.first { it.name == "srw2_mini12" }
-        val img = assertNotNull(SrwReader.read(SrwSynth.build(s).file))
+        val img = assertNotNull(RawFormatCheck.read("SRW", SrwSynth.build(s).file))
         val rggb = img.cfa.colors.toList()
         assertEquals(listOf(0, 1, 1, 2), rggb)
         assertContentEquals(floatArrayOf(7f, 9f, 11f, 13f), img.black) // R, G in the R row, G in the B row, B
@@ -404,7 +404,7 @@ class SrwTest {
     @Test
     fun brokenInputReturnsNull() {
         val good = SrwSynth.build(specs[1]).file
-        assertNotNull(SrwReader.read(good))
+        assertNotNull(RawFormatCheck.read("SRW", good))
         assertNull(SrwReader.read(ByteArray(0)))
         assertNull(SrwReader.read(good.copyOf(good.size / 2)))
         assertNull(SrwReader.read(good.copyOf().also { it[0] = 'M'.code.toByte() }))

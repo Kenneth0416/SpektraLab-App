@@ -35,7 +35,7 @@ class Cr3SampleTest {
     fun canonR6CRaw() {
         val bytes = sample("RAW_CANON_R6.CR3")
         val t0 = System.nanoTime()
-        val img = assertNotNull(Cr3Reader.read(bytes))
+        val img = assertNotNull(RawFormatCheck.read("CR3", bytes))
         val ms = (System.nanoTime() - t0) / 1_000_000
         println("R6 CR3 decoded in $ms ms")
         assertEquals(3584, img.rawWidth)
@@ -109,7 +109,7 @@ class Cr3SampleTest {
      */
     @Test
     fun canonR6DevelopsLikeLibRaw() {
-        val img = assertNotNull(Cr3Reader.read(sample("RAW_CANON_R6.CR3")))
+        val img = assertNotNull(RawFormatCheck.read("CR3", sample("RAW_CANON_R6.CR3")))
         val lin = RawDeveloper.develop(img, 850)
         var r = 0.0; var g = 0.0; var b = 0.0
         for (y in 0 until lin.height) for (x in 0 until lin.width) { r += lin.red(x, y); g += lin.green(x, y); b += lin.blue(x, y) }

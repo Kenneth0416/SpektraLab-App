@@ -226,7 +226,7 @@ class Rw2Test {
                 File(d, s.name + ".rw2").writeBytes(built.file)
                 if (built.mosaic.isNotEmpty()) File(d, s.name + ".raw16").writeBytes(ByteArray(built.mosaic.size * 2) { i -> (built.mosaic[i / 2].toInt() shr (8 * (i % 2))).toByte() })
             }
-            val img = assertNotNull(Rw2Reader.read(built.file), s.name)
+            val img = assertNotNull(RawFormatCheck.read("RW2", built.file), s.name)
             if (s.orientation == 1 && s.encoding != 6) dumpDir()?.let { d ->
                 val dev = RawDeveloper.develop(img, 4096)
                 File(d, s.name + ".developed.txt").printWriter().use { p ->
@@ -307,7 +307,7 @@ class Rw2Test {
     @Test
     fun unsupportedAndBrokenInputReturnsNull() {
         val good = Rw2Synth.build(specs[0]).file
-        assertNotNull(Rw2Reader.read(good))
+        assertNotNull(RawFormatCheck.read("RW2", good))
         // wrong magic / not TIFF / empty
         assertNull(Rw2Reader.read(good.copyOf().also { it[2] = 42 }))
         assertNull(Rw2Reader.read(ByteArray(0)))

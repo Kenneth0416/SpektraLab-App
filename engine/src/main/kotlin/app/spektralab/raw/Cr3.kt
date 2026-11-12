@@ -38,8 +38,6 @@ object Cr3Reader {
         0x85.toByte(), 0xc0.toByte(), 0xb6.toByte(), 0x87.toByte(), 0x82.toByte(), 0x0f, 0x11, 0xe0.toByte(),
         0x81.toByte(), 0x11, 0xf4.toByte(), 0xce.toByte(), 0x46, 0x2b, 0x6a, 0x48)
 
-    private const val MAX_PIXELS = 200_000_000L
-
     /** Everything the reader found in the container (exposed for tests). */
     class Info {
         var cmt1 = -1; var cmt1Size = 0
@@ -74,7 +72,7 @@ object Cr3Reader {
         if (crawTracks.any { !it.isRaw && it.sampleSizeHint() > best.sampleSizeHint() }) return null
         if (hdr.nPlanes != 4 || (hdr.encType != 0 && hdr.encType != 3)) return null
         val w = hdr.width; val h = hdr.height
-        if (w.toLong() * h > MAX_PIXELS) return null
+        if (w.toLong() * h > RawDecodeLimits.MAX_SAMPLES) return null
         val offset = best.chunkOffset
         val size = if (best.sampleSize > 0) best.sampleSize else best.firstSampleSize
         if (offset <= 0 || size <= 0 || offset + size > bytes.size) return null

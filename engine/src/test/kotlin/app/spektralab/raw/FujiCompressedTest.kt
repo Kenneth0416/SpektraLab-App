@@ -148,7 +148,7 @@ class FujiCompressedTest {
     fun readerDecodesCompressedRaf() {
         val m = scene(3, 16383)
         val e = FujiCompressedEncoder.encode(m, w, h, 14, CfaPattern(6, 6, xt2c))
-        val img = assertNotNull(RafReader.read(rafWith(e.stream, "X-T2", true, 14, m)))
+        val img = assertNotNull(RawFormatCheck.read("RAF", rafWith(e.stream, "X-T2", true, 14, m)))
         assertEquals(RafReader.Layout.COMPRESSED, RafReader.parse(rafWith(e.stream, "X-T2", true, 14, m))!!.layout)
         assertContentEquals(e.decoded, IntArray(w * h) { img.data[it].toInt() and 0xffff })
     }
@@ -211,7 +211,7 @@ class FujiCompressedTest {
         }
         for ((name, pair) in cases) {
             assertEquals(LIBRAW[name], pair.second, "$name: LibRaw raw_image CRC")
-            val img = assertNotNull(RafReader.read(pair.first), name)
+            val img = assertNotNull(RawFormatCheck.read("RAF", pair.first), name)
             assertEquals(pair.second, crc(IntArray(w * h) { img.data[it].toInt() and 0xffff }), name)
         }
         // random streams, decoded without the strictness check (LibRaw keeps going on bad codes)

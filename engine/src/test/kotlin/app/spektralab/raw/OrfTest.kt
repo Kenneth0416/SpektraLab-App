@@ -98,7 +98,7 @@ class OrfTest {
     @Test
     fun syntheticFilesDecodeLikeLibRaw() {
         for (v in variants) {
-            val img = assertNotNull(OrfReader.read(build(v)), v.name)
+            val img = assertNotNull(RawFormatCheck.read("ORF", build(v)), v.name)
             assertEquals(v.w, img.rawWidth, v.name); assertEquals(v.h, img.rawHeight, v.name)
             assertEquals(v.crc, crc(img.data), "mosaic CRC ${v.name}")
             assertContentEquals(v.expectBlack, img.black, v.name)
@@ -116,7 +116,7 @@ class OrfTest {
     fun rejectsOtherFilesAndTruncatedData() {
         val v = variants[0]
         val good = build(v)
-        assertNotNull(OrfReader.read(good))
+        assertNotNull(RawFormatCheck.read("ORF", good))
         assertNull(OrfReader.read(build(v, make = "Canon", model = "EOS 5D")))
         assertNull(OrfReader.read(build(v, model = "No Such Camera")))
         assertNull(OrfReader.read(ByteArray(0)))
@@ -159,7 +159,7 @@ class OrfTest {
     fun olympusE3MatchesLibRaw() {
         val bytes = sample("ORF/RAW_OLYMPUS_E3.ORF")
         val t0 = System.nanoTime()
-        val img = assertNotNull(OrfReader.read(bytes))
+        val img = assertNotNull(RawFormatCheck.read("ORF", bytes))
         val ms = (System.nanoTime() - t0) / 1_000_000
         println("E-3 ORF decode: $ms ms")
         assertEquals(3720, img.rawWidth); assertEquals(2800, img.rawHeight)
@@ -179,7 +179,7 @@ class OrfTest {
 
     @Test
     fun olympusE3DevelopsToSaneColour() {
-        val img = assertNotNull(OrfReader.read(sample("ORF/RAW_OLYMPUS_E3.ORF")))
+        val img = assertNotNull(RawFormatCheck.read("ORF", sample("ORF/RAW_OLYMPUS_E3.ORF")))
         val dev = RawDeveloper.develop(img, 912)
         var r = 0.0; var g = 0.0; var b = 0.0; var n = 0
         for (y in 0 until dev.height) for (x in 0 until dev.width) { r += dev.red(x, y); g += dev.green(x, y); b += dev.blue(x, y); n++ }

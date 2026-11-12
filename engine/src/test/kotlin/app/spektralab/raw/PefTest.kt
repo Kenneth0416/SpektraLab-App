@@ -132,7 +132,7 @@ class PefTest {
     @Test
     fun encodedFilesRoundTrip() {
         for (v in variants) {
-            val img = assertNotNull(PefReader.read(build(v)), v.name)
+            val img = assertNotNull(RawFormatCheck.read("PEF", build(v)), v.name)
             val expect = pixels(v)
             assertEquals(v.w, img.rawWidth, v.name); assertEquals(v.h, img.rawHeight, v.name)
             for (i in expect.indices) if ((img.data[i].toInt() and 0xffff) != expect[i]) {
@@ -144,7 +144,7 @@ class PefTest {
     @Test
     fun matchesLibRaw() {
         for (v in variants) {
-            val img = assertNotNull(PefReader.read(build(v)), v.name)
+            val img = assertNotNull(RawFormatCheck.read("PEF", build(v)), v.name)
             assertEquals(v.crc, crc(img.data), "mosaic CRC ${v.name}")
             assertContentEquals(v.expectBlack, img.black, v.name)
             assertEquals(v.expectWhite, img.white, v.name)
@@ -197,7 +197,7 @@ class PefTest {
     fun rejectsOtherFilesAndBrokenData() {
         val v = variants[2]
         val good = build(v)
-        assertNotNull(PefReader.read(good))
+        assertNotNull(RawFormatCheck.read("PEF", good))
         assertNull(PefReader.read(build(v, make = "SAMSUNG TECHWIN")))
         assertNull(PefReader.read(build(v, make = "Canon")))
         assertNull(PefReader.read(build(v, withMakerNote = false)))
@@ -230,7 +230,7 @@ class PefTest {
         val bytes = build(v)
         repeat(3) {
             val t0 = System.nanoTime()
-            val img = assertNotNull(PefReader.read(bytes))
+            val img = assertNotNull(RawFormatCheck.read("PEF", bytes))
             println("PEF ${v.w}x${v.h} decode ${(System.nanoTime() - t0) / 1_000_000} ms (${bytes.size / 1_000_000} MB file)")
             assertEquals(6040, img.cropWidth)
         }

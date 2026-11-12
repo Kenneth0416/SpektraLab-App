@@ -398,7 +398,7 @@ class NefTest {
         }
         for (c in cases) {
             val bytes = build(c.spec)
-            val img = assertNotNull(NefReader.read(bytes), c.spec.name)
+            val img = assertNotNull(RawFormatCheck.read("NEF", bytes), c.spec.name)
             assertContentEquals(c.mosaic, IntArray(img.data.size) { img.data[it].toInt() and 0xffff }, c.spec.name)
             assertContentEquals(blacks(c), FloatArray(4) { img.blackAt(it / 2, it % 2) }, c.spec.name)
             assertEquals(c.white, img.white, c.spec.name)

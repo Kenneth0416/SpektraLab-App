@@ -20,9 +20,30 @@ import kotlin.math.max
 import kotlin.math.pow
 
 /** A decoded photo: either a display-referred sRGB bitmap or a scene-linear raw development. */
-class SourceImage(val bitmap: Bitmap?, val linear: LinearImage?) {
+class SourceImage(val bitmap: Bitmap?, val linear: LinearImage?,
+                  val originalWidth: Int = bitmap?.width ?: linear!!.width,
+                  val originalHeight: Int = bitmap?.height ?: linear!!.height) {
     val width get() = bitmap?.width ?: linear!!.width
     val height get() = bitmap?.height ?: linear!!.height
+}
+
+/** Known-size files need one compressed buffer, not readBytes' growing buffer plus final copy. */
+internal fun readRawBytes(input: java.io.InputStream, size: Long): ByteArray {
+    if (size < 0) return input.readBytes() // Providers backed by pipes may not expose a length.
+    require(size <= Int.MAX_VALUE) { "RAW file is too large" }
+    val bytes = ByteArray(size.toInt())
+    var offset = 0
+    while (offset < bytes.size) {
+        val count = input.read(bytes, offset, bytes.size - offset)
+        if (count < 0) throw java.io.EOFException("RAW file ended before its declared size")
+        if (count == 0) {
+            val value = input.read()
+            if (value < 0) throw java.io.EOFException("RAW file ended before its declared size")
+            bytes[offset++] = value.toByte()
+        } else offset += count
+    }
+    check(input.read() == -1) { "RAW file changed while reading" }
+    return bytes
 }
 
 object Media {
@@ -53,11 +74,16 @@ object Media {
      */
     fun loadSource(context: Context, uri: Uri, maxLongEdge: Int, tryRaw: Boolean, fast: Boolean = true): SourceImage {
         if (tryRaw) {
-            val linear = runCatching {
-                val bytes = context.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
-                RawReader.read(bytes)?.takeIf { RawDeveloper.supports(it) }?.let { RawDeveloper.develop(it, maxLongEdge, fast) }
-            }.getOrNull()
-            if (linear != null) return SourceImage(null, linear)
+            // Parsing expands the full sensor even for a small rendition. Serialize it
+            // across all consumers and wait for retained burst arrays to be released.
+            val source = RawMemoryGate.acquire().use {
+                runCatching {
+                    readRaw(context, uri)?.takeIf { RawDeveloper.supports(it) }?.let { raw ->
+                        SourceImage(null, RawDeveloper.develop(raw, maxLongEdge, fast), raw.uprightWidth, raw.uprightHeight)
+                    }
+                }.getOrNull()
+            }
+            if (source != null) return source
         }
         return SourceImage(decodeImage(context, uri, maxLongEdge), null)
     }
@@ -172,8 +198,7 @@ object Media {
                             date = parseExifDate(exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL) ?: exif.getAttribute(ExifInterface.TAG_DATETIME))
                         }
                     }
-                    val scale = rawScale(context, uri)
-                    return LibraryItem(id, uri.toString(), false, true, scale?.first ?: src.width, scale?.second ?: src.height, 0, 0,
+                    return LibraryItem(id, uri.toString(), false, true, src.originalWidth, src.originalHeight, 0, 0,
                         date ?: System.currentTimeMillis(), autoExposure(src.linear), Look.DEFAULT, name)
                 }
                 val bmp = src.bitmap!!
@@ -203,11 +228,14 @@ object Media {
         }
     }
 
-    /** Full upright size of a DNG we can develop. */
-    private fun rawScale(context: Context, uri: Uri): Pair<Int, Int>? = runCatching {
-        val bytes = context.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
-        RawReader.read(bytes)?.takeIf { RawDeveloper.supports(it) }?.let { it.uprightWidth to it.uprightHeight }
-    }.getOrNull()
+    /** Keep compressed bytes out of the development stack once parsing has returned. */
+    private fun readRaw(context: Context, uri: Uri): app.spektralab.raw.RawImage? {
+        val descriptor = context.contentResolver.openFileDescriptor(uri, "r") ?: return null
+        val bytes = android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).use {
+            readRawBytes(it, descriptor.statSize)
+        }
+        return RawReader.read(bytes)
+    }
 
     private fun parseExifDate(s: String?): Long? {
         if (s.isNullOrBlank()) return null

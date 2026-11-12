@@ -60,6 +60,15 @@ class EditorLayoutTest {
         assertEquals(800f, b("actions").bottom.value, 0.5f)
     }
 
+    @Test fun narrowLandscapeSidePaneKeepsPreviewRoom() {
+        layout(EditorMode.SIDE, null, 520, 320)
+        val p = b("preview"); val t = b("tools")
+        assertEquals(p.right.value, t.left.value, 0.5f)
+        assertEquals(520f, t.right.value, 0.5f)
+        assertTrue("side pane width ${t.right - t.left}", (t.right - t.left).value in 280f..340f)
+        assertTrue("preview width ${p.right - p.left}", (p.right - p.left).value >= 180f)
+    }
+
     @Test fun bookPostureSplitsAtVerticalHinge() {
         layout(EditorMode.BOOK, Rect(440f, 0f, 460f, 800f))
         assertEquals(440f, b("preview").right.value, 0.5f)

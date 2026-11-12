@@ -26,6 +26,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -89,7 +96,9 @@ fun LibraryScreen(state: AppState) {
         // tube not fully on yet: the whole table is dimmer
         if (tube < 1f) drawRect(Pal.ink.copy(alpha = 0.32f * (1f - tube)))
     }) {
-        Column(Modifier.fillMaxSize().statusBarsPadding()) {
+        // Sides only: cutout and side navigation in landscape. The bottom bar and list padding own the bottom.
+        Column(Modifier.fillMaxSize().statusBarsPadding()
+            .windowInsetsPadding(WindowInsets.displayCutout.union(WindowInsets.navigationBars).only(WindowInsetsSides.Horizontal))) {
             // header
             Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 16.dp, top = 14.dp), verticalAlignment = Alignment.Bottom) {
                 Column(Modifier.weight(1f)) {

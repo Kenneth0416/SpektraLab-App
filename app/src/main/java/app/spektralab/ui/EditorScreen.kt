@@ -57,6 +57,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -214,7 +215,10 @@ fun EditorScreen(state: AppState, id: Long) {
     )
 
     val fold = LocalFold.current
-    val wide = widthClass() != WidthClass.COMPACT
+    // Shape counts as well as width: a landscape window under 600dp would leave the stacked layout a sliver of preview.
+    val cfg = LocalConfiguration.current
+    val wide = widthClass() != WidthClass.COMPACT ||
+        (cfg.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE && cfg.screenWidthDp >= 480)
     var origin by remember { mutableStateOf(Offset.Zero) }
     val mode = when {
         fold.posture == Posture.TABLETOP -> EditorMode.TABLETOP
@@ -422,8 +426,10 @@ internal fun EditorLayout(mode: EditorMode, hinge: Rect?, modifier: Modifier, co
                 }
             }
             EditorMode.SIDE, EditorMode.BOOK -> {
-                // split at the hinge in book posture, otherwise give tools a side pane
-                val paneW = (w * 0.38f).toInt().coerceIn(340.dp.roundToPx(), 460.dp.roundToPx())
+                // split at the hinge in book posture, otherwise give tools a side pane.
+                // Narrower windows (landscape under 600dp) give the preview more room.
+                val paneMin = if (w < 600.dp.roundToPx()) 280.dp.roundToPx() else 340.dp.roundToPx()
+                val paneW = (w * 0.38f).toInt().coerceIn(paneMin, 460.dp.roundToPx())
                 val leftW = if (mode == EditorMode.BOOK && hinge != null && hinge.left > 0 && hinge.left < w) hinge.left.toInt() else w - paneW
                 val rightX = if (mode == EditorMode.BOOK && hinge != null && hinge.right < w) hinge.right.toInt() else leftW
                 val top = m[0].measure(loose(w, h))

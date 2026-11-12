@@ -56,8 +56,8 @@ class FilmViewfinder(private val onError: (String) -> Unit) : SurfaceProcessor {
     private val outMatrix = FloatArray(16)
 
     /**
-     * 1 = sharp viewfinder; 0 = the frame has not been advanced yet, so the finder is a
-     * ground-glass blur (the pipeline runs on a tiny image and is scaled up).
+     * 1 = sharp viewfinder; 0 = the frame has not been advanced yet, so a Gaussian
+     * ground-glass diffusion pass is applied after the regular film pipeline.
      */
     @Volatile var clarity = 1f
 
@@ -152,14 +152,14 @@ class FilmViewfinder(private val onError: (String) -> Unit) : SurfaceProcessor {
             val w = out.size.width
             val h = out.size.height
             if (frame % METER_EVERY == 0) meter(r, input)
-            // process at a bounded size: enough for a viewfinder, and keeps 30 fps within reach
+            // Keep the film pipeline at a stable size; only the diffusion mix changes with clarity.
             val frameClarity = clarity.coerceIn(0f, 1f)
-            val longEdge = BLUR_LONG_EDGE * (PROCESS_LONG_EDGE.toFloat() / BLUR_LONG_EDGE).pow(frameClarity)
-            val scale = minOf(1f, longEdge / max(w, h))
+            val scale = minOf(1f, PROCESS_LONG_EDGE.toFloat() / max(w, h))
             r.render(RenderRequest(
                 input = input,
                 imageWidth = (w * scale).roundToInt().coerceAtLeast(2), imageHeight = (h * scale).roundToInt().coerceAtLeast(2),
                 framebuffer = 0, outWidth = w, outHeight = h,
+                groundGlass = 1f - frameClarity,
                 seed = frame * 7919 + 17, autoEv = autoEv,
             ))
             e.setPresentationTime(outSurface, st.timestamp)
@@ -216,7 +216,6 @@ class FilmViewfinder(private val onError: (String) -> Unit) : SurfaceProcessor {
     companion object {
         private const val TAG = "SpektraViewfinder"
         private const val PROCESS_LONG_EDGE = 1280
-        private const val BLUR_LONG_EDGE = 22f
         private const val METER_W = 48
         private const val METER_H = 36
         private const val METER_EVERY = 8

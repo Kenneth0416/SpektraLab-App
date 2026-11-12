@@ -7,7 +7,9 @@ package app.spektralab.gl
  *
  *  expose   linear sRGB -> film raw exposure (Hanatos 2025 upsampling LUT)
  *  down     2x2 pyramid reduction
- *  blur     separable Gaussian (one octave of a Gaussian mixture)
+ *  groundGlassDown  area reduction to ceil(size / 2), including odd dimensions
+ *  blur     separable Gaussian (one octave of a Gaussian mixture / ground glass)
+ *  groundGlass  display-space Gaussian diffusion and clarity crossfade
  *  combine  weighted sum of blurred octaves
  *  corr     DIR coupler inhibitor amount (half resolution)
  *  develop  density curves, DIR couplers, sublayer Poisson grain
@@ -99,6 +101,43 @@ uniform sampler2D uSrc;
 void main() { fragColor = texture(uSrc, vUv); }
 """
 
+    /** Area average for ground glass only; the film pyramid keeps [DOWN]'s sampling. */
+    val GROUND_GLASS_DOWN = HEADER + """
+in vec2 vUv;
+out vec4 fragColor;
+uniform sampler2D uSrc;
+void main() {
+    ivec2 srcSize = textureSize(uSrc, 0);
+    ivec2 dstSize = (srcSize + ivec2(1)) / 2;
+    // The destination viewport is ceil(srcSize / 2), with origin (0, 0).
+    // In one axis, output j covers [j*N/D, (j+1)*N/D) in source pixel cells.
+    // Keep interval endpoints in units of 1/D so overlap weights are exact integers
+    // until normalization by N. N/D <= 2 means at most three source cells per axis.
+    ivec2 lo = ivec2(gl_FragCoord.xy) * srcSize;
+    ivec2 hi = lo + srcSize;
+    ivec2 first = lo / dstSize;
+    vec3 wx;
+    vec3 wy;
+    for (int i = 0; i < 3; i++) {
+        ivec2 cellLo = (first + ivec2(i)) * dstSize;
+        ivec2 overlap = max(ivec2(0), min(hi, cellLo + dstSize) - max(lo, cellLo));
+        wx[i] = float(overlap.x) / float(srcSize.x);
+        wy[i] = float(overlap.y) / float(srcSize.y);
+    }
+    vec3 acc = vec3(0.0);
+    for (int y = 0; y < 3; y++) {
+        for (int x = 0; x < 3; x++) {
+            float weight = wx[x] * wy[y];
+            if (weight > 0.0) {
+                ivec2 pixel = clamp(first + ivec2(x, y), ivec2(0), srcSize - ivec2(1));
+                acc += weight * texelFetch(uSrc, pixel, 0).rgb;
+            }
+        }
+    }
+    fragColor = vec4(acc, 1.0);
+}
+"""
+
     const val BLUR = """#version 300 es
 precision highp float;
 precision highp int;
@@ -117,6 +156,21 @@ void main() {
         acc += uWeights[i] * (texture(uSrc, vUv + o).rgb + texture(uSrc, vUv - o).rgb);
     }
     fragColor = vec4(acc, 1.0);
+}
+"""
+
+    val GROUND_GLASS = HEADER + """
+in vec2 vUv;
+out vec4 fragColor;
+uniform sampler2D uSharp;
+uniform sampler2D uBlurred;
+uniform float uAmount;
+void main() {
+    vec3 blurred = texture(uBlurred, vUv).rgb;
+    float amount = smoothstep(0.0, 1.0, clamp(uAmount, 0.0, 1.0));
+    vec3 col = blurred;
+    if (amount < 1.0) col = mix(texture(uSharp, vUv).rgb, blurred, amount);
+    fragColor = vec4(col, 1.0);
 }
 """
 

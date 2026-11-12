@@ -1,5 +1,6 @@
 package app.spektralab.camera
 
+import android.content.Context
 import android.graphics.SurfaceTexture
 import android.opengl.EGLSurface
 import android.opengl.GLES11Ext
@@ -12,6 +13,7 @@ import androidx.camera.core.CameraEffect
 import androidx.camera.core.SurfaceOutput
 import androidx.camera.core.SurfaceProcessor
 import androidx.camera.core.SurfaceRequest
+import app.spektralab.R
 import app.spektralab.engine.AutoExposure
 import app.spektralab.engine.LookSetup
 import app.spektralab.gl.EglCore
@@ -31,7 +33,8 @@ import kotlin.math.roundToInt
  * pipeline as photos and videos before it reaches the screen. Only the preview stream is
  * processed; captures are saved untouched (raw sensor data when the device offers it).
  */
-class FilmViewfinder(private val onError: (String) -> Unit) : SurfaceProcessor {
+class FilmViewfinder(context: Context, private val onError: (String) -> Unit) : SurfaceProcessor {
+    private val context = context.applicationContext
     private val thread = HandlerThread("spektra-viewfinder").apply { start() }
     private val handler = Handler(thread.looper)
     val executor = Executor { r -> if (thread.isAlive) handler.post(r) }
@@ -56,8 +59,8 @@ class FilmViewfinder(private val onError: (String) -> Unit) : SurfaceProcessor {
     private val outMatrix = FloatArray(16)
 
     /**
-     * 1 = sharp viewfinder; 0 = the frame has not been advanced yet, so the finder is a
-     * ground-glass blur (the pipeline runs on a tiny image and is scaled up).
+     * 1 = sharp viewfinder; 0 = the frame has not been advanced yet, so a Gaussian
+     * ground-glass diffusion pass is applied after the regular film pipeline.
      */
     @Volatile var clarity = 1f
 
@@ -84,7 +87,7 @@ class FilmViewfinder(private val onError: (String) -> Unit) : SurfaceProcessor {
         } catch (t: Throwable) {
             Log.e(TAG, "viewfinder GL init failed", t)
             failed = true
-            onError("这台设备的 GPU 无法实时处理取景画面")
+            onError(context.getString(R.string.gpu_viewfinder_unsupported))
             false
         }
     }
@@ -155,14 +158,14 @@ class FilmViewfinder(private val onError: (String) -> Unit) : SurfaceProcessor {
             val w = out.size.width
             val h = out.size.height
             if (frame % METER_EVERY == 0) meter(r, input)
-            // process at a bounded size: enough for a viewfinder, and keeps 30 fps within reach
+            // Keep the film pipeline at a stable size; only the diffusion mix changes with clarity.
             val frameClarity = clarity.coerceIn(0f, 1f)
-            val longEdge = BLUR_LONG_EDGE * (PROCESS_LONG_EDGE.toFloat() / BLUR_LONG_EDGE).pow(frameClarity)
-            val scale = minOf(1f, longEdge / max(w, h))
+            val scale = minOf(1f, PROCESS_LONG_EDGE.toFloat() / max(w, h))
             r.render(RenderRequest(
                 input = input,
                 imageWidth = (w * scale).roundToInt().coerceAtLeast(2), imageHeight = (h * scale).roundToInt().coerceAtLeast(2),
                 framebuffer = 0, outWidth = w, outHeight = h,
+                groundGlass = 1f - frameClarity,
                 seed = frame * 7919 + 17, autoEv = autoEv + evBias,
             ))
             e.setPresentationTime(outSurface, st.timestamp)
@@ -170,7 +173,7 @@ class FilmViewfinder(private val onError: (String) -> Unit) : SurfaceProcessor {
             frame++
         } catch (t: Throwable) {
             Log.e(TAG, "viewfinder frame failed", t)
-            if (!failed) { failed = true; onError("取景画面处理失败") }
+            if (!failed) { failed = true; onError(context.getString(R.string.viewfinder_render_failed)) }
         }
     }
 
@@ -219,7 +222,6 @@ class FilmViewfinder(private val onError: (String) -> Unit) : SurfaceProcessor {
     companion object {
         private const val TAG = "SpektraViewfinder"
         private const val PROCESS_LONG_EDGE = 1280
-        private const val BLUR_LONG_EDGE = 22f
         private const val METER_W = 48
         private const val METER_H = 36
         private const val METER_EVERY = 8

@@ -63,6 +63,7 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -71,6 +72,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import app.spektralab.R
 import app.spektralab.camera.RawShooter
 import app.spektralab.camera.FilmViewfinder
 import app.spektralab.engine.Catalog
@@ -135,7 +137,7 @@ fun CameraScreen(state: AppState) {
     LaunchedEffect(Unit) { if (!granted) ask.launch(Manifest.permission.CAMERA) }
 
     // viewfinder pipeline
-    val viewfinder = remember { FilmViewfinder { msg -> ContextCompat.getMainExecutor(context).execute { state.say(msg) } } }
+    val viewfinder = remember { FilmViewfinder(context) { msg -> ContextCompat.getMainExecutor(context).execute { state.say(msg) } } }
     val previewView = remember {
         PreviewView(context).apply {
             scaleType = PreviewView.ScaleType.FIT_CENTER
@@ -164,7 +166,7 @@ fun CameraScreen(state: AppState) {
                 var selector = if (front) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
                 if (!runCatching { p.hasCamera(selector) }.getOrDefault(false)) {
                     selector = if (front) CameraSelector.DEFAULT_BACK_CAMERA else CameraSelector.DEFAULT_FRONT_CAMERA
-                    if (!runCatching { p.hasCamera(selector) }.getOrDefault(false)) { state.say("没有可用的相机"); return@addListener }
+                    if (!runCatching { p.hasCamera(selector) }.getOrDefault(false)) { state.say(R.string.no_camera); return@addListener }
                 }
                 val fourThree = ResolutionSelector.Builder()
                     .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY).build()
@@ -192,7 +194,7 @@ fun CameraScreen(state: AppState) {
                 session = runCatching { bind(rawSupported) }.recoverCatching {
                     // some devices list raw but cannot stream it next to the preview
                     if (rawSupported) bind(false) else throw it
-                }.onFailure { state.say("相机打不开：${it.message ?: "未知错误"}") }.getOrNull()
+                }.onFailure { state.say(R.string.camera_open_failed, it.message ?: context.getString(R.string.unknown_error)) }.getOrNull()
                 session?.camera?.cameraControl?.setZoomRatio(zoom)
             }, ContextCompat.getMainExecutor(context))
         }
@@ -302,9 +304,9 @@ fun CameraScreen(state: AppState) {
 
     // focal-plane shutter: two blades close over the frame and open again
     fun shoot() {
-        val s = session ?: return state.say(if (granted) "相机还没准备好" else "需要相机权限")
+        val s = session ?: return state.say(if (granted) R.string.camera_not_ready else R.string.camera_permission_required)
         if (busy) return
-        if (!state.shooter.available) return state.say("上一张还在处理，请稍候")
+        if (!state.shooter.available) return state.say(R.string.previous_shot_processing)
         if (!cocked) {
             // shutter is locked until the film is advanced
             haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -324,7 +326,7 @@ fun CameraScreen(state: AppState) {
             if (previewView.awaitBlurredPreview(viewfinder, previousBlur)) {
                 blades.animateTo(0f, tween(260, easing = LinearOutSlowInEasing))
             } else {
-                state.say("取景画面暂未更新，过片后恢复")
+                state.say(R.string.viewfinder_stalled)
             }
         }
         scope.launch {
@@ -359,12 +361,12 @@ fun CameraScreen(state: AppState) {
             s.capture.takePicture(options, ContextCompat.getMainExecutor(context), object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(result: ImageCapture.OutputFileResults) {
                     captured.complete(true)
-                    result.savedUri?.let { state.onCaptured(it, evBias) } ?: state.say("原片没有保存下来")
+                    result.savedUri?.let { state.onCaptured(it, evBias) } ?: state.say(R.string.original_not_saved)
                 }
 
                 override fun onError(e: ImageCaptureException) {
                     captured.complete(false)
-                    state.say("拍摄失败：${e.message ?: e.imageCaptureError}")
+                    state.say(R.string.capture_failed, e.message ?: e.imageCaptureError.toString())
                 }
             })
         }
@@ -373,15 +375,15 @@ fun CameraScreen(state: AppState) {
             // raw frames into memory: one, or a burst that is merged in the background
             val frames = if (multiFrame) state.shooter.frameCount(chars) else 1
             s.capture.flashMode = if (frames > 1) ImageCapture.FLASH_MODE_OFF else flash
-            if (frames > 1) state.say("连拍 $frames 帧，请拿稳")
+            if (frames > 1) state.say(R.string.burst_hold_steady, frames)
             val accepted = state.shooter.shoot(s.capture, chars, frames, "SPK_$stamp", evBias) { ok, retry ->
                 when {
                     ok -> captured.complete(true)
                     retry && session === s -> saveThroughCameraX()
-                    else -> { captured.complete(false); state.say("拍摄失败") }
+                    else -> { captured.complete(false); state.say(R.string.capture_failed_short) }
                 }
             }
-            if (!accepted) { captured.complete(false); state.say("上一张还在处理，请稍候") }
+            if (!accepted) { captured.complete(false); state.say(R.string.previous_shot_processing) }
         } else saveThroughCameraX()
     }
     val shootNow by rememberUpdatedState(::shoot)
@@ -400,7 +402,7 @@ fun CameraScreen(state: AppState) {
 
     // ------------------------------------------------------------------ parts
     val topItems: @Composable (@Composable () -> Unit) -> Unit = { gap ->
-        Text("‹ 灯箱", color = Pal.text, fontSize = 15.sp, modifier = Modifier.springClick { state.closeCamera() }.padding(6.dp))
+        Text(stringResource(R.string.back_to_lightbox), color = Pal.text, fontSize = 15.sp, modifier = Modifier.springClick { state.closeCamera() }.padding(6.dp))
         // what the shutter will keep as the original
         AnimatedContent(session?.raw, label = "format", transitionSpec = { fadeIn() togetherWith fadeOut() }) { raw ->
             // tapping the badge switches multi-frame capture (raw only)
@@ -410,13 +412,17 @@ fun CameraScreen(state: AppState) {
                 modifier = Modifier.springClick {
                     if (raw == true) {
                         state.setMultiFrame(!multiFrame)
-                        state.say(if (!multiFrame) "多帧合成：按光线连拍 1–${RawShooter.MAX_FRAMES} 帧 RAW，合成更干净的原片" else "单帧 RAW")
+                        state.say(if (!multiFrame) context.getString(R.string.multi_frame_on, RawShooter.MAX_FRAMES) else context.getString(R.string.single_frame_raw))
                     }
                 }.padding(6.dp).border(1.dp, if (raw == true) accent else Pal.off, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp))
         }
-        merging?.let { Text("合成 ${(it * 100).toInt()}%", fontFamily = Fonts.mono, fontSize = 10.sp, color = Pal.dim, modifier = Modifier.padding(2.dp)) }
+        merging?.let { Text(stringResource(R.string.merging_percent, (it * 100).toInt()), fontFamily = Fonts.mono, fontSize = 10.sp, color = Pal.dim, modifier = Modifier.padding(2.dp)) }
         gap()
-        val flashLabel = when (flash) { ImageCapture.FLASH_MODE_ON -> "闪光 开"; ImageCapture.FLASH_MODE_AUTO -> "闪光 自动"; else -> "闪光 关" }
+        val flashLabel = stringResource(when (flash) {
+            ImageCapture.FLASH_MODE_ON -> R.string.flash_on
+            ImageCapture.FLASH_MODE_AUTO -> R.string.flash_auto
+            else -> R.string.flash_off
+        })
         Text(flashLabel, color = if (flash == ImageCapture.FLASH_MODE_OFF) Pal.dim else Pal.text, fontSize = 13.sp, modifier = Modifier.springClick {
             flash = when (flash) {
                 ImageCapture.FLASH_MODE_OFF -> ImageCapture.FLASH_MODE_AUTO
@@ -424,11 +430,11 @@ fun CameraScreen(state: AppState) {
                 else -> ImageCapture.FLASH_MODE_OFF
             }
         }.padding(8.dp))
-        Text("配方", color = Pal.text, fontSize = 13.sp, modifier = Modifier.springClick { state.openRecipes() }.padding(8.dp))
+        Text(stringResource(R.string.recipes), color = Pal.text, fontSize = 13.sp, modifier = Modifier.springClick { state.openRecipes() }.padding(8.dp))
         // the film settings stay out of the way until asked for
         val toolsInk by animateColorAsState(if (toolsOpen) Pal.dink else Pal.text, tween(180), label = "toolsInk")
         val toolsBg by animateColorAsState(if (toolsOpen) accent else Color.Transparent, tween(180), label = "toolsBg")
-        Text("调整", color = toolsInk, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 2.dp)
+        Text(stringResource(R.string.adjust), color = toolsInk, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 2.dp)
             .springClick { toolsOpen = !toolsOpen }.clip(RoundedCornerShape(14.dp)).background(toolsBg)
             .border(1.dp, accent, RoundedCornerShape(14.dp)).padding(horizontal = 12.dp, vertical = 5.dp))
     }
@@ -496,8 +502,8 @@ fun CameraScreen(state: AppState) {
                     }) {
                     if (granted) AndroidView({ previewView }, Modifier.fillMaxSize())
                     else Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("需要相机权限才能取景", color = Pal.dim, fontSize = 14.sp)
-                        Text("授权", color = Pal.dink, fontSize = 14.sp, modifier = Modifier.padding(top = 10.dp)
+                        Text(stringResource(R.string.camera_permission_explanation), color = Pal.dim, fontSize = 14.sp)
+                        Text(stringResource(R.string.grant_permission), color = Pal.dink, fontSize = 14.sp, modifier = Modifier.padding(top = 10.dp)
                             .springClick { ask.launch(Manifest.permission.CAMERA) }
                             .clip(RoundedCornerShape(16.dp)).background(accent).padding(horizontal = 16.dp, vertical = 6.dp))
                     }
@@ -546,7 +552,7 @@ fun CameraScreen(state: AppState) {
                                 modifier = Modifier.graphicsLayer { rotationZ = iconTurn }.background(Color(0x99140807)).padding(horizontal = 6.dp, vertical = 2.dp))
                         }
                         androidx.compose.animation.AnimatedVisibility(focusLocked, enter = fadeIn(), exit = fadeOut()) {
-                            Text("对焦锁定", fontSize = 10.sp, color = Pal.dink,
+                            Text(stringResource(R.string.focus_locked), fontSize = 10.sp, color = Pal.dink,
                                 modifier = Modifier.padding(top = 4.dp).graphicsLayer { rotationZ = iconTurn }.background(accent, RoundedCornerShape(3.dp)).padding(horizontal = 5.dp, vertical = 1.dp))
                         }
                     }
@@ -579,9 +585,10 @@ fun CameraScreen(state: AppState) {
 
     val thumbPart: @Composable () -> Unit = {
         // last frame on the lightbox: tap to open it in the darkroom
+        val previousDescription = stringResource(R.string.previous_frame)
         Box(Modifier.size(52.dp).graphicsLayer { rotationZ = iconTurn }.clip(RoundedCornerShape(6.dp)).background(Pal.line)
-            .semantics { contentDescription = "上一张" }
-            .springClick(0.9f) { last?.let { state.openEdit(it.id) } ?: state.say("还没有拍过") }) {
+            .semantics { contentDescription = previousDescription }
+            .springClick(0.9f) { last?.let { state.openEdit(it.id) } ?: state.say(R.string.no_photos_taken) }) {
             if (last != null) {
                 val thumb by produceState(state.app.thumbs.cached(last), last.id, last.look) { value = state.app.thumbs.get(last) }
                 Crossfade(thumb, label = "last") { t ->
@@ -594,7 +601,8 @@ fun CameraScreen(state: AppState) {
         // shutter release: locked (hollow, dim) until the film is advanced
         val sink by animateFloatAsState(if (busy) 0.72f else 1f, Motion.press, label = "shutter")
         val ready by animateFloatAsState(if (cocked) 1f else 0f, tween(260), label = "ready")
-        Box(Modifier.size(76.dp).semantics { contentDescription = if (cocked) "快门" else "快门，未过片" }.springClick(0.9f) { shoot() }
+        val shutterDescription = stringResource(if (cocked) R.string.shutter else R.string.shutter_not_advanced)
+        Box(Modifier.size(76.dp).semantics { contentDescription = shutterDescription }.springClick(0.9f) { shoot() }
             .border(3.dp, Pal.text.copy(alpha = 0.45f + 0.55f * ready), CircleShape).padding(7.dp), contentAlignment = Alignment.Center) {
             Box(Modifier.fillMaxSize().graphicsLayer { scaleX = sink; scaleY = sink; alpha = 0.18f + 0.82f * ready }
                 .clip(CircleShape).background(if (busy) accent else Pal.text))
@@ -602,7 +610,8 @@ fun CameraScreen(state: AppState) {
     }
     val flipPart: @Composable () -> Unit = {
         val spin = remember { Animatable(0f) }
-        Box(Modifier.size(52.dp).semantics { contentDescription = "切换前后镜头" }
+        val switchDescription = stringResource(R.string.switch_camera)
+        Box(Modifier.size(52.dp).semantics { contentDescription = switchDescription }
             .springClick(0.9f) {
                 front = !front; zoomJob?.cancel(); zoom = 1f
                 scope.launch { spin.snapTo(0f); spin.animateTo(180f, Motion.settle) }
@@ -620,7 +629,8 @@ fun CameraScreen(state: AppState) {
         }
         val motor: @Composable () -> Unit = {
             // motor drive for those who do not want to wind every frame
-            Text(if (autoWind) "自动过片 开" else "自动过片 关", color = if (autoWind) accent else Pal.dim, fontSize = 11.sp,
+            Text(stringResource(if (autoWind) R.string.auto_wind_on else R.string.auto_wind_off),
+                color = if (autoWind) accent else Pal.dim, fontSize = 11.sp,
                 modifier = Modifier.springClick {
                     autoWind = !autoWind
                     prefs.edit().putBoolean("autoWind", autoWind).apply()

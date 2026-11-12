@@ -1,6 +1,8 @@
 package app.spektralab.data
 
 import android.content.Context
+import androidx.annotation.StringRes
+import app.spektralab.R
 import app.spektralab.engine.Look
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,7 +28,9 @@ data class LibraryItem(
     val name: String,
 )
 
-data class Recipe(val name: String, val look: Look, val builtin: Boolean = false)
+data class Recipe(val name: String, val look: Look, val builtin: Boolean = false, @StringRes val nameRes: Int? = null)
+
+fun Recipe.localizedName(context: Context): String = nameRes?.let(context::getString) ?: name
 
 object LookJson {
     fun toJson(l: Look) = JSONObject().apply {
@@ -174,13 +178,13 @@ class Library(context: Context) {
 
     companion object {
         val BUILTIN_RECIPES = listOf(
-            Recipe("日常人像", Look(film = "kodak_portra_400", filmEv = 0.5), true),
-            Recipe("霓虹夜景", Look(film = "kodak_vision3_500t", paper = "kodak_2383", halation = 1.6,
-                diffusion = "cinebloom", diffusionAmount = 0.4), true),
-            Recipe("风光浓郁", Look(film = "fujifilm_velvia_100", grain = 0.8), true),
-            Recipe("旅行快照", Look(film = "kodak_gold_200", diffusion = "pro_mist", diffusionAmount = 0.4,
-                halation = 1.3, dateStamp = true), true),
-            Recipe("街头迫冲", Look(film = "kodak_portra_800", push = 2, grain = 1.3, format = "half"), true),
+            Recipe("builtin:daily_portrait", Look(film = "kodak_portra_400", filmEv = 0.5), true, R.string.recipe_daily_portrait),
+            Recipe("builtin:neon_night", Look(film = "kodak_vision3_500t", paper = "kodak_2383", halation = 1.6,
+                diffusion = "cinebloom", diffusionAmount = 0.4), true, R.string.recipe_neon_night),
+            Recipe("builtin:rich_landscape", Look(film = "fujifilm_velvia_100", grain = 0.8), true, R.string.recipe_rich_landscape),
+            Recipe("builtin:travel_snapshot", Look(film = "kodak_gold_200", diffusion = "pro_mist", diffusionAmount = 0.4,
+                halation = 1.3, dateStamp = true), true, R.string.recipe_travel_snapshot),
+            Recipe("builtin:street_push", Look(film = "kodak_portra_800", push = 2, grain = 1.3, format = "half"), true, R.string.recipe_street_push),
         )
     }
 }

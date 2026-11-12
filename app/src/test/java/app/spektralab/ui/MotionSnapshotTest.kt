@@ -196,9 +196,11 @@ class MotionSnapshotTest {
             if (kotlin.math.abs(c.red - 0.914f) < 0.03f && kotlin.math.abs(c.green - 0.769f) < 0.03f && kotlin.math.abs(c.blue - 0.541f) < 0.03f) ring++
         }
         assertTrue("selected frame ring ($ring px)", ring > 200)
-        rule.onNodeWithContentDescription("Portra 160，ISO 160，彩色负片").performClick()
+        val description = "Portra 160, " + rule.activity.getString(app.spektralab.R.string.film_choice_subtitle,
+            "160", rule.activity.getString(app.spektralab.R.string.film_kind_negative))
+        rule.onNodeWithContentDescription(description).performClick()
         rule.mainClock.advanceTimeBy(400)
         assertTrue("select the intended stock", selected == "kodak_portra_160")
-        rule.onNodeWithContentDescription("Portra 160，ISO 160，彩色负片").assertIsSelected()
+        rule.onNodeWithContentDescription(description).assertIsSelected()
     }
 }

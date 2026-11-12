@@ -34,6 +34,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
+import app.spektralab.R
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
@@ -63,6 +65,7 @@ fun FilmAdvanceLever(cocked: Boolean, accent: Color, nudge: Int, autoStroke: Int
     val haptics = LocalHapticFeedback.current
     val advance by rememberUpdatedState(onAdvance)
     val isCocked by rememberUpdatedState(cocked)
+    val leverDescription = stringResource(if (cocked) R.string.film_lever_advanced else R.string.film_lever_action)
     var interacting by remember { mutableStateOf(false) }
     var interaction by remember { mutableIntStateOf(0) }
     var guideReady by remember { mutableStateOf(false) }
@@ -117,7 +120,7 @@ fun FilmAdvanceLever(cocked: Boolean, accent: Color, nudge: Int, autoStroke: Int
 
     Box(modifier.size(112.dp, 84.dp)
         .semantics {
-            contentDescription = if (cocked) "过片扳手，已过片" else "过片扳手，向右扳动过片"
+            contentDescription = leverDescription
             role = Role.Button
             onClick { scope.launch { finishStroke() }; true }
         }

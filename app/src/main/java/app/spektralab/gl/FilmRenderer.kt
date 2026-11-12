@@ -37,10 +37,15 @@ class RenderRequest(
     val overlayTexture: Int = 0,
     val flipY: Boolean = false,
     val original: Boolean = false,
+    /** Display-space ground-glass diffusion: 0 is sharp, 1 is fully diffused. */
+    val groundGlass: Float = 0f,
     val seed: Int = 1,
     /** Auto exposure (EV) measured on the source image. */
     val autoEv: Float = 0f,
 )
+
+/** Adjacent pairs of Gaussian samples collapsed into single bilinear texture reads. */
+internal data class LinearGaussianKernel(val taps: Int, val offsets: FloatArray, val weights: FloatArray)
 
 /**
  * GLES 3.0 implementation of the spektrafilm pipeline (see [Shaders]). One
@@ -65,6 +70,8 @@ class FilmRenderer {
     private val pExposeExt get() = pExposeExtLazy.value
     private val pDown = Program(Shaders.VERTEX, Shaders.DOWN)
     private val pBlur = Program(Shaders.VERTEX, Shaders.BLUR)
+    private val pGroundGlassDown = Program(Shaders.VERTEX, Shaders.GROUND_GLASS_DOWN)
+    private val pGroundGlass = Program(Shaders.VERTEX, Shaders.GROUND_GLASS)
     private val pCombine = Program(Shaders.VERTEX, Shaders.COMBINE)
     private val pCorr = Program(Shaders.VERTEX, Shaders.CORR)
     private val pDevelop = Program(Shaders.VERTEX, Shaders.DEVELOP)
@@ -248,8 +255,13 @@ class FilmRenderer {
     }
 
     private fun drawFinal(r: RenderRequest, s: LookSetup, density: Int) {
-        glBindFramebuffer(GL_FRAMEBUFFER, r.framebuffer)
-        glViewport(0, 0, r.outWidth, r.outHeight)
+        val glass = if (r.original) 0f else r.groundGlass.coerceIn(0f, 1f)
+        val source = if (glass > 0f) {
+            val size = GroundGlassSizing.sourceSize(r.outWidth, r.outHeight)
+            target("GlassFull", size.width, size.height, GL_RGBA8)
+        } else null
+        glBindFramebuffer(GL_FRAMEBUFFER, source?.framebuffer ?: r.framebuffer)
+        glViewport(0, 0, source?.width ?: r.outWidth, source?.height ?: r.outHeight)
         val p = if (r.original && r.input.external) pFinalExt else pFinal
         p.use()
         if (r.original) {
@@ -275,6 +287,61 @@ class FilmRenderer {
         p.set1i("uOverlay", if (r.overlayTexture != 0) 1 else 0)
         if (r.overlayTexture != 0) p.texture("uOverlayTex", 3, r.overlayTexture)
         quad.draw()
+        if (source != null) groundGlass(r, source, glass)
+    }
+
+    /**
+     * Display-space diffusion: two area reductions, then the cached sigma=4 Gaussian.
+     * Its nominal sigma in output pixels is (4*outWidth/low.width, 4*outHeight/low.height),
+     * about 16 source pixels; ceil sizing, kernel truncation and resampling alter the PSF.
+     * At 1920x1080 and 3840x2160 the source/half/low sizes are 1280x720/640x360/320x180,
+     * giving nominal output sigma 24 and 48 respectively. Small outputs are not upscaled.
+     *
+     * Five reused RGBA8 targets cost 4*(source pixels + half pixels + 3*low pixels):
+     * 5,299,200 bytes (5.05 MiB) at either resolution, excluding driver/FBO overhead.
+     * FINAL + two reductions + two blur passes + output composite is six draws (five
+     * extra versus direct FINAL); 1,324,800 offscreen fragments plus the output area.
+     * Reductions use at most 9 fetches/pixel (4 at even sizes), blur uses 13 per axis,
+     * and composite uses 1 at full diffusion or 2 during the crossfade.
+     *
+     * The cap also limits the sharp crossfade leg and overlay detail while glass > 0;
+     * zero glass/original still renders FINAL directly. RGBA8 rounds every pass, so
+     * faint impulses can vanish; normalized weights do not guarantee impulse energy.
+     * This bounds only glass postprocessing: the viewfinder still runs the full film
+     * pipeline at long edge 1280, even fully blurred, rather than the former 22 pixels
+     * (roughly 3,400 times the film pixel area). It is not a device frame-rate guarantee.
+     */
+    private fun groundGlass(r: RenderRequest, source: RenderTarget, amount: Float) {
+        val half = target("GlassHalf", (source.width + 1) / 2, (source.height + 1) / 2, GL_RGBA8)
+        val low = target("GlassLow", (half.width + 1) / 2, (half.height + 1) / 2, GL_RGBA8)
+        groundGlassDownsample(source.texture, half)
+        groundGlassDownsample(half.texture, low)
+        val tmp = target("GlassTmp", low.width, low.height, GL_RGBA8)
+        val blurred = target("GlassBlur", low.width, low.height, GL_RGBA8)
+        blurPass(low.texture, tmp, GROUND_GLASS_KERNEL, 1f / low.width, 0f)
+        blurPass(tmp.texture, blurred, GROUND_GLASS_KERNEL, 0f, 1f / low.height)
+
+        glBindFramebuffer(GL_FRAMEBUFFER, r.framebuffer)
+        glViewport(0, 0, r.outWidth, r.outHeight)
+        pGroundGlass.use()
+        pGroundGlass.texture("uSharp", 0, source.texture)
+        pGroundGlass.texture("uBlurred", 1, blurred.texture)
+        pGroundGlass.set1f("uAmount", amount)
+        quad.draw()
+    }
+
+    private fun groundGlassDownsample(src: Int, dst: RenderTarget) {
+        dst.bind()
+        pGroundGlassDown.use()
+        pGroundGlassDown.texture("uSrc", 0, src)
+        quad.draw()
+    }
+
+    private fun downsample(src: Int, dst: RenderTarget) {
+        dst.bind()
+        pDown.use()
+        pDown.texture("uSrc", 0, src)
+        quad.draw()
     }
 
     /** Pyramid of half-resolution reductions of [src]; element 0 is half size. */
@@ -284,10 +351,7 @@ class FilmRenderer {
         var i = 0
         while (min(cur.width, cur.height) > 6 && i < 12) {
             val t = target("$prefix$i", (cur.width + 1) / 2, (cur.height + 1) / 2)
-            t.bind()
-            pDown.use()
-            pDown.texture("uSrc", 0, cur.texture)
-            quad.draw()
+            downsample(cur.texture, t)
             out += t
             cur = t
             i++
@@ -313,28 +377,17 @@ class FilmRenderer {
     }
 
     private fun blurPass(src: Int, dst: RenderTarget, sigma: Double, dx: Float, dy: Float) {
-        val radius = ceil(3 * sigma).toInt().coerceIn(1, 28)
-        val g = DoubleArray(radius + 2) { if (it <= radius) exp(-it * it / (2 * sigma * sigma)) else 0.0 }
-        val norm = g[0] + 2 * (1..radius).sumOf { g[it] }
-        val offsets = FloatArray(16)
-        val weights = FloatArray(16)
-        weights[0] = (g[0] / norm).toFloat()
-        var taps = 1
-        var k = 1
-        while (k <= radius && taps < 16) {
-            val w = g[k] + g[k + 1]
-            offsets[taps] = ((k * g[k] + (k + 1) * g[k + 1]) / w).toFloat()
-            weights[taps] = (w / norm).toFloat()
-            taps++
-            k += 2
-        }
+        blurPass(src, dst, linearGaussianKernel(sigma), dx, dy)
+    }
+
+    private fun blurPass(src: Int, dst: RenderTarget, kernel: LinearGaussianKernel, dx: Float, dy: Float) {
         dst.bind()
         pBlur.use()
         pBlur.texture("uSrc", 0, src)
         pBlur.set2f("uStep", dx, dy)
-        pBlur.set1i("uTaps", taps)
-        pBlur.set1fv("uOffsets", offsets)
-        pBlur.set1fv("uWeights", weights)
+        pBlur.set1i("uTaps", kernel.taps)
+        pBlur.set1fv("uOffsets", kernel.offsets)
+        pBlur.set1fv("uWeights", kernel.weights)
         quad.draw()
     }
 
@@ -357,7 +410,7 @@ class FilmRenderer {
 
     fun release() {
         releaseTargets()
-        listOf(pExpose, pDown, pBlur, pCombine, pCorr, pDevelop, pFinal).forEach { it.release() }
+        listOf(pExpose, pDown, pBlur, pGroundGlassDown, pGroundGlass, pCombine, pCorr, pDevelop, pFinal).forEach { it.release() }
         if (pExposeExtLazy.isInitialized()) pExposeExt.release()
         if (pFinalExtLazy.isInitialized()) pFinalExt.release()
         listOf(texTc, texCurves, texCurves0, texLayers, texZero, texLut).forEach { GlUtil.deleteTexture(it) }
@@ -367,6 +420,29 @@ class FilmRenderer {
     companion object {
         private val EXPOSE_UNITS = mapOf("uInput" to 0, "uTcLut" to 1)
         private val FINAL_UNITS = mapOf("uInput" to 0, "uDensity" to 1, "uLut" to 2, "uOverlayTex" to 3)
+
+        internal const val GROUND_GLASS_SIGMA = 6.0
+        private val GROUND_GLASS_KERNEL = linearGaussianKernel(GROUND_GLASS_SIGMA)
+
+        /** Normalized Gaussian, with adjacent taps paired for hardware bilinear sampling. */
+        internal fun linearGaussianKernel(sigma: Double): LinearGaussianKernel {
+            val radius = ceil(3 * sigma).toInt().coerceIn(1, 28)
+            val g = DoubleArray(radius + 2) { if (it <= radius) exp(-it * it / (2 * sigma * sigma)) else 0.0 }
+            val norm = g[0] + 2 * (1..radius).sumOf { g[it] }
+            val offsets = FloatArray(16)
+            val weights = FloatArray(16)
+            weights[0] = (g[0] / norm).toFloat()
+            var taps = 1
+            var k = 1
+            while (k <= radius && taps < 16) {
+                val w = g[k] + g[k + 1]
+                offsets[taps] = ((k * g[k] + (k + 1) * g[k + 1]) / w).toFloat()
+                weights[taps] = (w / norm).toFloat()
+                taps++
+                k += 2
+            }
+            return LinearGaussianKernel(taps, offsets, weights)
+        }
 
         /** 3x3 Gaussian (center, edge, corner) weights for the grain blur. */
         fun grainBlurWeights(sigma: Double): FloatArray {

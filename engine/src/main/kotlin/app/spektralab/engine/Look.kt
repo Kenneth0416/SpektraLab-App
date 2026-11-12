@@ -43,70 +43,65 @@ data class Look(
     }
 }
 
-data class FilmInfo(val stock: String, val name: String, val iso: String, val kind: String, val note: String,
-                    val accent: Long)
-data class PaperInfo(val id: String, val label: String, val note: String)
-data class DiffusionInfo(val id: String, val label: String, val note: String)
-data class BorderInfo(val id: String, val label: String, val note: String)
-data class FormatInfo(val id: String, val label: String, val longMm: Double, val aspect: Double, val note: String)
+data class FilmInfo(val stock: String, val name: String, val iso: String, val kind: String, val accent: Long)
+data class PaperInfo(val id: String, val label: String)
+data class DiffusionInfo(val id: String, val label: String)
+data class BorderInfo(val id: String)
+data class FormatInfo(val id: String, val label: String, val longMm: Double, val aspect: Double)
 
 /** Stocks shipped with spektrafilm, with UI labels. */
 object Catalog {
     val films = listOf(
-        FilmInfo("kodak_portra_400", "Portra 400", "400", "彩色负片", "肤色柔和，宽容度高，过曝也好看。", 0xFFE9C48A),
-        FilmInfo("kodak_portra_160", "Portra 160", "160", "彩色负片", "更细腻、更低反差的 Portra，适合棚拍和人像。", 0xFFEED3A6),
-        FilmInfo("kodak_portra_800", "Portra 800", "800", "彩色负片", "高感 Portra，暗部有层次，迫冲时使用真实的迫冲曲线。", 0xFFE3A86E),
-        FilmInfo("kodak_ektar_100", "Ektar 100", "100", "彩色负片", "颗粒极细，颜色浓、反差高，适合风光。", 0xFFF0624A),
-        FilmInfo("kodak_gold_200", "Gold 200", "200", "彩色负片", "暖黄怀旧，晴天最合适。", 0xFFF2B63A),
-        FilmInfo("kodak_ultramax_400", "UltraMax 400", "400", "彩色负片", "日常卷，饱和偏高，颗粒比 Portra 明显。", 0xFF5CB4EA),
-        FilmInfo("fujifilm_c200", "Fujicolor C200", "200", "彩色负片", "清爽偏绿的日常卷。", 0xFF6BC48A),
-        FilmInfo("fujifilm_pro_400h", "Pro 400H", "400", "彩色负片", "通透的青绿色调，高光柔和。", 0xFF8FD3C1),
-        FilmInfo("fujifilm_xtra_400", "X-TRA 400", "400", "彩色负片", "饱和、反差略高的富士日常卷。", 0xFF4FB58C),
-        FilmInfo("kodak_vision3_50d", "Vision3 50D", "50D", "电影负片", "日光型电影卷，最细的颗粒。", 0xFFB9C7E8),
-        FilmInfo("kodak_vision3_250d", "Vision3 250D", "250D", "电影负片", "日光型电影卷，宽容度极高。", 0xFF9DB4E4),
-        FilmInfo("kodak_vision3_200t", "Vision3 200T", "200T", "电影负片", "灯光型电影卷，日光下偏蓝。", 0xFF8AA8E0),
-        FilmInfo("kodak_vision3_500t", "Vision3 500T", "500T", "电影负片", "灯光型电影卷，夜景和霓虹的首选，日光下偏蓝。", 0xFF7FA6E6),
-        FilmInfo("kodak_verita_200d", "Verita 200D", "200D", "电影负片", "日光型电影负片。", 0xFFA7B0D8),
-        FilmInfo("fujifilm_velvia_100", "Velvia 100", "100", "彩色反转片", "极高饱和与反差，风光经典。直接扫描，不印相。", 0xFFE0457B),
-        FilmInfo("fujifilm_provia_100f", "Provia 100F", "100", "彩色反转片", "准确中性的反转片。直接扫描，不印相。", 0xFF5FA8D3),
-        FilmInfo("kodak_ektachrome_100", "Ektachrome 100", "100", "彩色反转片", "干净偏冷的反转片。直接扫描，不印相。", 0xFF4F8FD8),
-        FilmInfo("kodak_kodachrome_64", "Kodachrome 64", "64", "彩色反转片", "浓郁的红与深沉的影调。直接扫描，不印相。", 0xFFD9573B),
+        FilmInfo("kodak_portra_400", "Portra 400", "400", "negative", 0xFFE9C48A),
+        FilmInfo("kodak_portra_160", "Portra 160", "160", "negative", 0xFFEED3A6),
+        FilmInfo("kodak_portra_800", "Portra 800", "800", "negative", 0xFFE3A86E),
+        FilmInfo("kodak_ektar_100", "Ektar 100", "100", "negative", 0xFFF0624A),
+        FilmInfo("kodak_gold_200", "Gold 200", "200", "negative", 0xFFF2B63A),
+        FilmInfo("kodak_ultramax_400", "UltraMax 400", "400", "negative", 0xFF5CB4EA),
+        FilmInfo("fujifilm_c200", "Fujicolor C200", "200", "negative", 0xFF6BC48A),
+        FilmInfo("fujifilm_pro_400h", "Pro 400H", "400", "negative", 0xFF8FD3C1),
+        FilmInfo("fujifilm_xtra_400", "X-TRA 400", "400", "negative", 0xFF4FB58C),
+        FilmInfo("kodak_vision3_50d", "Vision3 50D", "50D", "cine", 0xFFB9C7E8),
+        FilmInfo("kodak_vision3_250d", "Vision3 250D", "250D", "cine", 0xFF9DB4E4),
+        FilmInfo("kodak_vision3_200t", "Vision3 200T", "200T", "cine", 0xFF8AA8E0),
+        FilmInfo("kodak_vision3_500t", "Vision3 500T", "500T", "cine", 0xFF7FA6E6),
+        FilmInfo("kodak_verita_200d", "Verita 200D", "200D", "cine", 0xFFA7B0D8),
+        FilmInfo("fujifilm_velvia_100", "Velvia 100", "100", "positive", 0xFFE0457B),
+        FilmInfo("fujifilm_provia_100f", "Provia 100F", "100", "positive", 0xFF5FA8D3),
+        FilmInfo("kodak_ektachrome_100", "Ektachrome 100", "100", "positive", 0xFF4F8FD8),
+        FilmInfo("kodak_kodachrome_64", "Kodachrome 64", "64", "positive", 0xFFD9573B),
     )
 
     val papers = listOf(
-        PaperInfo("auto", "自动", "跟随胶片的原配相纸；反转片直接扫描。"),
-        PaperInfo("kodak_portra_endura", "Portra Endura", "彩色相纸：照片感，反差适中。"),
-        PaperInfo("kodak_supra_endura", "Supra Endura", "彩色相纸：饱和度和反差略高。"),
-        PaperInfo("kodak_ultra_endura", "Ultra Endura", "彩色相纸：最鲜艳的 Endura。"),
-        PaperInfo("kodak_endura_premier", "Endura Premier", "彩色相纸：新一代，黑位更深。"),
-        PaperInfo("kodak_ektacolor_edge", "Ektacolor Edge", "彩色相纸：冲印店常用的经济型相纸。"),
-        PaperInfo("fujifilm_crystal_archive_typeii", "Crystal Archive", "富士相纸：通透，偏冷的白。"),
-        PaperInfo("kodak_2383", "2383", "电影拷贝片：反差更高，暗部偏冷，电影感最强。"),
-        PaperInfo("kodak_2393", "2393", "高端电影拷贝片：比 2383 更深的黑位。"),
-        PaperInfo("none", "不印相", "跳过印相，直接扫描底片；负片看到的是负像。"),
+        PaperInfo("auto", "Auto"),
+        PaperInfo("kodak_portra_endura", "Portra Endura"),
+        PaperInfo("kodak_supra_endura", "Supra Endura"),
+        PaperInfo("kodak_ultra_endura", "Ultra Endura"),
+        PaperInfo("kodak_endura_premier", "Endura Premier"),
+        PaperInfo("kodak_ektacolor_edge", "Ektacolor Edge"),
+        PaperInfo("fujifilm_crystal_archive_typeii", "Crystal Archive"),
+        PaperInfo("kodak_2383", "2383"),
+        PaperInfo("kodak_2393", "2393"),
+        PaperInfo("none", "No print"),
     )
 
     val diffusions = listOf(
-        DiffusionInfo("off", "关", "不加柔焦镜。"),
-        DiffusionInfo("black_pro_mist", "Black Pro-Mist", "高光溢开但黑位不灰，最常用。"),
-        DiffusionInfo("pro_mist", "Pro-Mist", "大范围柔化，整体偏粉彩、低反差。"),
-        DiffusionInfo("glimmerglass", "Glimmerglass", "很轻，保留锐度，只给高光加一点光泽。"),
-        DiffusionInfo("cinebloom", "CineBloom", "很宽、缓慢衰减的一层雾，梦幻感最强。"),
+        DiffusionInfo("off", "Off"),
+        DiffusionInfo("black_pro_mist", "Black Pro-Mist"),
+        DiffusionInfo("pro_mist", "Pro-Mist"),
+        DiffusionInfo("glimmerglass", "Glimmerglass"),
+        DiffusionInfo("cinebloom", "CineBloom"),
     )
 
     val formats = listOf(
-        FormatInfo("half", "半格", 24.0, 4.0 / 3.0, "底片小，颗粒被放得更大。"),
-        FormatInfo("135", "135", 36.0, 1.5, "标准 135 颗粒。"),
-        FormatInfo("xpan", "XPan", 65.0, 65.0 / 24.0, "宽幅 135，颗粒同 135。"),
-        FormatInfo("66", "6×6", 56.0, 1.0, "底片大，颗粒更细腻。"),
-        FormatInfo("67", "6×7", 70.0, 70.0 / 56.0, "底片大，颗粒更细腻。"),
+        FormatInfo("half", "Half frame", 24.0, 4.0 / 3.0),
+        FormatInfo("135", "135", 36.0, 1.5),
+        FormatInfo("xpan", "XPan", 65.0, 65.0 / 24.0),
+        FormatInfo("66", "6×6", 56.0, 1.0),
+        FormatInfo("67", "6×7", 70.0, 70.0 / 56.0),
     )
 
-    val borders = listOf(
-        BorderInfo("none", "无", "不加边框。"),
-        BorderInfo("white", "相纸白边", "spektrafilm 的白边：四周留长边 3% 的相纸。白边颜色是这张相纸未曝光处的真实颜色；反转片和直接扫描时为纯白。"),
-        BorderInfo("edge", "片边", "连同底片片边一起印出来，带胶片名与格号；片边颜色按片基真实印出。"),
-    )
+    val borders = listOf(BorderInfo("none"), BorderInfo("white"), BorderInfo("edge"))
 
     fun border(id: String): BorderInfo = borders.firstOrNull { it.id == id } ?: borders.first()
 

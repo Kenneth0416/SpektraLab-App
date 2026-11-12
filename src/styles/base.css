@@ -21,8 +21,12 @@
 }
 
 * { box-sizing: border-box; }
-html { overflow-x: hidden; overflow-x: clip; scroll-behavior: smooth; scroll-padding-top: 92px; }
-body { margin: 0; min-width: 320px; overflow-x: hidden; overflow-x: clip; background: var(--ink); color: var(--paper); }
+html { scroll-behavior: smooth; scroll-padding-top: 92px; }
+body { margin: 0; background: var(--ink); color: var(--paper); }
+.site-shell { max-width: 100%; overflow-x: hidden; }
+@supports (overflow: clip) {
+  .site-shell { overflow-x: clip; }
+}
 body::before {
   content: '';
   position: fixed;
@@ -158,7 +162,8 @@ h1, h2, h3, p { margin-top: 0; }
 
 .js-motion .reveal { opacity: 1; transform: none; }
 .js-motion .hero-copy, .js-motion .hero-lab, .js-motion .filmstrip-track { animation: none; }
-.js-motion .filmstrip { overflow-x: auto; }
+.filmstrip-viewport { width: 100%; max-width: 100%; overflow: hidden; }
+.js-motion .filmstrip { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 @media (min-width: 801px) {
   .js-motion .filmstrip { overflow: hidden; }
 }

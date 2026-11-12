@@ -5,7 +5,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.launch
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -26,8 +26,9 @@ import app.spektralab.ui.LocalFold
 import app.spektralab.ui.rememberFoldState
 import app.spektralab.ui.Sheet
 import app.spektralab.ui.Sheets
+import app.spektralab.ui.SettingsScreen
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
     private val state: AppState by viewModels()
 
     /** Volume keys release the shutter in the camera, like on every phone camera. */
@@ -62,10 +63,12 @@ class MainActivity : ComponentActivity() {
                 val sheet by state.sheet.collectAsState()
                 val selecting by state.selecting.collectAsState()
                 val cameraOpen by state.cameraOpen.collectAsState()
-                BackHandler(sheet != Sheet.NONE || editId != null || selecting || cameraOpen) {
+                val settingsOpen by state.settingsOpen.collectAsState()
+                BackHandler(sheet != Sheet.NONE || editId != null || selecting || cameraOpen || settingsOpen) {
                     when {
                         sheet != Sheet.NONE && sheet != Sheet.PROGRESS -> state.sheet.value = Sheet.NONE
                         sheet == Sheet.PROGRESS -> state.sheet.value = Sheet.NONE
+                        settingsOpen -> state.closeSettings()
                         editId != null || cameraOpen -> state.back()
                         selecting -> state.toggleSelecting()
                     }
@@ -73,7 +76,8 @@ class MainActivity : ComponentActivity() {
                 Box(Modifier.fillMaxSize()) {
                     // lightbox <-> darkroom: the bright table fades to near black
                     // rooms: lightbox (bright), darkroom editor and camera (dark)
-                    RoomTransition(editId to cameraOpen, isDark = { it.first != null || it.second }) { (id, camera) ->
+                    if (settingsOpen) SettingsScreen(state)
+                    else RoomTransition(editId to cameraOpen, isDark = { it.first != null || it.second }) { (id, camera) ->
                         when {
                             id != null -> EditorScreen(state, id)
                             camera -> CameraScreen(state)

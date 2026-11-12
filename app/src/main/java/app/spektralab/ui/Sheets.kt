@@ -53,7 +53,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import app.spektralab.R
 import app.spektralab.data.Library
+import app.spektralab.data.localizedName
 import app.spektralab.engine.Catalog
 import app.spektralab.export.PhotoFormat
 
@@ -119,21 +123,21 @@ private fun ImportSheet(state: AppState) {
     val photos = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(50)) { state.importUris(it) }
     val files = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { state.importUris(it) }
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("导入", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Pal.ink, modifier = Modifier.weight(1f))
-        Text("取消", color = Pal.grey, modifier = Modifier.clickable { state.sheet.value = Sheet.NONE }.padding(6.dp))
+        Text(stringResource(R.string.import_title), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Pal.ink, modifier = Modifier.weight(1f))
+        Text(stringResource(R.string.cancel), color = Pal.grey, modifier = Modifier.clickable { state.sheet.value = Sheet.NONE }.padding(6.dp))
     }
     Spacer(Modifier.height(14.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         // the two slide mounts are dealt out one after the other
-        SourceCard("相册", "照片和视频，可多选", Modifier.weight(1f).dealIn(1, fromY = 50f, tilt = -4f)) {
+        SourceCard(stringResource(R.string.gallery), stringResource(R.string.gallery_subtitle), Modifier.weight(1f).dealIn(1, fromY = 50f, tilt = -4f)) {
             photos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
         }
-        SourceCard("文件", "RAW / DNG / JPEG / 视频", Modifier.weight(1f).dealIn(2, fromY = 50f, tilt = 4f)) {
+        SourceCard(stringResource(R.string.files), stringResource(R.string.files_subtitle), Modifier.weight(1f).dealIn(2, fromY = 50f, tilt = 4f)) {
             files.launch(arrayOf("image/*", "video/*"))
         }
     }
     Spacer(Modifier.height(12.dp))
-    Text("只选一项会直接进暗房。RAW 文件从「文件」导入，由系统解码（取决于设备支持）。原片只读不改。", color = Pal.grey, fontSize = 12.sp)
+    Text(stringResource(R.string.import_explanation), color = Pal.grey, fontSize = 12.sp)
 }
 
 @Composable
@@ -150,11 +154,12 @@ private fun SourceCard(title: String, sub: String, modifier: Modifier, onClick: 
 private fun RecipeSheet(state: AppState, inEditor: Boolean) {
     val mine by state.library.recipes.collectAsState()
     val picked by state.picked.collectAsState()
+    val context = LocalContext.current
     val fg = if (inEditor) Pal.text else Pal.ink
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(if (inEditor) "配方" else "配方 · 套用到 ${picked.size} 项", fontSize = 20.sp, fontWeight = FontWeight.Bold,
-            color = fg, modifier = Modifier.weight(1f))
-        Text("关闭", color = if (inEditor) Pal.dim else Pal.grey, modifier = Modifier.clickable { state.sheet.value = Sheet.NONE }.padding(6.dp))
+        Text(if (inEditor) stringResource(R.string.recipes) else stringResource(R.string.recipes_apply_count, picked.size),
+            fontSize = 20.sp, fontWeight = FontWeight.Bold, color = fg, modifier = Modifier.weight(1f))
+        Text(stringResource(R.string.close), color = if (inEditor) Pal.dim else Pal.grey, modifier = Modifier.clickable { state.sheet.value = Sheet.NONE }.padding(6.dp))
     }
     Spacer(Modifier.height(12.dp))
     Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
@@ -163,19 +168,19 @@ private fun RecipeSheet(state: AppState, inEditor: Boolean) {
             Row(Modifier.padding(vertical = 5.dp).dealIn(i, key = r.name, fromX = if (i % 2 == 0) -90f else 90f, fromY = 24f, tilt = rot * 10f)
                 .rotate(rot).fillMaxWidth().clip(RoundedCornerShape(4.dp)).background(Pal.card)
                 .combinedClickable(onClick = { state.applyRecipe(r) },
-                    onLongClick = { if (!r.builtin) { state.library.removeRecipe(r.name); state.say("已删除：${r.name}") } })
+                    onLongClick = { if (!r.builtin) { state.library.removeRecipe(r.name); state.say(R.string.recipe_deleted, r.localizedName(context)) } })
                 .padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(10.dp).clip(CircleShape).background(Color(Catalog.film(r.look.film).accent)))
                 Spacer(Modifier.width(10.dp))
                 Column {
-                    Text(r.name, fontFamily = Fonts.hand, fontSize = 24.sp, color = Pal.ink)
+                    Text(r.localizedName(context), fontFamily = Fonts.hand, fontSize = 24.sp, color = Pal.ink)
                     Text(summary(r.look), fontSize = 12.sp, color = Pal.grey)
                 }
             }
         }
     }
     if (inEditor) {
-        Text("＋ 把当前设置写成一张配方卡", color = Pal.text, fontSize = 14.sp,
+        Text(stringResource(R.string.save_recipe_card), color = Pal.text, fontSize = 14.sp,
             modifier = Modifier.padding(top = 12.dp).fillMaxWidth().border(1.dp, Pal.off, RoundedCornerShape(8.dp))
                 .clickable { state.saveRecipe() }.padding(12.dp))
     }
@@ -188,21 +193,22 @@ private fun ExportSheet(state: AppState) {
     val notifier = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     val acc = state.editId.collectAsState().value?.let { state.library.item(it) }?.let { Color(Catalog.film(it.look.film).accent) } ?: Pal.red
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("导出 ${targets.size} 项", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Pal.text, modifier = Modifier.weight(1f))
-        Text("取消", color = Pal.dim, modifier = Modifier.clickable { state.sheet.value = Sheet.NONE }.padding(6.dp))
+        Text(stringResource(R.string.export_count, targets.size), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Pal.text, modifier = Modifier.weight(1f))
+        Text(stringResource(R.string.cancel), color = Pal.dim, modifier = Modifier.clickable { state.sheet.value = Sheet.NONE }.padding(6.dp))
     }
     if (targets.any { !it.isVideo }) {
-        Label("格式")
+        Label(stringResource(R.string.format))
         Row { PhotoFormat.entries.forEach { f -> Chip(f.label, o.photoFormat == f, Pal.paper) { state.exportOptions.value = o.copy(photoFormat = f) } } }
-        Label("尺寸")
+        Label(stringResource(R.string.size))
         Row {
-            listOf(2048 to "长边 2048", 3400 to "长边 3400", 0 to "全尺寸").forEach { (v, l) ->
+            listOf(2048 to stringResource(R.string.long_edge, 2048), 3400 to stringResource(R.string.long_edge, 3400),
+                0 to stringResource(R.string.full_size)).forEach { (v, l) ->
                 Chip(l, o.photoLongEdge == v, Pal.paper) { state.exportOptions.value = o.copy(photoLongEdge = v) }
             }
         }
     }
     if (targets.any { it.isVideo }) {
-        Label("视频")
+        Label(stringResource(R.string.video))
         Row {
             listOf(1920 to "1080p", 3840 to "4K").forEach { (v, l) ->
                 Chip(l, o.videoLongEdge == v, Pal.paper) { state.exportOptions.value = o.copy(videoLongEdge = v) }
@@ -210,16 +216,16 @@ private fun ExportSheet(state: AppState) {
         }
     }
     Spacer(Modifier.height(8.dp))
-    Text("导出的是一份新文件，原片不动。颗粒和光晕按输出尺寸重新计算。", color = Pal.dim, fontSize = 12.sp)
+    Text(stringResource(R.string.export_explanation), color = Pal.dim, fontSize = 12.sp)
     Spacer(Modifier.height(14.dp))
     fun go(share: Boolean) {
         if (Build.VERSION.SDK_INT >= 33) notifier.launch(Manifest.permission.POST_NOTIFICATIONS)
         state.startExport(share)
     }
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("分享…", color = Pal.text, fontSize = 15.sp, modifier = Modifier.weight(1f).clip(RoundedCornerShape(22.dp))
+        Text(stringResource(R.string.share), color = Pal.text, fontSize = 15.sp, modifier = Modifier.weight(1f).clip(RoundedCornerShape(22.dp))
             .border(1.dp, Pal.text, RoundedCornerShape(22.dp)).springClick { go(true) }.padding(12.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-        Text("存到相册", color = Pal.dink, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f)
+        Text(stringResource(R.string.save_to_gallery), color = Pal.dink, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f)
             .clip(RoundedCornerShape(22.dp)).background(acc).springClick { go(false) }.padding(12.dp),
             textAlign = androidx.compose.ui.text.style.TextAlign.Center)
     }
@@ -231,7 +237,7 @@ private fun Label(t: String) = Text(t, color = Pal.dim, fontSize = 12.sp, modifi
 @Composable
 private fun ProgressSheet(state: AppState) {
     val st = state.exports.state.collectAsState().value ?: return
-    Text("正在冲印" + busyDots(), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Pal.text)
+    Text(stringResource(R.string.developing) + busyDots(), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Pal.text)
     Row(Modifier.padding(vertical = 8.dp)) {
         RollingNumber(minOf(st.total, st.done + 1), Fonts.mono, 14.sp, Pal.text)
         Text(" / ${st.total}", fontFamily = Fonts.mono, color = Pal.text, fontSize = 14.sp)
@@ -252,12 +258,12 @@ private fun ProgressSheet(state: AppState) {
         }
     }
     Spacer(Modifier.height(10.dp))
-    Text("每一项都要完整算一遍，全尺寸需要几秒，视频需要更久。可以先回去继续修图。", color = Pal.dim, fontSize = 12.sp)
+    Text(stringResource(R.string.export_progress_explanation), color = Pal.dim, fontSize = 12.sp)
     Spacer(Modifier.height(14.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("停止", color = Pal.dim, fontSize = 15.sp, modifier = Modifier.clickable { state.exports.cancel() }.padding(12.dp))
+        Text(stringResource(R.string.stop), color = Pal.dim, fontSize = 15.sp, modifier = Modifier.clickable { state.exports.cancel() }.padding(12.dp))
         Spacer(Modifier.weight(1f))
-        Text("后台继续", color = Pal.dink, fontSize = 15.sp, fontWeight = FontWeight.Bold,
+        Text(stringResource(R.string.continue_background), color = Pal.dink, fontSize = 15.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier.clip(RoundedCornerShape(22.dp)).background(Pal.text)
                 .springClick { state.sheet.value = Sheet.NONE }.padding(horizontal = 18.dp, vertical = 12.dp))
     }
@@ -280,7 +286,7 @@ private fun ProgressPill(state: AppState, modifier: Modifier) {
             Box(Modifier.size(7.dp).graphicsLayer { alpha = pulse; scaleX = 0.7f + 0.3f * pulse; scaleY = 0.7f + 0.3f * pulse }
                 .clip(CircleShape).background(Pal.safelight))
             Spacer(Modifier.width(8.dp))
-            Text("冲印中 ", color = Pal.paper, fontSize = 13.sp, fontFamily = Fonts.mono)
+            Text(stringResource(R.string.printing) + " ", color = Pal.paper, fontSize = 13.sp, fontFamily = Fonts.mono)
             RollingNumber(minOf(s.total, s.done + 1), Fonts.mono, 13.sp, Pal.paper)
             Text(" / ${s.total}", color = Pal.paper, fontSize = 13.sp, fontFamily = Fonts.mono)
         }

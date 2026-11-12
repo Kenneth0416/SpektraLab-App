@@ -18,6 +18,8 @@ import app.spektralab.export.ExportManager
 import app.spektralab.render.Framing
 import app.spektralab.render.GlWorker
 import app.spektralab.render.OverlayPainter
+import app.spektralab.ui.AppLocales
+import app.spektralab.ui.LanguagePreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -45,6 +47,7 @@ class SpektraApp : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        AppLocales.apply(LanguagePreferences(this).load())
         engine = EngineData { path -> assets.open("spektra/$path") }
         library = Library(this)
         looks = LookCache(engine)

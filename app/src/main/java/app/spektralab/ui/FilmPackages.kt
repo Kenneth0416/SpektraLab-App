@@ -24,6 +24,8 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import app.spektralab.R
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -71,6 +73,7 @@ fun FilmPackageRow(selected: String, onPick: (String) -> Unit) {
     ) {
         items(Catalog.films, key = { it.stock }) { film ->
             val on = film.stock == selected
+            val subtitle = stringResource(R.string.film_choice_subtitle, film.iso, filmKind(film))
             val accent = Color(film.accent)
             val ring by animateColorAsState(if (on) accent else Pal.off.copy(alpha = 0.4f), tween(180), label = "packageRing")
             val lift by animateFloatAsState(if (on) 1f else 0f, Motion.settle, label = "packageLift")
@@ -80,7 +83,7 @@ fun FilmPackageRow(selected: String, onPick: (String) -> Unit) {
                     .graphicsLayer { translationY = -3.dp.toPx() * lift }
                     .springClick(0.95f) { onPick(film.stock) }
                     .semantics(mergeDescendants = true) {
-                        contentDescription = "${film.name}，ISO ${film.iso}，${film.kind}"
+                        contentDescription = "${film.name}, $subtitle"
                         this.selected = on
                         role = Role.RadioButton
                     }

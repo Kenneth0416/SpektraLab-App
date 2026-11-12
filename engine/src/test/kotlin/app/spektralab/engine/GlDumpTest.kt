@@ -15,6 +15,7 @@ class GlDumpTest {
     fun dump() {
         val out = File(outDir ?: return).apply { mkdirs() }
         mapOf("vertex" to Shaders.VERTEX, "expose" to Shaders.EXPOSE, "down" to Shaders.DOWN, "blur" to Shaders.BLUR,
+            "ground_glass_down" to Shaders.GROUND_GLASS_DOWN, "ground_glass" to Shaders.GROUND_GLASS,
             "combine" to Shaders.COMBINE, "corr" to Shaders.CORR, "develop" to Shaders.DEVELOP, "final" to Shaders.FINAL,
             "polaroid" to Shaders.POLAROID)
             .forEach { (k, v) -> File(out, "$k.glsl").writeText(v) }

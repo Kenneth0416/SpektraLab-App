@@ -105,7 +105,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
         shots[uri] = viewModelScope.async {
             val item = withContext(Dispatchers.IO) { Media.importItem(app, uri, library.reserveIds(1)) }
                 ?.let { it.copy(look = look, autoEv = it.autoEv + evBias) }
-            if (item == null) say("拍到了，但读不回原片") else { library.add(listOf(item)); say("已放上灯箱 · RAW 原片保留") }
+            if (item == null) say("拍到了，但读不回原片") else library.add(listOf(item))
             item
         }
     }

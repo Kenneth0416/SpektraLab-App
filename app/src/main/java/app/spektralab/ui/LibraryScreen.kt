@@ -92,7 +92,7 @@ fun LibraryScreen(state: AppState) {
             // header
             Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 16.dp, top = 14.dp), verticalAlignment = Alignment.Bottom) {
                 Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.contact_sheet), fontFamily = Fonts.mono, fontSize = 9.sp, color = Pal.grey, letterSpacing = 1.5.sp)
+                    Text(stringResource(R.string.brand_kicker), fontFamily = Fonts.mono, fontSize = 9.sp, color = Pal.grey, letterSpacing = 1.5.sp)
                     // the printed title is swapped for a handwritten note when circling frames
                     AnimatedContent(selecting, label = "title", transitionSpec = {
                         (slideInVertically(Motion.glideOffset) { if (targetState) it / 2 else -it / 2 } + fadeIn(tween(180))) togetherWith
@@ -108,10 +108,17 @@ fun LibraryScreen(state: AppState) {
                         }
                     }
                 }
-                SettingsButton(state::openSettings, Modifier.padding(end = 6.dp))
-                Text(stringResource(if (selecting) R.string.done else R.string.select), color = Pal.ink, fontSize = 15.sp,
-                    modifier = Modifier.clip(RoundedCornerShape(16.dp)).border(1.dp, Pal.ink, RoundedCornerShape(16.dp))
-                        .springClick { state.toggleSelecting() }.padding(horizontal = 14.dp, vertical = 6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    val aboutDescription = stringResource(R.string.about_action_description)
+                    SettingsButton(state::openSettings)
+                    Text(stringResource(R.string.about_action), color = Pal.ink, fontSize = 14.sp,
+                        modifier = Modifier.clip(RoundedCornerShape(16.dp)).border(1.dp, Pal.grey.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
+                            .semantics { contentDescription = aboutDescription }
+                            .springClick { state.sheet.value = Sheet.ABOUT }.padding(horizontal = 12.dp, vertical = 6.dp))
+                    Text(stringResource(if (selecting) R.string.done else R.string.select), color = Pal.ink, fontSize = 15.sp,
+                        modifier = Modifier.clip(RoundedCornerShape(16.dp)).border(1.dp, Pal.ink, RoundedCornerShape(16.dp))
+                            .springClick { state.toggleSelecting() }.padding(horizontal = 14.dp, vertical = 6.dp))
+                }
             }
             // filters with a red crayon underline
             Row(Modifier.padding(start = 20.dp, top = 10.dp, bottom = 4.dp)) {

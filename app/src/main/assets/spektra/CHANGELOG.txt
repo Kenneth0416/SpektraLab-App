@@ -1,0 +1,53 @@
+================================================================================
+CHANGELOG — Derived spektrafilm Profiles, LUTs, and Baked Engine Data
+================================================================================
+
+Upstream Work:
+  spektrafilm by Andrea Volpato
+  Canonical Source: https://github.com/andreavolpato/spektrafilm
+  Upstream Commit: 3bb2c2d2801ff68b92019cf1dbcbb133d60832bc (v0.3.4)
+  Data License: Creative Commons Attribution-ShareAlike 4.0 International
+                (CC BY-SA 4.0) — see SPEKTRAFILM_LICENSE.txt (unmodified)
+
+Downstream Project:
+  Silvercam / 银盐工坊 / 銀鹽工坊
+  Source Repository: https://github.com/Kenneth0416/SpektraLab-App
+  Notice: Independent downstream port/fork; not affiliated with, sponsored by,
+          or endorsed by Andrea Volpato, the upstream spektrafilm project, or
+          the SpektraLab project.
+
+--------------------------------------------------------------------------------
+Modification History
+--------------------------------------------------------------------------------
+
+2026-11-10 — Initial Kotlin/GLSL Port & Binary Data Baking
+  - Baked upstream JSON film/paper profiles (src/spektrafilm/data/profiles/*.json)
+    and optical databases from spektrafilm v0.3.4 (commit 3bb2c2d) using
+    tools/bake/bake_spektrafilm.py into compact SPK1 binary files (*.spk) for
+    mobile runtime loading:
+      * film/*.spk (20 film stock files including Portra 800 Push 1 & Push 2)
+        containing density curves, sublayer curves, dye absorption spectra,
+        base density, Hanatos 2025 spectral-upsampling LUTs (tc_lut, fp16),
+        CAT16 sRGB-to-XYZ matrices, and direct-scan 3D LUTs (scan_lut, fp16).
+      * paper/*.spk (8 print paper/film stock files) containing spectral
+        sensitivities, fitted model density curves, dye absorption spectra,
+        base density, and scanner 3D LUTs (scan_lut, fp16).
+      * global.spk containing 380–780 nm (5 nm) wavelengths, TH-KG3 enlarger
+        illuminant, custom dichroic C/M/Y filter transmittances, and the
+        neutral print filtration database.
+      * index.json indexing the baked film and paper stock metadata.
+  - Note: Individual binary .spk files were not re-encoded with per-file text
+    headers; attribution and license terms accompany the collection via
+    SPEKTRAFILM_LICENSE.txt, this CHANGELOG.txt, and the application's About /
+    Open-Source Licenses screen.
+
+2026-11-11 — Attribution, Licensing Notices & Independent Display Branding
+  - Added this CHANGELOG.txt alongside verbatim SPEKTRAFILM_LICENSE.txt
+    (preserved unmodified per upstream preamble instructions).
+  - Adopted independent display branding Silvercam / 银盐工坊 / 銀鹽工坊 while
+    keeping internal package/application IDs (app.spektralab) stable.
+  - Replaced upstream paper-back watermark graphic with neutral independent
+    geometric artwork (paper_back_mark.png).
+  - Clarified output treatment: finished photos and videos exported by users
+    are not copyleft per the upstream preamble and GPLv3 Section 2, and require
+    no output image watermark.

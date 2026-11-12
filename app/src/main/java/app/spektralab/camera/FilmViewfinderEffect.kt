@@ -68,6 +68,9 @@ class FilmViewfinder(context: Context, private val onError: (String) -> Unit) : 
     @Volatile var blurredTimestamp = Long.MIN_VALUE
         private set
 
+    /** Exposure compensation (EV) added to the metered film exposure. */
+    @Volatile var evBias = 0f
+
     /** Tables of the look loaded in the camera. */
     fun setLook(s: LookSetup) = executor.execute { setup = s }
 
@@ -163,7 +166,7 @@ class FilmViewfinder(context: Context, private val onError: (String) -> Unit) : 
                 input = input,
                 imageWidth = (w * scale).roundToInt().coerceAtLeast(2), imageHeight = (h * scale).roundToInt().coerceAtLeast(2),
                 framebuffer = 0, outWidth = w, outHeight = h,
-                seed = frame * 7919 + 17, autoEv = autoEv,
+                seed = frame * 7919 + 17, autoEv = autoEv + evBias,
             ))
             e.setPresentationTime(outSurface, st.timestamp)
             if (e.swap(outSurface) && frameClarity == 0f) blurredTimestamp = st.timestamp

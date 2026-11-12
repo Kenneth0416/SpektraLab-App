@@ -1,0 +1,1405 @@
+{
+  "schema": 1,
+  "version": "0.1.0",
+  "builtAt": "2026-11-11T17:04:59.078Z",
+  "apkSha256": "7128f98c87e17dd778d729143b39b924fae7b81bba4f32739f3735fc75303f8d",
+  "sourceSha256": "453878fbb0e822c0dc13869816219304f4c73e1b9d79075a863bef3aea921839",
+  "sourceDigest": "6e892d6af49a92f10ea0ef737da5a3782c605cd4fce951817b91cc422a567911",
+  "files": [
+    {
+      "name": ".gitignore",
+      "mode": 420,
+      "sha256": "d2d1b61d861d1931cf6389932753cb2e069a1ba7aae1b4615ef86a0742af5604"
+    },
+    {
+      "name": "LICENSE",
+      "mode": 420,
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+    },
+    {
+      "name": "NOTICE.md",
+      "mode": 420,
+      "sha256": "eebb6b92b27a103c854cc22ed83db0c7d7d9ea554f6b7c2f659193255e5063a9"
+    },
+    {
+      "name": "README.md",
+      "mode": 420,
+      "sha256": "40a81d53666e6b40421947681f86104198905b9ccc0ec30068b61838dc5bc2f4"
+    },
+    {
+      "name": "android/app/build.gradle",
+      "mode": 420,
+      "sha256": "f02e307582d145fd2e5fcb23d543a5079b7e7d91be0b5854d2175e0551bca328"
+    },
+    {
+      "name": "android/app/src/main/AndroidManifest.xml",
+      "mode": 420,
+      "sha256": "ba8d7f9ba88bc481708667fceaa86954144764c00c4f602324aeff2957bc62ba"
+    },
+    {
+      "name": "android/app/src/main/assets/app.css",
+      "mode": 420,
+      "sha256": "da9f2a3e6edb9115fd310a78bf0211481a1b4f9522f47981d82f205ec3f7e599"
+    },
+    {
+      "name": "android/app/src/main/assets/app.js",
+      "mode": 420,
+      "sha256": "8905ef731349a9187d21fb52d3766c6b9be0b31a3765d8471fec0187d1f60c82"
+    },
+    {
+      "name": "android/app/src/main/assets/assets/alaska-falls.jpg",
+      "mode": 420,
+      "sha256": "6a208ce2ee529469658434fbe0fd0eb64d7da85821cf16549506761fbc72c72e"
+    },
+    {
+      "name": "android/app/src/main/assets/assets/alaska-otter.jpg",
+      "mode": 420,
+      "sha256": "24617df9cd5ef8f4135f8e88835753ce5fb651a48d7d5a7ac33b31146774755f"
+    },
+    {
+      "name": "android/app/src/main/assets/assets/alaska-peak.jpg",
+      "mode": 420,
+      "sha256": "f1afeafd07d8466fea875159a1bd8246a1a64347be1b498eac7824aa48d17e16"
+    },
+    {
+      "name": "android/app/src/main/assets/assets/grain.svg",
+      "mode": 420,
+      "sha256": "9bedd1d8c126eebf681179ed97ba1675df58cea74943e98f6612bf18004c64c8"
+    },
+    {
+      "name": "android/app/src/main/assets/assets/guangzhou-bus.jpg",
+      "mode": 420,
+      "sha256": "bf660586adc7a3e2f1d531ecf010316111d4a11ed126b67b5ff8beb09b736a82"
+    },
+    {
+      "name": "android/app/src/main/assets/assets/guangzhou-night.jpg",
+      "mode": 420,
+      "sha256": "d36e612ba5218364ffcb88867d4a0fcb062396a11fbdfa982395323689dcd71b"
+    },
+    {
+      "name": "android/app/src/main/assets/assets/scene-beach.svg",
+      "mode": 420,
+      "sha256": "626695eaf5eac49937505dd978b76e2aafb82ddefd606fbfd8cad0f5c179fe97"
+    },
+    {
+      "name": "android/app/src/main/assets/assets/scene-dusk.svg",
+      "mode": 420,
+      "sha256": "aa62095be4dbed39ef47cdc95a896f82b3d41d1e88e3dcad77f783a9e6395021"
+    },
+    {
+      "name": "android/app/src/main/assets/assets/scene-neon.svg",
+      "mode": 420,
+      "sha256": "a1b2dc6e43237b03dbd82bbd92ce1e985b942ff54d6f41555cfa2c6f7e5dbdc5"
+    },
+    {
+      "name": "android/app/src/main/assets/assets/scene-window.svg",
+      "mode": 420,
+      "sha256": "091ec8886c104b2f4a839c0046890df6609e3067280823a4103e0275cde39f83"
+    },
+    {
+      "name": "android/app/src/main/assets/assets/snow-pines.jpg",
+      "mode": 420,
+      "sha256": "6c0c749987325278733524635885a334f707e09054170ba851c1f4c1aec166d3"
+    },
+    {
+      "name": "android/app/src/main/assets/assets/snow-tree.jpg",
+      "mode": 420,
+      "sha256": "4e9c59c1335fa074eaedfca85cca8cb47885045938bef31deb1bcab9fabc51dd"
+    },
+    {
+      "name": "android/app/src/main/assets/assets/spiral-atrium.jpg",
+      "mode": 420,
+      "sha256": "5a6817a73db03c7784038add622e92a732fb59b4b58577316665c018ee6063d9"
+    },
+    {
+      "name": "android/app/src/main/assets/assets/woods-cow.jpg",
+      "mode": 420,
+      "sha256": "49f6c5f4589adc77ca4bb1842f6268330fe36a7a6c60883d0454775f0083d9d3"
+    },
+    {
+      "name": "android/app/src/main/assets/index.html",
+      "mode": 420,
+      "sha256": "6342c82518db77d7eadcfac1586bb743d69ce6b097cc41bc46f824e7100a901a"
+    },
+    {
+      "name": "android/app/src/main/assets/licenses-data.js",
+      "mode": 420,
+      "sha256": "58cb2b0d0755e301bd94d13438114ffe98dfca47ee0f1e0af6e16d614be71190"
+    },
+    {
+      "name": "android/app/src/main/assets/licenses/CHANGELOG.txt",
+      "mode": 420,
+      "sha256": "40362c1e033d7e0726f59a89b5dcffb42bcc88d0808e3a6ac73bec6ede8c413e"
+    },
+    {
+      "name": "android/app/src/main/assets/licenses/GPL-3.0.txt",
+      "mode": 420,
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+    },
+    {
+      "name": "android/app/src/main/assets/licenses/LIBRAW_LGPL_2_1.txt",
+      "mode": 420,
+      "sha256": "4724d775ad4e5cec5a140fca14197c4ee5368690da31b1b45e658a12643def46"
+    },
+    {
+      "name": "android/app/src/main/assets/licenses/NOTICE.txt",
+      "mode": 420,
+      "sha256": "14f0fa64b8333912468c19c882d1a8b2b57babfdd507572c793a0ada39b150f9"
+    },
+    {
+      "name": "android/app/src/main/assets/licenses/SPEKTRAFILM_LICENSE.txt",
+      "mode": 420,
+      "sha256": "76d629501783ae52e8d63aee1e054c1e1a9713b9fe7d36fb306e25b1d14b24e9"
+    },
+    {
+      "name": "android/app/src/main/java/app/spektralab/prototype/MainActivity.java",
+      "mode": 420,
+      "sha256": "29445f2ae7b8212d4b4d115322463e361000fa90b1b91e3073f680c007bdb5d1"
+    },
+    {
+      "name": "android/app/src/main/res/drawable/ic_launcher_foreground.xml",
+      "mode": 420,
+      "sha256": "84b6455080b91500585ff6947f45a4a905ddac506d6a7d51da98e6e88dc34893"
+    },
+    {
+      "name": "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
+      "mode": 420,
+      "sha256": "1f62a6df6d31bcd601efc50366f1ea504890c78f38ad2666a8a728f27ce5445d"
+    },
+    {
+      "name": "android/app/src/main/res/values-b+zh+Hans/strings.xml",
+      "mode": 420,
+      "sha256": "df1ac8948e24083969c54248e2dcd161b11d9a3e536e5e02e9ad271126fd5020"
+    },
+    {
+      "name": "android/app/src/main/res/values-b+zh+Hant/strings.xml",
+      "mode": 420,
+      "sha256": "f1992245321c8625ac86e8fd9566439921361b6afbb5b663438c268881610925"
+    },
+    {
+      "name": "android/app/src/main/res/values-en/strings.xml",
+      "mode": 420,
+      "sha256": "81131744f1f838d1dd5434cc552e3db219e5fbcd6cec40315f1e15cb10865fac"
+    },
+    {
+      "name": "android/app/src/main/res/values/colors.xml",
+      "mode": 420,
+      "sha256": "e39fb79029ff04e74c27187a2f928aeb912f00cbea56627105029845c052e478"
+    },
+    {
+      "name": "android/app/src/main/res/values/strings.xml",
+      "mode": 420,
+      "sha256": "df1ac8948e24083969c54248e2dcd161b11d9a3e536e5e02e9ad271126fd5020"
+    },
+    {
+      "name": "android/app/src/main/res/values/styles.xml",
+      "mode": 420,
+      "sha256": "6cbbaf9cf31f06aa2b2b5728e12a4bc51c041f8e4e659c4b4e1e3797101c574e"
+    },
+    {
+      "name": "android/build.gradle",
+      "mode": 420,
+      "sha256": "d1bd47ceb68955ed5d99760e0b50e0b0fc48077a8c3370651fc4c2ac12a5de66"
+    },
+    {
+      "name": "android/gradle.properties",
+      "mode": 420,
+      "sha256": "cc38bc495ca4e4d7fa2fe7c9c1112f36af7a63fbf4fc3e7a088e215942403385"
+    },
+    {
+      "name": "android/gradle/wrapper/gradle-wrapper.jar",
+      "mode": 420,
+      "sha256": "7d3a4ac4de1c32b59bc6a4eb8ecb8e612ccd0cf1ae1e99f66902da64df296172"
+    },
+    {
+      "name": "android/gradle/wrapper/gradle-wrapper.properties",
+      "mode": 420,
+      "sha256": "7e0821d895908883350587c74476b717016ab416320c44dc82a10def916c6fb5"
+    },
+    {
+      "name": "android/gradlew",
+      "mode": 493,
+      "sha256": "b187b4c52e749f5760afdd6fadc31b2a98ad35fb249bf0dff03b72650f320409"
+    },
+    {
+      "name": "android/gradlew.bat",
+      "mode": 420,
+      "sha256": "1d297e00bd21de3ace22b4d7f2de1f9dfa858883d66bbf7c1ccbecccec8f4f3b"
+    },
+    {
+      "name": "android/settings.gradle",
+      "mode": 420,
+      "sha256": "8529d0af97ce974d803584144c195f02ef0155d9895c842af8d49f9ac7a165e5"
+    },
+    {
+      "name": "app/build.gradle.kts",
+      "mode": 420,
+      "sha256": "22422c59cf987b546503601f21e9fbdac21cdcc59c29b53aff877a601743e703"
+    },
+    {
+      "name": "app/src/main/AndroidManifest.xml",
+      "mode": 420,
+      "sha256": "8ebc32a958e646838c5e8a16f6660fe96e1ac3672d06ce8b43ee6409fbb8b322"
+    },
+    {
+      "name": "app/src/main/assets/licenses/APACHE-2.0.txt",
+      "mode": 420,
+      "sha256": "809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0"
+    },
+    {
+      "name": "app/src/main/assets/licenses/GPL-3.0.txt",
+      "mode": 420,
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+    },
+    {
+      "name": "app/src/main/assets/licenses/LIBRAW_LGPL_2_1.txt",
+      "mode": 420,
+      "sha256": "4724d775ad4e5cec5a140fca14197c4ee5368690da31b1b45e658a12643def46"
+    },
+    {
+      "name": "app/src/main/assets/licenses/NOTICE.txt",
+      "mode": 420,
+      "sha256": "188b06e0fd519c7d982ae2eab7fef2f44e2ade02349056766c3869829579a080"
+    },
+    {
+      "name": "app/src/main/assets/licenses/OFL-LongCang.txt",
+      "mode": 420,
+      "sha256": "603546b7219a94bb59bf8294458194a5010119486354092b66a09a3fd61aeacc"
+    },
+    {
+      "name": "app/src/main/assets/licenses/OFL-MartianMono.txt",
+      "mode": 420,
+      "sha256": "ddafd2c3f37ef1d83ef284ca63e159befd3820850c5e9eded14ca52eee92c256"
+    },
+    {
+      "name": "app/src/main/assets/spektra/CHANGELOG.txt",
+      "mode": 420,
+      "sha256": "03e465fcbe84f1ef38f617b9e0c6292b07522b142e38c41d47424badca6874fd"
+    },
+    {
+      "name": "app/src/main/assets/spektra/SPEKTRAFILM_LICENSE.txt",
+      "mode": 420,
+      "sha256": "76d629501783ae52e8d63aee1e054c1e1a9713b9fe7d36fb306e25b1d14b24e9"
+    },
+    {
+      "name": "app/src/main/assets/spektra/film/fujifilm_c200.spk",
+      "mode": 420,
+      "sha256": "e3eb75267e3630f4d2ce0d35174adb7c68774c93a3ece81ccc02c7ecf3d62921"
+    },
+    {
+      "name": "app/src/main/assets/spektra/film/fujifilm_pro_400h.spk",
+      "mode": 420,
+      "sha256": "b46b1c84ca9bf12cfc428943b84d87a08b9a9c7a03981074611bf498466b4f2b"
+    },
+    {
+      "name": "app/src/main/assets/spektra/film/fujifilm_provia_100f.spk",
+      "mode": 420,
+      "sha256": "5a8440d62554330e45cf14572652c8bce4b4aa5717b9b6c490f54f67420c57f4"
+    },
+    {
+      "name": "app/src/main/assets/spektra/film/fujifilm_velvia_100.spk",
+      "mode": 420,
+      "sha256": "eb4639c51473fae7bbc13d78e03f3e2a0c965474dc8528472acd2b676f447443"
+    },
+    {
+      "name": "app/src/main/assets/spektra/film/fujifilm_xtra_400.spk",
+      "mode": 420,
+      "sha256": "a7eab1893218967b0b7874a022bccb2c3590daf5a433a53eec282f9d8c58d212"
+    },
+    {
+      "name": "app/src/main/assets/spektra/film/kodak_ektachrome_100.spk",
+      "mode": 420,
+      "sha256": "2aef1f75f6362468f8a4579cac7b93a56155e95043cb3d53ae11e10e7a807735"
+    },
+    {
+      "name": "app/src/main/assets/spektra/film/kodak_ektar_100.spk",
+      "mode": 420,
+      "sha256": "feda887e928746f689274cfcaa0c9336ec348c0eb4540fda52d2151fbc0bff1c"
+    },
+    {
+      "name": "app/src/main/assets/spektra/film/kodak_gold_200.spk",
+      "mode": 420,
+      "sha256": "c4cac21509a6c2ce871da6d0d937fe83f26e2ea12c6612b9adfeb302382ac2ef"
+    },
+    {
+      "name": "app/src/main/assets/spektra/film/kodak_kodachrome_64.spk",
+      "mode": 420,
+      "sha256": "ca1163e1dc6b13852d72065a03ce18e1aff9422867b8552c981833ce02b580f7"
+    },
+    {
+      "name": "app/src/main/assets/spektra/film/kodak_portra_160.spk",
+      "mode": 420,
+      "sha256": "b58bd593ea0c77d30a1184e0463129598db567c49c266c9b3731e14af61d414a"
+    },
+    {
+      "name": "app/src/main/assets/spektra/film/kodak_portra_400.spk",
+      "mode": 420,
+      "sha256": "1bb3dc8d7e7030f5ee8ad30a1581507a3306eb7440218e3005a0dbeb0e034050"
+    },
+    {
+      "name": "app/src/main/assets/spektra/film/kodak_portra_800.spk",
+      "mode": 420,
+      "sha256": "b1c97fd00cc1a985bec53abd7f43459add82b8ea755718252b265f011fe1a710"
+    },
+    {
+      "name": "app/src/main/assets/spektra/film/kodak_portra_800_push1.spk",
+      "mode": 420,
+      "sha256": "8a7de0de611edb4627b070634aca0180fccad0c62800f08a6040ee83d064aa50"
+    },
+    {
+      "name": "app/src/main/assets/spektra/film/kodak_portra_800_push2.spk",
+      "mode": 420,
+      "sha256": "78356f7752656e8d98613e0e3a024dc79e71b42a95b240f8f3d76ce251f35ff2"
+    },
+    {
+      "name": "app/src/main/assets/spektra/film/kodak_ultramax_400.spk",
+      "mode": 420,
+      "sha256": "95ff6aa371d510facc830871a15163db79edc44312e87e6e338be459656d4001"
+    },
+    {
+      "name": "app/src/main/assets/spektra/film/kodak_verita_200d.spk",
+      "mode": 420,
+      "sha256": "6103e66442f84d80b86564ef47417b13cae11faf15a08519749e7047ca4facaa"
+    },
+    {
+      "name": "app/src/main/assets/spektra/film/kodak_vision3_200t.spk",
+      "mode": 420,
+      "sha256": "ffea298f89c225b4b0d4fe19b4474271f6ce2a0ace5ee6df6f8ca9f8a8b830c8"
+    },
+    {
+      "name": "app/src/main/assets/spektra/film/kodak_vision3_250d.spk",
+      "mode": 420,
+      "sha256": "32e3141d52693d9715a39342ed31390c0ec429a58467094257f68d5fd1780f7c"
+    },
+    {
+      "name": "app/src/main/assets/spektra/film/kodak_vision3_500t.spk",
+      "mode": 420,
+      "sha256": "b696e683ff0516c0a54c471bdfb741c81df20baaa2054ced6fe111d901624722"
+    },
+    {
+      "name": "app/src/main/assets/spektra/film/kodak_vision3_50d.spk",
+      "mode": 420,
+      "sha256": "fb7cde80d342715e77bed0ea25fae1db84fb5f685a91296eac4ab6d3ce22de10"
+    },
+    {
+      "name": "app/src/main/assets/spektra/global.spk",
+      "mode": 420,
+      "sha256": "20db5e060078ab1d73fdc690a3bb8539eaa855678ad4a5a6dafa714e2c5edcc1"
+    },
+    {
+      "name": "app/src/main/assets/spektra/index.json",
+      "mode": 420,
+      "sha256": "5f99378573b83f7ea1123516fd82e9ba255236af78d747d6a046310a1ec0b506"
+    },
+    {
+      "name": "app/src/main/assets/spektra/paper/fujifilm_crystal_archive_typeii.spk",
+      "mode": 420,
+      "sha256": "9b09981ef3a224d86c2f61152b24059374082b48d10b7406e3f36a39efbce5d0"
+    },
+    {
+      "name": "app/src/main/assets/spektra/paper/kodak_2383.spk",
+      "mode": 420,
+      "sha256": "5585dd2ea1cb02bf682733608cf8840f90cebd4c459d34df750f924a1bc37e4d"
+    },
+    {
+      "name": "app/src/main/assets/spektra/paper/kodak_2393.spk",
+      "mode": 420,
+      "sha256": "fb37d80ee4dd58f8fbce8e15a54e97de99f9cd68acbeeaa367845e45bec15175"
+    },
+    {
+      "name": "app/src/main/assets/spektra/paper/kodak_ektacolor_edge.spk",
+      "mode": 420,
+      "sha256": "73f323a54adeceec44bcd6e57265dcebd9b9bedf38b4ec92c1b29382a13b48a2"
+    },
+    {
+      "name": "app/src/main/assets/spektra/paper/kodak_endura_premier.spk",
+      "mode": 420,
+      "sha256": "9915c9c8be42a9c892ae6f13f05fd3051721545644e5cce1d823ee5f90c7a152"
+    },
+    {
+      "name": "app/src/main/assets/spektra/paper/kodak_portra_endura.spk",
+      "mode": 420,
+      "sha256": "946f2b1671eee8cb71f6645e22a0225661cedba07819cc3d9f947debe49a5449"
+    },
+    {
+      "name": "app/src/main/assets/spektra/paper/kodak_supra_endura.spk",
+      "mode": 420,
+      "sha256": "6ff09c13ab935ecfbc23c60e48b2d5c2d482c47bc3b539fba86b53b2e343549e"
+    },
+    {
+      "name": "app/src/main/assets/spektra/paper/kodak_ultra_endura.spk",
+      "mode": 420,
+      "sha256": "98b191c31fc6b9dfc37d6e54fb1020fb148ba8c9e7a87ecac56765160b3e4235"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/MainActivity.kt",
+      "mode": 420,
+      "sha256": "54f23870db96f4e8c4fbecf1b12257fdfd44e856ad9989c189f654db6e036592"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/SpektraApp.kt",
+      "mode": 420,
+      "sha256": "548f54b46e3bd78727b6df1919c97b29135aca699ae0b37be5558f0bfc7183f1"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/camera/FilmViewfinderEffect.kt",
+      "mode": 420,
+      "sha256": "253f4303787c95268db625b6acf3e5adb28ef5b561441e914fb0d055eff707a7"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/camera/RawShooter.kt",
+      "mode": 420,
+      "sha256": "51f08cd3f9c41f485101b1f9df0cd944856f2008ab60202dc176efefdd158fbd"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/camera/ShotAdmission.kt",
+      "mode": 420,
+      "sha256": "d0706301c3a342589fe383cb33f842aab526db6cec61e30f35d4a9fa3fbc34b2"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/data/Library.kt",
+      "mode": 420,
+      "sha256": "06c9a47278b61ca1af509c125c96f29d77b92e1a3cbc8fffd5e74e86de383b2e"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/data/Media.kt",
+      "mode": 420,
+      "sha256": "07ac52cde0a55ee0ee78d4c07a39fea5411446fe7bdc9b522a078c6eb5ca81f2"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/export/ExportManager.kt",
+      "mode": 420,
+      "sha256": "df672fe311e7e663a7a98c0d7de160f25b96888509ad6b3237124a17d4a9b9f6"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/export/VideoExporter.kt",
+      "mode": 420,
+      "sha256": "ff8bbeaa9a76e9171c5246cba4ff50c80ac4a7dd85e351ed50bd7ef2143b996b"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/gl/BurstGl.kt",
+      "mode": 420,
+      "sha256": "84bdab44cefb82aa30fb80fce95f571609485090e31b1de778849c1f1de13a51"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/gl/EglCore.kt",
+      "mode": 420,
+      "sha256": "72aa8eff2b9975a7f1861e264c081b4e2ae14d221bab1eb45ba532a87b3c6f0a"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/gl/FilmRenderer.kt",
+      "mode": 420,
+      "sha256": "2192d30d4b6b7e0920060c42a0cf09ca5d342c24974b6fa3ebe78ba44a222093"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/gl/GlUtil.kt",
+      "mode": 420,
+      "sha256": "c3e93f503bb0568d67ba409f69a543b887aeb8fef11764270e794eb3b217a052"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/render/Borders.kt",
+      "mode": 420,
+      "sha256": "f9ebb40b4a3e8c135e5d67b6e1e09a4ac4f89afbbef7828f3175e55175a50090"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/render/FilmPreviewView.kt",
+      "mode": 420,
+      "sha256": "b96101e5424903e7783f8981e5e336edc1b6dcf20fe5ab108da8905b75d4d374"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/render/Framing.kt",
+      "mode": 420,
+      "sha256": "b6eff6d1b766f8763cc38a9e4e741326adb29d9e8aacc4054e295ddf8eac8ec0"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/render/GlWorker.kt",
+      "mode": 420,
+      "sha256": "2904841630538c70414560c671d981561bf1cb50e4649ef97fef1c97e3092c94"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/render/OverlayPainter.kt",
+      "mode": 420,
+      "sha256": "d49d4bdf16fa4b5e07c49e12426184d118fed53275f0389f476b6c2bcaeecb25"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/render/PaperBack.kt",
+      "mode": 420,
+      "sha256": "693186a0511c147d413d271840a3a1c9ebb11a72a6c5e2bac4625bcbcdf0b972"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/ui/AboutSheet.kt",
+      "mode": 420,
+      "sha256": "ed8e8363055e36cab536ab6b57d716279b0f265f6f27b9593e75b1283f4cab64"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/ui/Adaptive.kt",
+      "mode": 420,
+      "sha256": "45018aafcada082e0e2e0ec5f9499c09f5bd452faba152c40062523559701e3a"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/ui/AppState.kt",
+      "mode": 420,
+      "sha256": "c35a8e7fbec677d020164f3941c35a5cad84b810e48775415fbe5153e7e27111"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/ui/CameraControls.kt",
+      "mode": 420,
+      "sha256": "d75a71fd5aaae27f00d9ae53bac1d8acac219b2b646fb32a8361c2933bf97c3e"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/ui/CameraScreen.kt",
+      "mode": 420,
+      "sha256": "bf4b59b1aac855f28dfb8dbf7cfaabdb80f8c17d7cd178d97a7dea8997085c71"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/ui/Controls.kt",
+      "mode": 420,
+      "sha256": "28955ef25b83f5ffe759e2176cf4cfcfdc3dfec1b22fe58dbac136e7f3d54173"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/ui/EditorScreen.kt",
+      "mode": 420,
+      "sha256": "9cba97599c5f9fc7707d327ec82673a0d5394c591c8e0219f355f57ce9d65ace"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/ui/FilmAdvance.kt",
+      "mode": 420,
+      "sha256": "08dcb0697aa91fce69839cbc5cd5a64e0333e88ed9bb01fca6cce607fa6464c8"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/ui/LibraryScreen.kt",
+      "mode": 420,
+      "sha256": "da8c893d072ebbd33ee141dedacacb9a8f8d3eca9c01085d315c1c1a241a96d5"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/ui/Motion.kt",
+      "mode": 420,
+      "sha256": "08a3119a3ec9372b5ab9a20cd1c88f36d5636b2b365b1f0d7d0fe371c1c2a1cf"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/ui/PhotoSourceEffects.kt",
+      "mode": 420,
+      "sha256": "0afa035bfcc8a5421119376fd165feca5cd9dca5d13dc7e19dadc9299f58eaaa"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/ui/PreviewPresentation.kt",
+      "mode": 420,
+      "sha256": "ef65d8ae7c76bfeaf8b1cc776e9e3b126457772b8b083e35cda6e81af523ca3f"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/ui/PreviewZoom.kt",
+      "mode": 420,
+      "sha256": "5192c96fa6c97c2d70d7291ee7a896fa6fce07b8f03121393a03bec4a18f2fb2"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/ui/Sheets.kt",
+      "mode": 420,
+      "sha256": "9ed382fc7a08f2c958709e97a89fedc1a8206f2dc253f7348d0fc17ce33183c9"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/ui/Swatches.kt",
+      "mode": 420,
+      "sha256": "5c775f3e28b8b8225cf4f2e24f39ab0c8acc79b1b74b27f144837425aed3e398"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/ui/Theme.kt",
+      "mode": 420,
+      "sha256": "d79ac5ff188c0be36fb8f74a77634244f657276677582bd7483f99e68b0a03b0"
+    },
+    {
+      "name": "app/src/main/res/drawable-nodpi/paper_back_mark.png",
+      "mode": 420,
+      "sha256": "714ed93c0c7e058582de2eae52c8199ffee1faac5a517362a28e7baffc7847f3"
+    },
+    {
+      "name": "app/src/main/res/drawable/ic_launcher_foreground.xml",
+      "mode": 420,
+      "sha256": "f77934cef16c3e4d347011b6b9ff7419efa3e59749961c8057d9a547762cc426"
+    },
+    {
+      "name": "app/src/main/res/drawable/ic_notification.xml",
+      "mode": 420,
+      "sha256": "23c2501b3f87245c95743a971ca1ca2c62e0c1c8e0abaf8268a5c9dc2ae3ea0d"
+    },
+    {
+      "name": "app/src/main/res/font/long_cang.ttf",
+      "mode": 420,
+      "sha256": "f67191d665f68865e8cecfa0f4cc22807fea0f1155d26a17292fc46b849e0a38"
+    },
+    {
+      "name": "app/src/main/res/font/martian_mono.ttf",
+      "mode": 420,
+      "sha256": "1292b90b9a7b213707e2a1581a82a57e74c94e87cb88579befaf2f8feacf4776"
+    },
+    {
+      "name": "app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
+      "mode": 420,
+      "sha256": "5f3b1ed2282af327c78539428c3398a99a7e9a09051c2ae2cf7aa27068201319"
+    },
+    {
+      "name": "app/src/main/res/values-b+zh+Hans/strings.xml",
+      "mode": 420,
+      "sha256": "7bd0df700ac13e044e039eedc00c2a94985b3de7462147f325f1c0ebdb5b72bb"
+    },
+    {
+      "name": "app/src/main/res/values-b+zh+Hant/strings.xml",
+      "mode": 420,
+      "sha256": "0fc663da95a53b281e857f02c313d8815971458a7580ede5df11931fb25bec90"
+    },
+    {
+      "name": "app/src/main/res/values-en/strings.xml",
+      "mode": 420,
+      "sha256": "d4537cd25f8ceec7a57e80b207dfa55dab0557a147ede37064b032df0a6cb5c7"
+    },
+    {
+      "name": "app/src/main/res/values/colors.xml",
+      "mode": 420,
+      "sha256": "650c792f548b6f3366c1775f5a2b3ddce14f7d5c17ed3f44d705a35868c19c78"
+    },
+    {
+      "name": "app/src/main/res/values/strings.xml",
+      "mode": 420,
+      "sha256": "3fb0495002d89704cb0b5df2219d6037bd0d714ade5e9f686987ad6fd1a3ec65"
+    },
+    {
+      "name": "app/src/main/res/values/themes.xml",
+      "mode": 420,
+      "sha256": "5f50e943f5a45bd3782ae0eff8a83ae2aa7c06a12d7dd387f49a7b72f441fe5d"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/camera/ShotAdmissionTest.kt",
+      "mode": 420,
+      "sha256": "aa2fa0ad828e3148be5ea12a4d4a0b8aed150ee500a51c8788d05fef24e62708"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/render/PaperBackTest.kt",
+      "mode": 420,
+      "sha256": "8064906b4f504c86ee85c6e3f4a40620721ad20c6ff788db6ff626594cd11703"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/ui/AboutAndLicensingTest.kt",
+      "mode": 420,
+      "sha256": "3a69289a365dfc37ac5acd0e07828a3a10f74acdff5dbb3eceb0f51a584ae7f3"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/ui/BurstSourceRetentionTest.kt",
+      "mode": 420,
+      "sha256": "b80e88ab97a5c97213d37c5c5620054de43e8334292b1d3428e4faec80de8a36"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/ui/EditorLayoutTest.kt",
+      "mode": 420,
+      "sha256": "262f7697265a8944e2e813aa04c215fc02051d74f14e0fb9e8b06a6e765bcf34"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/ui/MotionSnapshotTest.kt",
+      "mode": 420,
+      "sha256": "1042a8ef328e9d05f7c8df365c86801d569363393deded2b2a41c376190952e4"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/ui/PhotoSourceEffectsTest.kt",
+      "mode": 420,
+      "sha256": "585260b48d417ed2d5469484f93564f66b64239251f69a691b47232ae7365077"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/ui/PreviewGesturesTest.kt",
+      "mode": 420,
+      "sha256": "cb1d93317588f8e909061d7ee2a142b7e5d1e6eb70712bb8bda96a61d5fdbb32"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/ui/PreviewZoomTest.kt",
+      "mode": 420,
+      "sha256": "d2407f8de3fcda47fb139f27f7961c69b582663957fffaf698f1bb5dbe5bdb8f"
+    },
+    {
+      "name": "build.gradle.kts",
+      "mode": 420,
+      "sha256": "4cd1b7937a7970352b4f12e26818e62922b1ecf5ddbd0771b4238a8388e5d18a"
+    },
+    {
+      "name": "docs/YSJF_SAMPLES.md",
+      "mode": 420,
+      "sha256": "7f2fe0650cd6dbd2562318f87d0727183282e4554046da33636f80d5b4807dd3"
+    },
+    {
+      "name": "engine/build.gradle.kts",
+      "mode": 420,
+      "sha256": "93810745ac7407a5b6881ce9393218885c4c5f07176dd81398563e6592ecea12"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/engine/Emulsion.kt",
+      "mode": 420,
+      "sha256": "d9ec8caee8bac657594b9947b775f05c355b4ff46dc7699f66e3832ca90d7f07"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/engine/Grain.kt",
+      "mode": 420,
+      "sha256": "1e9820f8cb84a6d82623c9bd6d3ee037459b87ef5199d4a9b5934f75d0d02244"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/engine/Interp.kt",
+      "mode": 420,
+      "sha256": "fa948faa2fb4ed53353397f1c964ffb872546c555617fe4faa94e86a2cbba6dd"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/engine/Kernels.kt",
+      "mode": 420,
+      "sha256": "6dc3d1d336b123318b0112d1b24d6000e72d2c3053357b0099ef39463f0c63aa"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/engine/Look.kt",
+      "mode": 420,
+      "sha256": "69a5ec253aafe63aaf29b640d190e03c5452ee628fd785d1dfbff8b9e2f1ad6d"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/engine/Params.kt",
+      "mode": 420,
+      "sha256": "27ac06a8804b2b4ebf2d62addd715e572683fec7e4539cda6f07442aac804581"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/engine/Pipeline.kt",
+      "mode": 420,
+      "sha256": "fbd4ea67422c519457d0acc578403cdb2544eae11757b268fa9af39f76702fab"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/engine/Polaroid.kt",
+      "mode": 420,
+      "sha256": "deca6558dd05e35d8f99468984b243544195938eac17ff234f322f497a143911"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/engine/Profiles.kt",
+      "mode": 420,
+      "sha256": "a9e00cfe2b923269bd1283211721c1915a99e488172e06a1c2d090b3d6d52762"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/engine/RenderSetup.kt",
+      "mode": 420,
+      "sha256": "dd18f0ebf0626a053044b48463a6ffd2db05786dcb94a31b71f2429761502464"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/engine/SpkFile.kt",
+      "mode": 420,
+      "sha256": "90ec1a52fcc73aa78e179a1d9c8fd3f9196e34e9bb1f6e8e076b98b13b41db98"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/gl/Shaders.kt",
+      "mode": 420,
+      "sha256": "179ea6f6e82951e931642bf8b89e3cf794614bd2d2815d9787f7f5657a069301"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/raw/Bits.kt",
+      "mode": 420,
+      "sha256": "102116fd35f262c4b28484afc65ccb1a158ae26f703a98b1b2ba74e07fe5c672"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/raw/BurstMerge.kt",
+      "mode": 420,
+      "sha256": "0f34e1c067049d3f17b56c4c27b083b22807a09e1bd85f2b53a3911eb97ce6b1"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/raw/CameraMatrices.kt",
+      "mode": 420,
+      "sha256": "827d432412cb30a0ee3ee203eef213396a66b38735c00962059a2d1c1ab05695"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/raw/Dng.kt",
+      "mode": 420,
+      "sha256": "e31ed163cac7ba6f070a31c57b87e90f4b702c2573ff35f0210705c6640e13c2"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/raw/DngWriter.kt",
+      "mode": 420,
+      "sha256": "573c977b133038ed29f70b545de09e5220c0bb99536ee8bbfbdc3601c581ae54"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/raw/LosslessJpeg.kt",
+      "mode": 420,
+      "sha256": "24e4645fe7cedf1b30cd6564bf89f289b7693ecdb03477a3f5e25894040d0d1b"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/raw/RawColor.kt",
+      "mode": 420,
+      "sha256": "2db607e6e61ca5f1b33d37204a60fe324be20dd8bff043b8e89a5b307e1b1668"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/raw/RawDeveloper.kt",
+      "mode": 420,
+      "sha256": "6b4478f7984b2687c41aeb619da166869621f921b3ca4b529aeae5e1efc8462c"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/raw/RawImage.kt",
+      "mode": 420,
+      "sha256": "246ed8bb1b1997cc7434392e182f5abdb4c1a9775e0014dc484e18f3c8eac3a3"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/raw/RawReader.kt",
+      "mode": 420,
+      "sha256": "da7d7532743afa0e88de16056d62778ca71bd4164536e11792b2df0f68b92408"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/raw/Tiff.kt",
+      "mode": 420,
+      "sha256": "241b2f05f87e0a6515f40f5223d6ea029db8036cb87fef1aab58276d8c1aa3b7"
+    },
+    {
+      "name": "engine/src/main/resources/silvercam/ENGINE_NOTICE.txt",
+      "mode": 420,
+      "sha256": "73034b0c024510fff4e48de0494c8734f188bbbbe404691ba5daa1ea9489dbb3"
+    },
+    {
+      "name": "engine/src/main/resources/silvercam/LIBRAW_LGPL_2_1.txt",
+      "mode": 420,
+      "sha256": "4724d775ad4e5cec5a140fca14197c4ee5368690da31b1b45e658a12643def46"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/engine/GlDumpTest.kt",
+      "mode": 420,
+      "sha256": "f66a66156ba7a269cd4db991613b7df70559cef82819d97a49558c578f36be6e"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/engine/ReferenceTest.kt",
+      "mode": 420,
+      "sha256": "5b041f7d19a3671fc668df90e5511c438ccfc784dd59c4c3519c4d1dc11d98af"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/engine/SpatialTest.kt",
+      "mode": 420,
+      "sha256": "669e9f3bccb4aabb0f69a8e9b533158956ee14f2de9ea811c62972a77eca8c79"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/engine/TcLutSamplingTest.kt",
+      "mode": 420,
+      "sha256": "540a2f04c0ca38d26ad998d492257bc85048af7f9dc3e60c5b0d2116a1a6d542"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/BitsTest.kt",
+      "mode": 420,
+      "sha256": "c6d4f286734ce60daa9adcc00372cc35691f3ef07db39fd6f29c6890befee094"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/BurstTest.kt",
+      "mode": 420,
+      "sha256": "d12de3e75fa582731fb3c43c262c78040b2a27e4c6d972857f70a9178cc15f10"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/CameraMatricesTest.kt",
+      "mode": 420,
+      "sha256": "09923647936a2c505f7bd2735a93597e90d2d251020dd1b12f2aec23b207dccd"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/DecoderSafetyTest.kt",
+      "mode": 420,
+      "sha256": "a45e9428ba027e7bf0f6346f04e6cd45770252613273bfc018a7c78e8e91b6d8"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/DngFormatsTest.kt",
+      "mode": 420,
+      "sha256": "10d9792fd75607a0325201d2edeb93cc5d2595e9a0faa371096946a1eb79933d"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/DngTest.kt",
+      "mode": 420,
+      "sha256": "78e0bca9bd7196805494ad8b7ae91127c182358f7847fc23d40aae58722494db"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/LinearDngIntegrationTest.kt",
+      "mode": 420,
+      "sha256": "229c8c22365b60bb02341b178837b9ba9515bdef954650a221ee80c3099d395a"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/LosslessJpegTest.kt",
+      "mode": 420,
+      "sha256": "be95af9cad1588d865fc4e752b33833a07389b3ecaf159ce16eb949251cde65f"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/RawColorTest.kt",
+      "mode": 420,
+      "sha256": "016f739a0f7bdc4c02252f0a73861259b6a029cd09e3dafd7c9a6f6e4a4d1d63"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/TestSupport.kt",
+      "mode": 420,
+      "sha256": "512872e91681e47b2809d67bfe673053561e9118380f7cf4a52b37adb0a31a39"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/TiffTest.kt",
+      "mode": 420,
+      "sha256": "3630bfd823ca4c3c6bac2ef329cd210d1844f5b9e001477ab513d1dacdaaead6"
+    },
+    {
+      "name": "engine/src/test/resources/reference/c200_crystal.spk",
+      "mode": 420,
+      "sha256": "ff5d96a5551643916bd0c30c440a772b2caeb1dd3195dae2bf17f036eb2ed2e6"
+    },
+    {
+      "name": "engine/src/test/resources/reference/ektar_supra_shifted.spk",
+      "mode": 420,
+      "sha256": "af6042ec415c661a750b760081ea8fc3a45f0f4d881312c346c9bd5809307be9"
+    },
+    {
+      "name": "engine/src/test/resources/reference/gold_premier_gamma.spk",
+      "mode": 420,
+      "sha256": "bb5e72568899d2e3f6bc46ed07dbaee148d3f747a71f45f61d84afb629b59387"
+    },
+    {
+      "name": "engine/src/test/resources/reference/portra400_endura.spk",
+      "mode": 420,
+      "sha256": "9521fc93facb5ff8cd9d0d3e2f8b6e9f794e1806f0fd706f4ebbec86677d24b6"
+    },
+    {
+      "name": "engine/src/test/resources/reference/portra400_negative_scan.spk",
+      "mode": 420,
+      "sha256": "143397db591f31c13fbab80165ee996511bc27ff7e6d5d54bbc0e7c0d7eaca4c"
+    },
+    {
+      "name": "engine/src/test/resources/reference/portra400_no_couplers.spk",
+      "mode": 420,
+      "sha256": "91bb43040b4ba20b7ec006da374161b2f3adfbbec3052a578aa3fb7633fbfa66"
+    },
+    {
+      "name": "engine/src/test/resources/reference/velvia_scan.spk",
+      "mode": 420,
+      "sha256": "4dc5efcb6ae6c30b60789a169fde85f4c3d91f49e0b93d571059d9b0d092b6cd"
+    },
+    {
+      "name": "engine/src/test/resources/reference/vision500t_2383.spk",
+      "mode": 420,
+      "sha256": "0553ad7f3f46c4d2ef8e3ed3661120bb64a94d3cdbf8d494327ab12540a77124"
+    },
+    {
+      "name": "engine/src/test/resources/spatial/spatial.spk",
+      "mode": 420,
+      "sha256": "747cb5eaea3581a83a2e63a2a2020619d14a3ffbbee338fd2a3206172cda6a5e"
+    },
+    {
+      "name": "gradle.properties",
+      "mode": 420,
+      "sha256": "9ea6d394c7683b725ea86c9d50d77c75470c7f55d1d16c8d74f10bb16c8c63d5"
+    },
+    {
+      "name": "gradle/wrapper/gradle-wrapper.jar",
+      "mode": 420,
+      "sha256": "7d3a4ac4de1c32b59bc6a4eb8ecb8e612ccd0cf1ae1e99f66902da64df296172"
+    },
+    {
+      "name": "gradle/wrapper/gradle-wrapper.properties",
+      "mode": 420,
+      "sha256": "7e0821d895908883350587c74476b717016ab416320c44dc82a10def916c6fb5"
+    },
+    {
+      "name": "gradlew",
+      "mode": 493,
+      "sha256": "b187b4c52e749f5760afdd6fadc31b2a98ad35fb249bf0dff03b72650f320409"
+    },
+    {
+      "name": "gradlew.bat",
+      "mode": 420,
+      "sha256": "1d297e00bd21de3ace22b4d7f2de1f9dfa858883d66bbf7c1ccbecccec8f4f3b"
+    },
+    {
+      "name": "index.html",
+      "mode": 420,
+      "sha256": "d7376c8cf29b319b645f9a698cb9f277d979bb557fdc4d4d3e8f8684a4cd89f2"
+    },
+    {
+      "name": "package-lock.json",
+      "mode": 420,
+      "sha256": "a97a9386ac012c8a55d9b68751d0d3cfe666e0aaf2fcddac12343e28fae635c9"
+    },
+    {
+      "name": "package.json",
+      "mode": 420,
+      "sha256": "23ea2badd98b7bbd58d6086c7ddbae54a187a83d67c671c6826fe2f887b3881f"
+    },
+    {
+      "name": "prototype/Main.dc.html",
+      "mode": 420,
+      "sha256": "b590e864291098b7648c80a3a802b7aa213a19a2cf4a7a1378305b0b8378e367"
+    },
+    {
+      "name": "prototype/assets/grain.svg",
+      "mode": 420,
+      "sha256": "9bedd1d8c126eebf681179ed97ba1675df58cea74943e98f6612bf18004c64c8"
+    },
+    {
+      "name": "prototype/assets/scene-beach.svg",
+      "mode": 420,
+      "sha256": "626695eaf5eac49937505dd978b76e2aafb82ddefd606fbfd8cad0f5c179fe97"
+    },
+    {
+      "name": "prototype/assets/scene-dusk.svg",
+      "mode": 420,
+      "sha256": "aa62095be4dbed39ef47cdc95a896f82b3d41d1e88e3dcad77f783a9e6395021"
+    },
+    {
+      "name": "prototype/assets/scene-neon.svg",
+      "mode": 420,
+      "sha256": "a1b2dc6e43237b03dbd82bbd92ce1e985b942ff54d6f41555cfa2c6f7e5dbdc5"
+    },
+    {
+      "name": "prototype/assets/scene-window.svg",
+      "mode": 420,
+      "sha256": "091ec8886c104b2f4a839c0046890df6609e3067280823a4103e0275cde39f83"
+    },
+    {
+      "name": "prototype/canvas.json",
+      "mode": 420,
+      "sha256": "10282439dd495239e54c7431dd20bf75531952f132871b1b6edd5cb1315731a2"
+    },
+    {
+      "name": "public/_headers",
+      "mode": 420,
+      "sha256": "0954fee3bbec2c320e22271709203f462d4e054a032ded54423e1685a28df34f"
+    },
+    {
+      "name": "public/_redirects",
+      "mode": 420,
+      "sha256": "6036983e5fc00f0169c9e939b1816ed771eee00e27f2fcc517b819041460b9ef"
+    },
+    {
+      "name": "public/assets/grain.svg",
+      "mode": 420,
+      "sha256": "9bedd1d8c126eebf681179ed97ba1675df58cea74943e98f6612bf18004c64c8"
+    },
+    {
+      "name": "public/assets/scene-beach.svg",
+      "mode": 420,
+      "sha256": "626695eaf5eac49937505dd978b76e2aafb82ddefd606fbfd8cad0f5c179fe97"
+    },
+    {
+      "name": "public/assets/scene-dusk.svg",
+      "mode": 420,
+      "sha256": "aa62095be4dbed39ef47cdc95a896f82b3d41d1e88e3dcad77f783a9e6395021"
+    },
+    {
+      "name": "public/assets/scene-neon.svg",
+      "mode": 420,
+      "sha256": "a1b2dc6e43237b03dbd82bbd92ce1e985b942ff54d6f41555cfa2c6f7e5dbdc5"
+    },
+    {
+      "name": "public/assets/scene-window.svg",
+      "mode": 420,
+      "sha256": "091ec8886c104b2f4a839c0046890df6609e3067280823a4103e0275cde39f83"
+    },
+    {
+      "name": "public/assets/scenes/alaska-falls.jpg",
+      "mode": 420,
+      "sha256": "6a208ce2ee529469658434fbe0fd0eb64d7da85821cf16549506761fbc72c72e"
+    },
+    {
+      "name": "public/assets/scenes/alaska-otter.jpg",
+      "mode": 420,
+      "sha256": "24617df9cd5ef8f4135f8e88835753ce5fb651a48d7d5a7ac33b31146774755f"
+    },
+    {
+      "name": "public/assets/scenes/alaska-peak.jpg",
+      "mode": 420,
+      "sha256": "f1afeafd07d8466fea875159a1bd8246a1a64347be1b498eac7824aa48d17e16"
+    },
+    {
+      "name": "public/assets/scenes/guangzhou-bus.jpg",
+      "mode": 420,
+      "sha256": "bf660586adc7a3e2f1d531ecf010316111d4a11ed126b67b5ff8beb09b736a82"
+    },
+    {
+      "name": "public/assets/scenes/guangzhou-night.jpg",
+      "mode": 420,
+      "sha256": "d36e612ba5218364ffcb88867d4a0fcb062396a11fbdfa982395323689dcd71b"
+    },
+    {
+      "name": "public/assets/scenes/snow-pines.jpg",
+      "mode": 420,
+      "sha256": "6c0c749987325278733524635885a334f707e09054170ba851c1f4c1aec166d3"
+    },
+    {
+      "name": "public/assets/scenes/snow-tree.jpg",
+      "mode": 420,
+      "sha256": "4e9c59c1335fa074eaedfca85cca8cb47885045938bef31deb1bcab9fabc51dd"
+    },
+    {
+      "name": "public/assets/scenes/spiral-atrium.jpg",
+      "mode": 420,
+      "sha256": "5a6817a73db03c7784038add622e92a732fb59b4b58577316665c018ee6063d9"
+    },
+    {
+      "name": "public/assets/scenes/thumbs/alaska-falls.jpg",
+      "mode": 420,
+      "sha256": "887141a39cdd03a20f46d2adf627a74510e7646c8c3efba420ec4582ba0a2f72"
+    },
+    {
+      "name": "public/assets/scenes/thumbs/alaska-otter.jpg",
+      "mode": 420,
+      "sha256": "a12599978ce616d5591f9dd92fff83763dff840313c19839220adf7bdfc25f6e"
+    },
+    {
+      "name": "public/assets/scenes/thumbs/alaska-peak.jpg",
+      "mode": 420,
+      "sha256": "73b0c6d4cea991c341f4a31b2a43a346fce00d41681af5db7b9f97345d691d2f"
+    },
+    {
+      "name": "public/assets/scenes/thumbs/guangzhou-bus.jpg",
+      "mode": 420,
+      "sha256": "862858a933c46a6c7442aa3f24cfc3868d4ec694a6a6e3737632d60689e9005a"
+    },
+    {
+      "name": "public/assets/scenes/thumbs/guangzhou-night.jpg",
+      "mode": 420,
+      "sha256": "bd2b8aa8c0bc5908bbc831ae18534c1159cded42f087dd082edccdf5eb3ec39a"
+    },
+    {
+      "name": "public/assets/scenes/thumbs/snow-pines.jpg",
+      "mode": 420,
+      "sha256": "fbf054b0ddfcb5964ff242e488e15c5c528e2b86cbfb4d3e891d5892e87a870c"
+    },
+    {
+      "name": "public/assets/scenes/thumbs/snow-tree.jpg",
+      "mode": 420,
+      "sha256": "332d01db51d2e19b9eff929cb155494e7a4e0045f8784de99f44b24a60f03b86"
+    },
+    {
+      "name": "public/assets/scenes/thumbs/spiral-atrium.jpg",
+      "mode": 420,
+      "sha256": "c3dbad41fc8a03fd70fffdeaa6b6f7725a424b902e0f59c921d048d33adb804b"
+    },
+    {
+      "name": "public/assets/scenes/thumbs/woods-cow.jpg",
+      "mode": 420,
+      "sha256": "64dbb11f8248463dcd397ff0ae0e3a4c6d9330a50e259ecfe2b2433269bf8ffb"
+    },
+    {
+      "name": "public/assets/scenes/woods-cow.jpg",
+      "mode": 420,
+      "sha256": "49f6c5f4589adc77ca4bb1842f6268330fe36a7a6c60883d0454775f0083d9d3"
+    },
+    {
+      "name": "public/favicon.svg",
+      "mode": 420,
+      "sha256": "70fded0c5f582e53532a87bc48fe5cbfe8567820825dfe2b785cbd278ff05b6d"
+    },
+    {
+      "name": "scripts/build-android.mjs",
+      "mode": 420,
+      "sha256": "276c9799f22c708417f914f5218f4bf70ee2e8d0d43187e865ffcb4732010b57"
+    },
+    {
+      "name": "scripts/build-licenses-data.mjs",
+      "mode": 420,
+      "sha256": "6ba38c9dfcca2bd0bf0c139db3e65acead12d0191232b7b280527e93396e7213"
+    },
+    {
+      "name": "scripts/download-archives.mjs",
+      "mode": 420,
+      "sha256": "af85e12e796f884a4bce2028611b99aebffafff6e2f04942bc4e917b405f0b47"
+    },
+    {
+      "name": "scripts/package-downloads.mjs",
+      "mode": 420,
+      "sha256": "11d9113b12a0c5408fd950fc07e2f729ab6f9e51fa459e042b5d9f37673c2dfe"
+    },
+    {
+      "name": "settings.gradle.kts",
+      "mode": 420,
+      "sha256": "9e82ff3ca90681892e7336e199673699db19827da0245940760b631f9d638aef"
+    },
+    {
+      "name": "src/App.tsx",
+      "mode": 420,
+      "sha256": "096115f9434fffc8c1fbb49869f8636f9b365fef9f23f2223bc35f39426f3576"
+    },
+    {
+      "name": "src/components/FilmLab.tsx",
+      "mode": 420,
+      "sha256": "7e1b3a01f01de9d6eb95e7db89ae7da337d8c8a2670bde611539e8ce385b62e4"
+    },
+    {
+      "name": "src/components/FilmStrip.tsx",
+      "mode": 420,
+      "sha256": "d3f46db7bc4848100c6f4f1d00d59377ea3e0add89a4fbcc9e6ab6c9bb43dcd6"
+    },
+    {
+      "name": "src/components/LanguageSwitcher.tsx",
+      "mode": 420,
+      "sha256": "fd6ee3f6a1890e742e131769888ba5d6f00764a267f1b594b6d5ab6baedc5c78"
+    },
+    {
+      "name": "src/components/Logo.tsx",
+      "mode": 420,
+      "sha256": "99215de869f56ef90bcd598f847165abbbc6876bbbd60d0e4db91585898fd286"
+    },
+    {
+      "name": "src/components/Reveal.tsx",
+      "mode": 420,
+      "sha256": "5a86c3bffca16a006d145036014e026fc5e289109980e46962dbedf415bbc04e"
+    },
+    {
+      "name": "src/components/SiteFooter.tsx",
+      "mode": 420,
+      "sha256": "2798b623363bece78447b982c1878b96eadb851f025fa8b90b91bf4bb0ac160e"
+    },
+    {
+      "name": "src/components/SiteHeader.tsx",
+      "mode": 420,
+      "sha256": "6a24bcd2c4782c09b0cd0007e8234e12f81a2b264465261ab93aaa9b7de82065"
+    },
+    {
+      "name": "src/download-meta-types.ts",
+      "mode": 420,
+      "sha256": "7d1e091cb690fd923c3e5d2c9bb535f1edd7f904cece2a0fc14c9f79ab1b9719"
+    },
+    {
+      "name": "src/i18n/LanguageContext.tsx",
+      "mode": 420,
+      "sha256": "ff374c0fbde2d6add708b3ea5825d54289042e10ee7d061ffdeb65e9866f600a"
+    },
+    {
+      "name": "src/i18n/translations.ts",
+      "mode": 420,
+      "sha256": "5b39eabb8d99c1adea31f42fc4cab110ac678800d02d5618891b7e870f97e525"
+    },
+    {
+      "name": "src/main.tsx",
+      "mode": 420,
+      "sha256": "982958658928bb87d9f44f8953dc03ed1926b0fd2593a8f4b9774cfb5fcb6185"
+    },
+    {
+      "name": "src/motion/gsap.ts",
+      "mode": 420,
+      "sha256": "89f82b0abfd3b4b97406a62a3ec9472ca05f1829edeacf9b7dd298910bd774dc"
+    },
+    {
+      "name": "src/motion/homeMotion.ts",
+      "mode": 420,
+      "sha256": "8a53f8850e45fa6a626fe376a8d113ebc632274db450e6dc8a00d915cbf2337e"
+    },
+    {
+      "name": "src/pages/CreditsPage.tsx",
+      "mode": 420,
+      "sha256": "0ef389fcefa3a7821998d73f40de08c345c4ffd14ec498bf9ed095eb203da637"
+    },
+    {
+      "name": "src/pages/DownloadPage.tsx",
+      "mode": 420,
+      "sha256": "cf8dc55159fe6335c665149ec2e28cbf6f4c61a1f728c4a6d69153a11d29eb23"
+    },
+    {
+      "name": "src/pages/HomePage.tsx",
+      "mode": 420,
+      "sha256": "ddee590cebbc9aab1cabc387820295e852f0b902cbbaae5def3f7882788b3c53"
+    },
+    {
+      "name": "src/styles/base.css",
+      "mode": 420,
+      "sha256": "acd09a0bd86fe25e9f29c4fb649d816bb37945b6b441bd87eda1e9d63e155b29"
+    },
+    {
+      "name": "src/styles/credits.css",
+      "mode": 420,
+      "sha256": "0ec80579adfc60a25e0eab6e84f97df56bdb7a7638a48d0b9e8cd21443b73307"
+    },
+    {
+      "name": "src/styles/download.css",
+      "mode": 420,
+      "sha256": "06e2684e8af03d5119efbbe02bada991e739b2763ef1cee034bf61445e4872a4"
+    },
+    {
+      "name": "src/styles/home.css",
+      "mode": 420,
+      "sha256": "fe3b0f521205ecb7499f63f6638406ffc34afe9885d87ba8fc8c3125bce0f2bb"
+    },
+    {
+      "name": "src/styles/i18n.css",
+      "mode": 420,
+      "sha256": "4b7252f9417aab66b732837dc827bace82073d0e0a390dc6ef2d9690617cdf84"
+    },
+    {
+      "name": "src/vite-env.d.ts",
+      "mode": 420,
+      "sha256": "65996936fbb042915f7b74a200fcdde7e410f32a669b1ab9597cfaa4b0faddb5"
+    },
+    {
+      "name": "tools/bake/README.md",
+      "mode": 420,
+      "sha256": "06ce80c87f8a41832ad66daa3272c4d94e8ade3e8059a56c5f81b0d064991ed0"
+    },
+    {
+      "name": "tools/bake/bake_spektrafilm.py",
+      "mode": 420,
+      "sha256": "edca406d8b6b61c1fc27e7945ca72fe2b2b147396807836f9bb3766af2a9bfde"
+    },
+    {
+      "name": "tools/bake/make_reference.py",
+      "mode": 420,
+      "sha256": "822f2643b7f8578b04c949b7cf0a778da02bb5522d8994158b9cc10f75bd3894"
+    },
+    {
+      "name": "tools/bake/make_spatial_reference.py",
+      "mode": 420,
+      "sha256": "d3adc9bb80b2316ab057ced0769811fd606b053eb718d298f60da58cbe811b41"
+    },
+    {
+      "name": "tools/bake/spk.py",
+      "mode": 420,
+      "sha256": "27c5b45b8943c4f2a60483ffd2d2bfc92bf4c83f074866a2728803104a51dd46"
+    },
+    {
+      "name": "tools/gen_camera_matrices.py",
+      "mode": 420,
+      "sha256": "f3f0378e1e7b1a79e39ee87c55a4923a11538744d5aaf316ed3b57def43be6b5"
+    },
+    {
+      "name": "tools/glcheck/README.md",
+      "mode": 420,
+      "sha256": "99208a71060ae101a37ec7942aa1ab08fa94955e08ca3932d8ee72732d5568ea"
+    },
+    {
+      "name": "tools/glcheck/blur.js",
+      "mode": 420,
+      "sha256": "e539399e14b8210852bd194085fda9be1469f3254bc26301b372f4c6cdfb8588"
+    },
+    {
+      "name": "tools/glcheck/grain.js",
+      "mode": 420,
+      "sha256": "1de3d0608e52ceba6dd6f98d4dec7665800c3aa7a958435295df4adfd40365aa"
+    },
+    {
+      "name": "tools/glcheck/merge.js",
+      "mode": 420,
+      "sha256": "a70b3c28f4b7d66ca564e4fa80c780d65080ca14d0ac2d5cbe5483145533d934"
+    },
+    {
+      "name": "tools/glcheck/pipeline.js",
+      "mode": 420,
+      "sha256": "a96a7fed3ff3f2d8a0fc15072b6bb2fed43d6f053fa0ee934561146efcc35e04"
+    },
+    {
+      "name": "tools/glcheck/polaroid.js",
+      "mode": 420,
+      "sha256": "a975869660d7e491c76f8d506229009fa44d87b067cb3a6839afbb3fa32c4a7d"
+    },
+    {
+      "name": "tools/glcheck/polaroid_reference.py",
+      "mode": 420,
+      "sha256": "89045d57f209aabcde154e24d6e60a7eb25db62bab0aef19b7f19c37416a6217"
+    },
+    {
+      "name": "tools/libraw-provenance.json",
+      "mode": 420,
+      "sha256": "b43ac7cf9c8da0c8e04c4094c05531a334c76cbbfb71ad4c47dd08e77724d1e2"
+    },
+    {
+      "name": "tools/rawcheck.py",
+      "mode": 420,
+      "sha256": "dd06b6ad8bbc4b28684d857b8eac6521fa4ef1d747c7dae0567fc6aa69861de5"
+    },
+    {
+      "name": "tsconfig.json",
+      "mode": 420,
+      "sha256": "0c30224d102176c8aff5f8bed938bfec35be7998ad2674f33f5208ff7411a437"
+    },
+    {
+      "name": "vite.config.ts",
+      "mode": 420,
+      "sha256": "c32cedbf50183f587eb4a137761d0af6b99da3abe967cbce2ee6200334e31ffa"
+    }
+  ]
+}

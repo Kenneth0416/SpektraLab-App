@@ -32,8 +32,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -85,10 +87,15 @@ fun Sheets(state: AppState) {
             val shownSheet = lastSheet
             val bg by animateColorAsState(
                 if (dark || shownSheet == Sheet.EXPORT || shownSheet == Sheet.PROGRESS) Pal.darkPanel else Pal.paper, tween(250), label = "sheetBg")
-            Column(Modifier.widthIn(max = SheetMaxWidth).heightIn(max = maxSheet).fillMaxWidth().clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp)).background(bg)
-                .clickable(remember { MutableInteractionSource() }, null) {}
-                .verticalScroll(rememberScrollState())
-                .navigationBarsPadding().padding(20.dp).animateContentSize(Motion.glideSize)) {
+            val baseModifier = Modifier.widthIn(max = SheetMaxWidth).heightIn(max = maxSheet).fillMaxWidth()
+                .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp)).background(bg)
+                .pointerInput(Unit) { detectTapGestures { } }
+            val sheetModifier = if (shownSheet == Sheet.ABOUT) {
+                baseModifier.navigationBarsPadding().padding(20.dp).animateContentSize(Motion.glideSize)
+            } else {
+                baseModifier.verticalScroll(rememberScrollState()).navigationBarsPadding().padding(20.dp).animateContentSize(Motion.glideSize)
+            }
+            Column(sheetModifier) {
                 // export options hand over to the progress view in place
                 AnimatedContent(shownSheet, label = "sheet", transitionSpec = {
                     (fadeIn(tween(220, delayMillis = 90)) + slideInVertically(Motion.glideOffset) { it / 6 }) togetherWith fadeOut(tween(90))
@@ -99,6 +106,7 @@ fun Sheets(state: AppState) {
                             Sheet.RECIPES -> RecipeSheet(state, dark)
                             Sheet.EXPORT -> ExportSheet(state)
                             Sheet.PROGRESS -> ProgressSheet(state)
+                            Sheet.ABOUT -> AboutSheet(state, dark)
                             Sheet.NONE -> {}
                         }
                     }

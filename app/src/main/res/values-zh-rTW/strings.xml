@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">SpektraLab</string>
-    <string name="contact_sheet">SPEKTRALAB · CONTACT SHEET</string>
+    <string name="app_name">銀鹽工坊</string>
+    <string name="brand_kicker">銀鹽工坊 · CONTACT SHEET</string>
+    <string name="about_title">關於 銀鹽工坊 與開源許可</string>
+    <string name="about_action">關於</string>
+    <string name="about_action_description">關於與開源許可</string>
     <string name="export_channel">沖印</string>
     <string name="export_running">正在沖印…</string>
 
@@ -251,4 +254,46 @@
     <string name="recipe_rich_landscape">風光濃郁</string>
     <string name="recipe_travel_snapshot">旅行快照</string>
     <string name="recipe_street_push">街頭增感</string>
+
+    <string name="previous_shot_processing">上一張還在處理，請稍候</string>
+    <string name="burst_hold_steady">連拍 %1$d 幀，請拿穩</string>
+    <string name="capture_failed_short">拍攝失敗</string>
+    <string name="multi_frame_on">多幀合成：按光線連拍 1–%1$d 幀 RAW，合成更乾淨的原片</string>
+    <string name="single_frame_raw">單幀 RAW</string>
+    <string name="merging_percent">合成 %1$d%%</string>
+    <string name="focus_locked">對焦鎖定</string>
+    <string name="burst_merged">%.1f 幀合成完成</string>
+    <string name="film_choice_subtitle">ISO %1$s · %2$s</string>
+    <string name="paper_kind_matched">原配相紙</string>
+    <string name="paper_kind_print_film">電影拷貝片</string>
+    <string name="paper_kind_color">彩色相紙</string>
+    <string name="paper_edge_scan">SCAN</string>
+    <string name="paper_edge_print">PRINT</string>
+
+    <string name="license_gpl_title">GNU GPL v3.0 完整許可原文</string>
+    <string name="license_gpl_subtitle">程式碼許可（app / engine / GLSL）· licenses/GPL-3.0.txt</string>
+    <string name="license_cc_title">CC BY-SA 4.0 與 spektrafilm 資料前序</string>
+    <string name="license_cc_subtitle">底片／相紙檔案與 LUT 許可 · spektra/SPEKTRAFILM_LICENSE.txt</string>
+    <string name="license_changelog_title">檔案與 LUT 修改記錄（CHANGELOG）</string>
+    <string name="license_changelog_subtitle">烘焙與歸屬記錄 · spektra/CHANGELOG.txt</string>
+    <string name="license_notice_title">修改聲明、原始碼與第三方依賴摘要</string>
+    <string name="license_notice_subtitle">NOTICE · licenses/NOTICE.txt</string>
+    <string name="license_ofl_longcang_title">SIL OFL 1.1 — Long Cang 字型</string>
+    <string name="license_ofl_longcang_subtitle">The LongCang Project Authors · licenses/OFL-LongCang.txt</string>
+    <string name="license_ofl_martian_title">SIL OFL 1.1 — Martian Mono 字型</string>
+    <string name="license_ofl_martian_subtitle">The Martian Mono Project Authors · licenses/OFL-MartianMono.txt</string>
+    <string name="license_apache_title">Apache License 2.0 完整原文</string>
+    <string name="license_apache_subtitle">Kotlin / Jetpack / AndroidX 依賴 · licenses/APACHE-2.0.txt</string>
+    <string name="license_load_error">無法讀取內建許可文件：%1$s</string>
+    <string name="license_back">‹ 返回</string>
+    <string name="about_identity">版本 0.1.0 · 應用程式套件名稱 app.spektralab\n獨立專案聲明：%1$s 是獨立專案，不隸屬於 spektrafilm 或 SpektraLab 專案，也未獲得其贊助或背書。\n名稱說明：%1$s 是為區分上游專案而採用的顯示名稱，尚未進行商標註冊（not trademark-cleared），本專案不主張也不聲明任何商標權利。\n本應用程式包含基於 spektrafilm 的獨立衍生移植（independent fork），保留 Andrea Volpato 與上游專案的來源歸屬。</string>
+    <string name="about_upstream_title">上游來源與實際儲存庫位址</string>
+    <string name="about_upstream_body">上游底片模擬專案：spektrafilm — Andrea Volpato\nhttps://github.com/andreavolpato/spektrafilm\n（引擎與烘焙資料源自 commit 3bb2c2d2801ff68b92019cf1dbcbb133d60832bc, v0.3.4）\n\n本應用程式原始碼儲存庫：\nhttps://github.com/Kenneth0416/SpektraLab-App</string>
+    <string name="about_license_split_title">程式碼與資料許可區分（GPLv3 vs CC BY-SA 4.0）</string>
+    <string name="about_license_split_body">• 可執行程式碼（app/、engine/ Kotlin 移植、DNG 沖洗與 GLSL ES 3.00 著色器）：採用 GNU General Public License v3.0（GPLv3）。包含修改記錄（2026-11-10 至 2026-11-11 移植與適配），按 GPLv3 條款「依現況」提供，不提供任何擔保（NO WARRANTY），任何獲許可方均可依 GPLv3 再散布。\n\n• 底片／相紙檔案與查找表資料（assets/spektra/*.spk、index.json）：源自 Andrea Volpato 的 spektrafilm 檔案，採用 Creative Commons Attribution-ShareAlike 4.0 International（CC BY-SA 4.0）授權，完整保留上游 SPEKTRAFILM_LICENSE.txt 前序與全文，並附帶 CHANGELOG.txt 記錄 2026-11-10 烘焙與 2026-11-11 歸屬維護。\n\n• 匯出成品：依據上游前序與 GPLv3 第 2 條，使用者透過本應用程式拍攝或匯出的成品照片與影片不受 copyleft 約束，也不強制添加任何輸出浮水印。</string>
+    <string name="about_source_title">對應原始碼要求（GPLv3 Section 6）</string>
+    <string name="about_source_body">僅提供通用儲存庫首頁連結本身並不足以自動滿足所有發行情境的 GPLv3 對應原始碼（Corresponding Source）義務。任何對外散布的 APK／二進位發行版，必須同步提供或確保可取得與該建置完全一致的精確原始碼版本（精確 Git 提交／標籤、Gradle 建置設定、app/ 與 engine/ 原始碼以及 tools/bake/ 烘焙指令碼與上游檔案）。</string>
+    <string name="about_dependencies_title">內建字型與第三方依賴聲明（按建置設定核驗）</string>
+    <string name="about_dependencies_body">• Long Cang（long_cang.ttf，子集）：Copyright 2018 The LongCang Project Authors (https://github.com/googlefonts/longcang) — SIL Open Font License 1.1\n• Martian Mono（martian_mono.ttf / SemiExpanded）：Copyright 2020/2021 The Martian Mono Project Authors / Evil Martians / Roman Shamin (https://github.com/evilmartians/mono) — SIL Open Font License 1.1\n• Kotlin Standard Library (2.1.21)、Kotlinx Coroutines (1.10.2)、Kotlinx Serialization Core (1.7.3)、JetBrains Annotations (23.0.0)、JSpecify (1.0.0)、AutoValue Annotations (1.6.3)、Guava ListenableFuture (1.0) — Apache License 2.0\n• Jetpack / AndroidX（core-ktx 1.16.0、activity-compose 1.10.1、lifecycle 2.9.1、compose-bom 2025.06.00、exifinterface 1.4.2、window 1.3.0、camera-* 1.5.3）— Apache License 2.0（其中 androidx.camera:camera-core:1.5.3 POM 另標明包含 BSD License 的 libyuv）\n• 底片／相紙名稱（如 Kodak、Portra、Vision3、Fujifilm、Velvia 等）僅用於說明上游檔案模擬對象，商標歸各自權利人所有。</string>
+    <string name="about_full_texts">本機內建完整許可文本（點擊查看全文）</string>
 </resources>

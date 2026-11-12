@@ -87,6 +87,12 @@ class Library(context: Context) {
         save()
     }
 
+    /** The original of an item was replaced by a better one (a merged burst). */
+    @Synchronized fun setSource(id: Long, uri: String, name: String) {
+        _items.value = _items.value.map { if (it.id == id) it.copy(uri = uri, name = name) else it }
+        save()
+    }
+
     @Synchronized fun setLook(id: Long, look: Look) {
         _items.value = _items.value.map { if (it.id == id) it.copy(look = look) else it }
         save()

@@ -39,6 +39,8 @@ class SpektraApp : Application() {
         private set
     lateinit var thumbs: Thumbnails
         private set
+    lateinit var swatches: app.spektralab.ui.Swatches
+        private set
     lateinit var exports: ExportManager
         private set
 
@@ -50,6 +52,7 @@ class SpektraApp : Application() {
         library = Library(this)
         looks = LookCache(engine)
         thumbs = Thumbnails(this)
+        swatches = app.spektralab.ui.Swatches(this)
         exports = ExportManager(this)
         runCatching { ResourcesCompat.getFont(this, R.font.martian_mono) }.getOrNull()?.let { OverlayPainter.monoTypeface = it }
     }

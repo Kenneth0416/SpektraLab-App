@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.spektralab.R
 import app.spektralab.SpektraApp
+import app.spektralab.camera.RawShooter
 import app.spektralab.data.LibraryItem
 import app.spektralab.data.Media
 import app.spektralab.data.LookJson
@@ -16,6 +17,7 @@ import app.spektralab.engine.Look
 import app.spektralab.export.ExportOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,7 +25,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-enum class Sheet { NONE, IMPORT, RECIPES, EXPORT, PROGRESS }
+enum class Sheet { NONE, IMPORT, RECIPES, EXPORT, PROGRESS, ABOUT }
 enum class Filter { ALL, PHOTO, VIDEO }
 
 /** UI state of the whole app (lightbox + darkroom), following the interaction prototype. */
@@ -82,15 +84,70 @@ class AppState(application: Application) : AndroidViewModel(application) {
      * A shot was saved to the album ([uri] is the untouched original, raw when possible):
      * put it on the lightbox with the camera's look and print it.
      */
-    fun onCaptured(uri: Uri) {
+    fun onCaptured(uri: Uri, evBias: Float = 0f) {
         val look = camLook.value
         viewModelScope.launch {
-            val item = withContext(Dispatchers.IO) { Media.importItem(app, uri, library.reserveIds(1)) }?.copy(look = look)
+            val item = withContext(Dispatchers.IO) { Media.importItem(app, uri, library.reserveIds(1)) }
+                // the exposure compensation dialled in at the viewfinder is part of the metered exposure
+                ?.let { it.copy(look = look, autoEv = it.autoEv + evBias) }
                 ?: return@launch say(R.string.captured_unreadable)
             library.add(listOf(item))
             say(if (item.isRaw) R.string.captured_raw_kept else R.string.captured_original_kept)
             // every shot is also printed: the film picture goes to the album next to the original
             exports.enqueue(item, exportOptions.value)
+        }
+    }
+
+    /** Multi-frame capture: each shot is a short raw burst merged into one cleaner original. */
+    val multiFrame = MutableStateFlow(application.getSharedPreferences("camera", android.content.Context.MODE_PRIVATE).getBoolean("multiFrame", false))
+    fun setMultiFrame(on: Boolean) {
+        multiFrame.value = on
+        app.getSharedPreferences("camera", android.content.Context.MODE_PRIVATE).edit().putBoolean("multiFrame", on).apply()
+    }
+
+    /** Progress 0..1 of the burst being merged, null when idle. */
+    val merging = MutableStateFlow<Float?>(null)
+
+    /** Raw capture into memory (single frames and bursts); lives as long as the app's UI state. */
+    val shooter = RawShooter(application).also { sh ->
+        sh.onProgress = { merging.value = it }
+        sh.onSaved = { uri, evBias -> onShotSaved(uri, evBias) }
+        sh.onFinished = { first, merged, used -> onShotFinished(first, merged, used) }
+    }
+    override fun onCleared() {
+        shooter.close()
+        shots.clear()
+        super.onCleared()
+    }
+
+    private val shots = HashMap<Uri, kotlinx.coroutines.Deferred<LibraryItem?>>()
+
+    /** The first frame of a shot is in the album: it goes on the lightbox right away. */
+    private fun onShotSaved(uri: Uri, evBias: Float) {
+        val look = camLook.value
+        shots[uri] = viewModelScope.async {
+            val item = withContext(Dispatchers.IO) { Media.importItem(app, uri, library.reserveIds(1)) }
+                ?.let { it.copy(look = look, autoEv = it.autoEv + evBias) }
+            if (item == null) say(R.string.captured_unreadable) else { library.add(listOf(item)); say(R.string.captured_raw_kept) }
+            item
+        }
+    }
+
+    /** The shot is complete: swap in the merged original if there is one, then print it. */
+    private fun onShotFinished(first: Uri, merged: Uri?, framesUsed: Float) {
+        val pending = shots.remove(first)
+        viewModelScope.launch {
+            val id = pending?.await()?.id
+            if (merged != null) {
+                // The lightbox uses the merged source. Keep the first frame in MediaStore:
+                // queued exports and in-flight decodes may still own its immutable URI.
+                if (id != null && library.item(id) != null) {
+                    library.setSource(id, merged.toString(), withContext(Dispatchers.IO) { Media.name(app, merged) })
+                    say(R.string.burst_merged, framesUsed)
+                }
+            }
+            // every shot is also printed: the film picture goes to the album next to the original
+            id?.let { library.item(it) }?.let { exports.enqueue(it, exportOptions.value) }
         }
     }
 

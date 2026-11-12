@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">SpektraLab</string>
-    <string name="contact_sheet">SPEKTRALAB · CONTACT SHEET</string>
-    <string name="export_channel">Developing</string>
-    <string name="export_running">Developing photos…</string>
+    <string name="app_name">银盐工坊</string>
+    <string name="brand_kicker">银盐工坊 · CONTACT SHEET</string>
+    <string name="about_title">关于 银盐工坊 与开源许可</string>
+    <string name="about_action">关于</string>
+    <string name="about_action_description">关于与开源许可</string>
+    <string name="export_channel">冲印</string>
+    <string name="export_running">正在冲印…</string>
 
     <string name="settings">Settings</string>
     <string name="language">Language</string>
@@ -252,4 +255,46 @@
     <string name="recipe_rich_landscape">Rich landscape</string>
     <string name="recipe_travel_snapshot">Travel snapshot</string>
     <string name="recipe_street_push">Pushed street</string>
+
+    <string name="previous_shot_processing">The previous shot is still processing</string>
+    <string name="burst_hold_steady">Burst of %1$d frames — hold steady</string>
+    <string name="capture_failed_short">Capture failed</string>
+    <string name="multi_frame_on">Multi-frame: capture 1–%1$d RAW frames by the light and merge a cleaner original</string>
+    <string name="single_frame_raw">Single-frame RAW</string>
+    <string name="merging_percent">Merging %1$d%%</string>
+    <string name="focus_locked">Focus locked</string>
+    <string name="burst_merged">Merged %.1f frames</string>
+    <string name="film_choice_subtitle">ISO %1$s · %2$s</string>
+    <string name="paper_kind_matched">Matched paper</string>
+    <string name="paper_kind_print_film">Motion-picture print</string>
+    <string name="paper_kind_color">Colour paper</string>
+    <string name="paper_edge_scan">SCAN</string>
+    <string name="paper_edge_print">PRINT</string>
+
+    <string name="license_gpl_title">GNU GPL v3.0 完整许可原文</string>
+    <string name="license_gpl_subtitle">Code license (app / engine / GLSL) · licenses/GPL-3.0.txt</string>
+    <string name="license_cc_title">CC BY-SA 4.0 与 spektrafilm 数据前序</string>
+    <string name="license_cc_subtitle">Film and paper profiles and LUT license · spektra/SPEKTRAFILM_LICENSE.txt</string>
+    <string name="license_changelog_title">档案与 LUT 修改记录（CHANGELOG）</string>
+    <string name="license_changelog_subtitle">Bake and attribution record · spektra/CHANGELOG.txt</string>
+    <string name="license_notice_title">修改声明、源码与第三方依赖摘要</string>
+    <string name="license_notice_subtitle">NOTICE · licenses/NOTICE.txt</string>
+    <string name="license_ofl_longcang_title">SIL OFL 1.1 — Long Cang 字体</string>
+    <string name="license_ofl_longcang_subtitle">The LongCang Project Authors · licenses/OFL-LongCang.txt</string>
+    <string name="license_ofl_martian_title">SIL OFL 1.1 — Martian Mono 字体</string>
+    <string name="license_ofl_martian_subtitle">The Martian Mono Project Authors · licenses/OFL-MartianMono.txt</string>
+    <string name="license_apache_title">Apache License 2.0 完整原文</string>
+    <string name="license_apache_subtitle">Kotlin / Jetpack / AndroidX dependencies · licenses/APACHE-2.0.txt</string>
+    <string name="license_load_error">Unable to read the bundled license file: %1$s</string>
+    <string name="license_back">‹ 返回</string>
+    <string name="about_identity">版本 0.1.0 · application id app.spektralab\n独立项目声明：%1$s is an independent project. It is not part of spektrafilm or SpektraLab, and it is not sponsored or endorsed by them.\nName: %1$s is a display name chosen to distinguish this project from upstream. It is not trademark-cleared, and this project claims no trademark rights.\nThis application contains an independent fork of spektrafilm and retains attribution to Andrea Volpato and the upstream project.</string>
+    <string name="about_upstream_title">Upstream source and repository</string>
+    <string name="about_upstream_body">Upstream film project: spektrafilm — Andrea Volpato\nhttps://github.com/andreavolpato/spektrafilm\n(Engine and baked data from commit 3bb2c2d2801ff68b92019cf1dbcbb133d60832bc, v0.3.4)\n\nThis application’s source repository:\nhttps://github.com/Kenneth0416/SpektraLab-App</string>
+    <string name="about_license_split_title">Code and data licenses (GPLv3 vs CC BY-SA 4.0)</string>
+    <string name="about_license_split_body">• Executable code (app/, the engine/ Kotlin port, DNG development, and GLSL ES 3.00 shaders) is licensed under the GNU General Public License v3.0 (GPLv3). Modifications from 2026-11-10 through 2026-11-11 are included. It is provided “AS IS” with NO WARRANTY, and any licensee may redistribute it under GPLv3.\n\n• Film and paper profiles and lookup-table data (assets/spektra/*.spk and index.json) come from Andrea Volpato’s spektrafilm archive under Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0). The upstream SPEKTRAFILM_LICENSE.txt preamble and full text are retained, with CHANGELOG.txt recording the 2026-11-10 bake and 2026-11-11 attribution maintenance.\n\n• Exported pictures: under the upstream preamble and GPLv3 section 2, photographs and videos made or exported with this application are not covered by the copyleft and do not require an output watermark.</string>
+    <string name="about_source_title">Corresponding source (GPLv3 Section 6)</string>
+    <string name="about_source_body">A generic repository homepage link does not by itself satisfy the GPLv3 Corresponding Source obligation for every distribution. Every distributed APK or binary must also provide, or make available, the exact source for that build: the exact Git commit or tag, Gradle configuration, app/ and engine/ source, the tools/bake/ scripts, and the upstream archive.</string>
+    <string name="about_dependencies_title">Bundled fonts and third-party dependencies</string>
+    <string name="about_dependencies_body">• Long Cang (long_cang.ttf, subset): Copyright 2018 The LongCang Project Authors (https://github.com/googlefonts/longcang) — SIL Open Font License 1.1\n• Martian Mono (martian_mono.ttf / SemiExpanded): Copyright 2020/2021 The Martian Mono Project Authors / Evil Martians / Roman Shamin (https://github.com/evilmartians/mono) — SIL Open Font License 1.1\n• Kotlin Standard Library (2.1.21), Kotlinx Coroutines (1.10.2), Kotlinx Serialization Core (1.7.3), JetBrains Annotations (23.0.0), JSpecify (1.0.0), AutoValue Annotations (1.6.3), and Guava ListenableFuture (1.0) — Apache License 2.0\n• Jetpack / AndroidX (core-ktx 1.16.0, activity-compose 1.10.1, lifecycle 2.9.1, compose-bom 2025.06.00, exifinterface 1.4.2, window 1.3.0, camera-* 1.5.3) — Apache License 2.0 (the androidx.camera:camera-core:1.5.3 POM also identifies BSD-licensed libyuv)\n• Film and paper names such as Kodak, Portra, Vision3, Fujifilm, and Velvia identify the upstream profiles being simulated. Their trademarks belong to their respective owners.</string>
+    <string name="about_full_texts">Bundled full license texts (tap to read)</string>
 </resources>

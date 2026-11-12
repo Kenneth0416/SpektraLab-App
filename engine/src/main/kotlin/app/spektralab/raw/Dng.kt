@@ -3,261 +3,354 @@ package app.spektralab.raw
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-/** Lens shading gain map (DNG opcode 9), one per CFA position on phone cameras. */
-class GainMap(
-    val top: Int, val left: Int, val bottom: Int, val right: Int,
-    val rowPitch: Int, val colPitch: Int,
-    val pointsV: Int, val pointsH: Int,
-    val spacingV: Double, val spacingH: Double, val originV: Double, val originH: Double,
-    val gains: FloatArray,
-) {
-    /** Gain at raw pixel (x, y) of an image [width] x [height] (bilinear, clamped). */
-    fun gain(x: Int, y: Int, width: Int, height: Int): Float {
-        val v = ((y.toDouble() / height - originV) / spacingV).coerceIn(0.0, (pointsV - 1).toDouble())
-        val h = ((x.toDouble() / width - originH) / spacingH).coerceIn(0.0, (pointsH - 1).toDouble())
-        val v0 = v.toInt().coerceAtMost(pointsV - 2).coerceAtLeast(0)
-        val h0 = h.toInt().coerceAtMost(pointsH - 2).coerceAtLeast(0)
-        val v1 = minOf(v0 + 1, pointsV - 1)
-        val h1 = minOf(h0 + 1, pointsH - 1)
-        val fv = (v - v0).toFloat()
-        val fh = (h - h0).toFloat()
-        val a = gains[v0 * pointsH + h0] * (1 - fh) + gains[v0 * pointsH + h1] * fh
-        val b = gains[v1 * pointsH + h0] * (1 - fh) + gains[v1 * pointsH + h1] * fh
-        return a * (1 - fv) + b * fv
-    }
-
-    fun covers(x: Int, y: Int) = y >= top && y < bottom && x >= left && x < right &&
-        (y - top) % rowPitch == 0 && (x - left) % colPitch == 0
-}
-
-/** A Bayer raw frame with the metadata needed to develop it to linear sRGB. */
-class DngImage(
-    val rawWidth: Int,
-    val rawHeight: Int,
-    /** Sensor values, row-major, unsigned 16 bit. */
-    val data: ShortArray,
-    /** Colour (0 R, 1 G, 2 B) at CFA position [row % 2][col % 2]. */
-    val cfa: IntArray,
-    /** Black level per CFA position. */
-    val black: FloatArray,
-    val white: Float,
-    /** Region to output (DefaultCrop inside ActiveArea), raw pixel coordinates. */
-    val cropX: Int, val cropY: Int, val cropWidth: Int, val cropHeight: Int,
-    /** White balance gains applied to black-subtracted, normalised camera RGB. */
-    val wb: FloatArray,
-    /** White-balanced camera RGB -> linear sRGB (D65), row-major 3x3. */
-    val camToSrgb: FloatArray,
-    /** TIFF orientation (1, 3, 6, 8 supported). */
-    val orientation: Int,
-    val baselineExposure: Float,
-    val gainMaps: List<GainMap>,
-) {
-    /** Size after applying [orientation]. */
-    val uprightWidth get() = if (orientation == 6 || orientation == 8) cropHeight else cropWidth
-    val uprightHeight get() = if (orientation == 6 || orientation == 8) cropWidth else cropHeight
-}
-
 /**
- * Minimal DNG reader for uncompressed Bayer DNGs, which is what Android's DngCreator
- * (Camera2 RAW_SENSOR, CameraX RAW capture) writes. Returns null for anything else
- * (compressed, tiled, non-Bayer, linear raw) so callers can fall back to the system decoder.
+ * DNG reader for CFA (mosaiced) DNGs: uncompressed (8..16 bit, packed or not) or
+ * lossless-JPEG compressed (Compression 7), in strips or tiles, with LinearizationTable,
+ * repeating black levels, ActiveArea / DefaultCrop, the colour matrices and GainMap
+ * opcodes. That covers Android DngCreator output, Adobe DNG Converter output and the
+ * DNGs written by most cameras.
+ *
+ * Also reads 16-bit linear RGB strips (uncompressed or deflate, including half-float).
+ * Returns null for lossy JPEG / JPEG XL, unsupported layouts,
+ * non-rectangular CFA layouts and anything malformed.
+ *
+ * Tile reassembly of lossless-JPEG data follows LibRaw's lossless_dng_load_raw.
  */
 object DngReader {
-    private class Entry(val type: Int, val count: Int, val valueOffset: Int)
-    private class Ifd(val entries: Map<Int, Entry>)
+    fun read(bytes: ByteArray): RawImage? = runCatching { parse(bytes) }.getOrNull()
 
-    fun read(bytes: ByteArray): DngImage? = runCatching { parse(ByteBuffer.wrap(bytes)) }.getOrNull()
-
-    private fun parse(b: ByteBuffer): DngImage? {
-        if (b.capacity() < 16) return null
-        val order = when (b.getShort(0).toInt()) { 0x4949 -> ByteOrder.LITTLE_ENDIAN; 0x4D4D -> ByteOrder.BIG_ENDIAN; else -> return null }
-        b.order(order)
-        if (b.getShort(2).toInt() != 42) return null
-        val ifd0 = readIfd(b, b.getInt(4)) ?: return null
+    private fun parse(bytes: ByteArray): RawImage? {
+        val tiff = Tiff.parse(bytes, 0, setOf(42)) ?: return null
+        val ifd0 = tiff.ifd0
+        if (TiffTags.DNG_VERSION !in ifd0) return null
         // the raw image is IFD0 itself or one of its SubIFDs (when a preview comes first)
-        val candidates = ArrayList<Ifd>().apply { add(ifd0) }
-        ifd0.entries[330]?.let { e -> values(b, e).forEach { off -> readIfd(b, off.toInt())?.let { candidates += it } } }
-        val raw = candidates.firstOrNull { ints(b, it, 262)?.firstOrNull() == 32803 } ?: return null
-        fun rawInts(tag: Int) = ints(b, raw, tag)
-        fun anyD(tag: Int) = doubles(b, raw, tag) ?: doubles(b, ifd0, tag)
+        val raw = tiff.allIfds()
+            .filter { it.int(TiffTags.PHOTOMETRIC) in setOf(32803, 34892) }
+            .sortedWith(compareBy({ (it.int(TiffTags.NEW_SUBFILE_TYPE) ?: 0) and 1 }, { -(it.int(TiffTags.IMAGE_WIDTH) ?: 0) }))
+            .firstOrNull() ?: return null
+        fun anyD(tag: Int) = raw.doubles(tag) ?: ifd0.doubles(tag)
 
-        val width = rawInts(256)?.first() ?: return null
-        val height = rawInts(257)?.first() ?: return null
-        if ((rawInts(259)?.first() ?: 1) != 1) return null                    // uncompressed only
-        if ((rawInts(258)?.first() ?: 0) != 16) return null
-        if ((rawInts(277)?.first() ?: 1) != 1) return null
-        val dim = rawInts(33421) ?: return null
-        if (dim.size != 2 || dim[0] != 2 || dim[1] != 2) return null
-        val cfa = rawInts(33422)?.takeIf { it.size == 4 && it.all { c -> c in 0..2 } } ?: return null
-        val offsets = rawInts(273) ?: return null                              // strips (no tiles)
-        val counts = rawInts(279) ?: return null
+        val linear = raw.int(TiffTags.PHOTOMETRIC) == 34892
+        val width = raw.int(TiffTags.IMAGE_WIDTH) ?: return null
+        val height = raw.int(TiffTags.IMAGE_LENGTH) ?: return null
+        if (width <= 0 || height <= 0 || width.toLong() * height * (if (linear) 3 else 1) > RawDecodeLimits.MAX_SAMPLES) return null
+        if (raw.int(TiffTags.SAMPLES_PER_PIXEL, 1) != (if (linear) 3 else 1)) return null
+        if (raw.int(TiffTags.CFA_LAYOUT, 1) != 1) return null
+        val bps = raw.int(TiffTags.BITS_PER_SAMPLE, 1)
+        val compression = raw.int(TiffTags.COMPRESSION, 1)
 
-        val data = ShortArray(width * height)
-        var pos = 0
-        for (i in offsets.indices) {
-            val n = minOf(counts[i] / 2, data.size - pos)
-            val sb = b.duplicate().order(order)
-            sb.position(offsets[i]); sb.limit(offsets[i] + n * 2)
-            sb.asShortBuffer().get(data, pos, n)
-            pos += n
+        // CFA, relative to the ActiveArea origin
+        val dim = if (linear) intArrayOf(2, 2) else raw.ints(TiffTags.CFA_REPEAT_PATTERN_DIM) ?: return null            // rows, cols
+        if (dim.size != 2 || dim[0] !in 1..CfaPattern.MAX_DIM || dim[1] !in 1..CfaPattern.MAX_DIM) return null
+        val cfaRows = dim[0]; val cfaCols = dim[1]
+        val planeColor = raw.ints(TiffTags.CFA_PLANE_COLOR) ?: intArrayOf(0, 1, 2)
+        val cfaValues = if (linear) intArrayOf(0, 1, 1, 2) else raw.ints(TiffTags.CFA_PATTERN)?.takeIf { it.size >= cfaRows * cfaCols } ?: return null
+        val colors = IntArray(cfaRows * cfaCols) { i -> planeColor.getOrElse(cfaValues[i]) { -1 } }
+        if (colors.any { it !in 0..2 }) return null                                          // e.g. CMYG sensors
+
+        val active = raw.ints(TiffTags.ACTIVE_AREA)?.takeIf { it.size == 4 } ?: intArrayOf(0, 0, height, width)  // top, left, bottom, right
+        if (active[0] < 0 || active[1] < 0 || active[2] > height || active[3] > width || active[2] <= active[0] || active[3] <= active[1]) return null
+        val cfa = CfaPattern(cfaCols, cfaRows, colors).anchoredAt(active[0], active[1])
+
+        // pixels
+        val data = (if (linear) readLinear(bytes, raw, width, height, bps, compression)
+            else readPixels(bytes, raw, width, height, bps, compression)) ?: return null
+        raw.ints(TiffTags.LINEARIZATION_TABLE, 65536)?.let { table ->
+            val last = table.size - 1
+            for (i in data.indices) data[i] = table[minOf(data[i].toInt() and 0xffff, last)].coerceIn(0, 65535).toShort()
         }
-        if (pos < data.size) return null
 
-        // levels
-        val blackRep = rawInts(50713) ?: intArrayOf(1, 1)
-        val blackVals = anyD(50714) ?: doubleArrayOf(0.0)
-        val black = FloatArray(4) { i ->
-            val r = i / 2; val c = i % 2
-            blackVals[((r % blackRep[0]) * blackRep[1] + (c % blackRep[1])).coerceAtMost(blackVals.size - 1)].toFloat()
-        }
-        val white = (anyD(50717)?.first() ?: 65535.0).toFloat()
+        // levels: BlackLevel repeats over BlackLevelRepeatDim (rows, cols) from the ActiveArea origin
+        val blackRep = raw.ints(TiffTags.BLACK_LEVEL_REPEAT_DIM)?.takeIf { it.size == 2 && it[0] in 1..CfaPattern.MAX_DIM && it[1] in 1..CfaPattern.MAX_DIM } ?: intArrayOf(1, 1)
+        val blackVals = raw.doubles(TiffTags.BLACK_LEVEL) ?: doubleArrayOf(0.0)
+        val black = blackPerCfaPosition(cfaRows, cfaCols, blackRep[0], blackRep[1], blackVals)
+            .let { CfaPattern.shiftPattern(it, cfaCols, cfaRows, active[0], active[1]) }
+        val white = if (linear && raw.int(339, 1) == 3) 65535f else (raw.double(TiffTags.WHITE_LEVEL) ?: ((1L shl bps.coerceIn(1, 16)) - 1).toDouble()).toFloat()
+        if (white <= black.max()) return null
 
         // crop: DefaultCropOrigin/Size are relative to the ActiveArea
-        val active = rawInts(50829) ?: intArrayOf(0, 0, height, width)         // top, left, bottom, right
-        val origin = anyD(50719) ?: doubleArrayOf(0.0, 0.0)                    // h, v
-        val size = anyD(50720) ?: doubleArrayOf((active[3] - active[1]).toDouble(), (active[2] - active[0]).toDouble())
-        var cropX = active[1] + origin[0].toInt()
-        var cropY = active[0] + origin[1].toInt()
-        // keep the CFA phase: start on an even raw coordinate
-        cropX += cropX % 2; cropY += cropY % 2
-        var cropW = minOf(size[0].toInt(), width - cropX)
-        var cropH = minOf(size[1].toInt(), height - cropY)
-        cropW -= cropW % 2; cropH -= cropH % 2
+        val origin = anyD(TiffTags.DEFAULT_CROP_ORIGIN)?.takeIf { it.size >= 2 } ?: doubleArrayOf(0.0, 0.0)          // h, v
+        val size = anyD(TiffTags.DEFAULT_CROP_SIZE)?.takeIf { it.size >= 2 }
+            ?: doubleArrayOf((active[3] - active[1]).toDouble(), (active[2] - active[0]).toDouble())
+        var cropX = active[1] + origin[0].toInt().coerceAtLeast(0)
+        var cropY = active[0] + origin[1].toInt().coerceAtLeast(0)
+        // keep the crop on even raw coordinates and sizes (as before RawImage handled any phase)
+        if (!linear) { cropX += cropX % 2; cropY += cropY % 2 }
+        var cropW = minOf(size[0].toInt(), active[3] - cropX)
+        var cropH = minOf(size[1].toInt(), active[2] - cropY)
+        if (!linear) { cropW -= cropW % 2; cropH -= cropH % 2 }
         if (cropW < 4 || cropH < 4) return null
 
         // colour
-        val neutral = anyD(50728)?.takeIf { it.size == 3 && it.all { v -> v > 0 } } ?: doubleArrayOf(1.0, 1.0, 1.0)
-        val wb = FloatArray(3) { (neutral[1] / neutral[it]).toFloat() }
-        val camToXyz50 = cameraToXyzD50(b, raw, ifd0, neutral) ?: return null
-        // wb is normalised to green (camera * wb = neutral_G * camera / neutral), so fold 1 / neutral_G in
-        val camToSrgb = mul(XYZ_D50_TO_SRGB, camToXyz50).let { m -> DoubleArray(9) { m[it] / neutral[1] } }
-        val orientation = ints(b, ifd0, 274)?.first() ?: rawInts(274)?.first() ?: 1
-        val baseline = (doubles(b, ifd0, 50730) ?: anyD(50730))?.first()?.toFloat() ?: 0f
-        val gainMaps = raw.entries[51009]?.let { parseGainMaps(b, it) } ?: emptyList()
+        val colour = colour(raw, ifd0) ?: return null
+        val orientation = (ifd0.int(TiffTags.ORIENTATION) ?: raw.int(TiffTags.ORIENTATION) ?: 1).let { if (it in 1..8) it else 1 }
+        val baseline = (ifd0.double(TiffTags.BASELINE_EXPOSURE) ?: raw.double(TiffTags.BASELINE_EXPOSURE))?.toFloat() ?: 0f
+        val gainMaps = raw[TiffTags.OPCODE_LIST_2]?.let { parseGainMaps(bytes, it.dataOffset, it.byteCount) } ?: emptyList()
 
-        return DngImage(width, height, data, cfa, black, white, cropX, cropY, cropW, cropH,
-            wb, FloatArray(9) { camToSrgb[it].toFloat() }, orientation, baseline, gainMaps)
+        val noise = anyD(51041)?.takeIf { it.size >= 2 && it.size % 2 == 0 }
+        val noiseScale = noise?.let { n -> (n.indices step 2).map { n[it] }.average().toFloat() }?.takeIf { it > 0f }
+        val noiseOffset = noise?.let { n -> (1 until n.size step 2).map { n[it] }.average().toFloat() }?.coerceAtLeast(0f) ?: 0f
+        return RawImage(width, height, data, cfa, black, white, cropX, cropY, cropW, cropH,
+            colour.wb, colour.camToSrgb, orientation, baseline, gainMaps,
+            make = ifd0.string(TiffTags.MAKE) ?: "", model = ifd0.string(TiffTags.MODEL) ?: ifd0.string(TiffTags.UNIQUE_CAMERA_MODEL) ?: "",
+            noiseScale = noiseScale, noiseOffset = noiseOffset, linear = linear, tags = keepTags(ifd0, raw))
     }
 
-    /**
-     * Matrix M with XYZ(D50) = M * (camera / neutral): the DNG ForwardMatrix when present,
-     * otherwise derived from the ColorMatrix with a Bradford adaptation of the as-shot white.
-     */
-    private fun cameraToXyzD50(b: ByteBuffer, raw: Ifd, ifd0: Ifd, neutral: DoubleArray): DoubleArray? {
-        fun mat(tag: Int) = (doubles(b, ifd0, tag) ?: doubles(b, raw, tag))?.takeIf { it.size == 9 }
-        fun illum(tag: Int) = (ints(b, ifd0, tag) ?: ints(b, raw, tag))?.first() ?: 0
-        // prefer the daylight calibration (usually illuminant 2 = D65)
-        val second = illum(50779).let { it == 21 || it == 20 || it == 23 || it == 1 } || mat(50721) == null
-        val fm = (if (second) mat(50965) else null) ?: mat(50964) ?: mat(50965)
-        if (fm != null) return fm
-        val cm = (if (second) mat(50722) else null) ?: mat(50721) ?: mat(50722) ?: return null
-        val inv = invert(cm) ?: return null
-        val whiteXyz = mulVec(inv, neutral)
-        val adapt = bradford(whiteXyz, D50)
-        // XYZ50 = adapt * inv(CM) * camera = adapt * inv(CM) * diag(neutral) * (camera / neutral)
-        val m = mul(adapt, inv)
-        return DoubleArray(9) { m[it] * neutral[it % 3] }
+    /** Average black per CFA position over the common period of the CFA and black patterns. */
+    private fun blackPerCfaPosition(cfaRows: Int, cfaCols: Int, br: Int, bc: Int, vals: DoubleArray): FloatArray {
+        val pr = lcm(cfaRows, br); val pc = lcm(cfaCols, bc)
+        val sum = DoubleArray(cfaRows * cfaCols)
+        val n = IntArray(cfaRows * cfaCols)
+        for (r in 0 until pr) for (c in 0 until pc) {
+            val i = (r % cfaRows) * cfaCols + c % cfaCols
+            sum[i] += vals[minOf(((r % br) * bc + c % bc), vals.size - 1)]
+            n[i]++
+        }
+        return FloatArray(sum.size) { (sum[it] / n[it]).toFloat() }
     }
 
-    private fun parseGainMaps(b: ByteBuffer, e: Entry): List<GainMap> {
-        // opcode lists are always big endian
-        val o = b.duplicate().order(ByteOrder.BIG_ENDIAN)
-        o.position(e.valueOffset)
-        val out = ArrayList<GainMap>()
-        val n = o.int
-        repeat(n) {
-            val id = o.int; o.int; o.int
-            val size = o.int
-            val next = o.position() + size
-            if (id == 9) {
-                val top = o.int; val left = o.int; val bottom = o.int; val right = o.int
-                o.int; o.int                                                   // plane, planes
-                val rowPitch = o.int; val colPitch = o.int
-                val pv = o.int; val ph = o.int
-                val sv = o.double; val sh = o.double; val ov = o.double; val oh = o.double
-                val mapPlanes = o.int
-                val gains = FloatArray(pv * ph)
-                for (i in 0 until pv * ph) { gains[i] = o.float; repeat(mapPlanes - 1) { o.float } }
-                if (pv >= 1 && ph >= 1 && rowPitch > 0 && colPitch > 0)
-                    out += GainMap(top, left, bottom, right, rowPitch, colPitch, pv, ph, sv, sh, ov, oh, gains)
+    private fun lcm(a: Int, b: Int): Int { var x = a; var y = b; while (y != 0) { val t = x % y; x = y; y = t }; return a / x * b }
+
+    // ---------------------------------------------------------------- pixel data
+    private fun readPixels(bytes: ByteArray, raw: TiffIfd, width: Int, height: Int, bps: Int, compression: Int): ShortArray? {
+        if (compression != 1 && compression != 7) return null
+        if (compression == 1 && bps !in 8..16) return null
+        val tiled = TiffTags.TILE_WIDTH in raw
+        val tw = if (tiled) raw.int(TiffTags.TILE_WIDTH) ?: return null else width
+        // TIFF permits unsigned 0xffffffff to mean one strip covering the image.
+        val th = if (tiled) raw.int(TiffTags.TILE_LENGTH) ?: return null else
+            (raw.longs(TiffTags.ROWS_PER_STRIP, 1)?.firstOrNull() ?: height.toLong()).coerceAtMost(height.toLong()).toInt()
+        if (tw <= 0 || th <= 0 || tw.toLong() * th > RawDecodeLimits.MAX_SAMPLES) return null
+        val across = (width.toLong() + tw - 1) / tw
+        val down = (height.toLong() + th - 1) / th
+        val tiles = across * down
+        if (tiles !in 1..RawDecodeLimits.MAX_SEGMENTS.toLong()) return null
+        val offsetsTag = if (tiled) TiffTags.TILE_OFFSETS else TiffTags.STRIP_OFFSETS
+        val countsTag = if (tiled) TiffTags.TILE_BYTE_COUNTS else TiffTags.STRIP_BYTE_COUNTS
+        fun segments(tag: Int): LongArray? {
+            val entry = raw[tag] ?: return null
+            if (entry.count !in tiles.toInt()..RawDecodeLimits.MAX_SEGMENTS) return null
+            return raw.longs(tag, RawDecodeLimits.MAX_SEGMENTS)
+        }
+        val offsets = segments(offsetsTag) ?: return null
+        val counts = segments(countsTag) ?: return null
+        val stride = Unpack.rowBytes(tw, bps)
+        if (compression == 1 && stride !in 1..Int.MAX_VALUE.toLong()) return null
+
+        // Preflight every segment before allocating the output. Uncompressed reads
+        // must fit their own declared byte range, not merely the surrounding file.
+        for (t in 0 until tiles.toInt()) {
+            val cols = minOf(tw.toLong(), width - (t % across) * tw).toInt()
+            val rows = minOf(th.toLong(), height - (t / across) * th).toInt()
+            val off = offsets[t]; val len = counts[t]
+            if (off <= 0 || off >= bytes.size || len <= 0 || len > bytes.size - off) return null
+            if (compression == 1) {
+                val required = (rows - 1).toLong() * stride + Unpack.rowBytes(cols, bps)
+                if (required > len) return null
+            } else {
+                val h = LosslessJpeg.readHeader(bytes, off.toInt(), len.toInt()) ?: return null
+                val samples = h.rowSamples.toLong() * h.height
+                val required = (rows - 1).toLong() * tw + cols
+                if (samples < required || samples > tw.toLong() * th) return null
             }
-            o.position(next)
+        }
+        val data = ShortArray(width * height)
+        for (t in 0 until tiles.toInt()) {
+            val tx = ((t % across) * tw).toInt()
+            val ty = ((t / across) * th).toInt()
+            val cols = minOf(tw, width - tx)
+            val rows = minOf(th, height - ty)
+            val off = offsets[t].toInt(); val len = counts[t].toInt()
+            val ok = if (compression == 1) {
+                if (bps == 16) Unpack.u16(bytes, off, stride.toInt(), cols, rows, raw.littleEndian, data, ty * width + tx, width)
+                else Unpack.packed(bytes, off, stride.toInt(), cols, rows, bps, Unpack.BitOrder.MSB, data, ty * width + tx, width)
+            } else ljpegTile(bytes, off, len, data, width, tx, ty, tw, cols, rows)
+            if (!ok) return null
+        }
+        return data
+    }
+
+    /** Linear RGB strips produced by DngWriter, including half-float predictor 3. */
+    private fun readLinear(bytes: ByteArray, raw: TiffIfd, width: Int, height: Int, bps: Int, compression: Int): ShortArray? {
+        if (bps != 16 || compression !in setOf(1, 8) || raw.int(284, 1) != 1 || TiffTags.TILE_WIDTH in raw) return null
+        val predictor = raw.int(317, 1)
+        val format = raw.int(339, 1)
+        val float = format == 3
+        if (format !in setOf(1, 3) || predictor !in 1..3 || float != (predictor == 3) ||
+            (compression == 1 && (float || predictor != 1))) return null
+        val rowsPerStrip = (raw.longs(278, 1)?.firstOrNull() ?: height.toLong()).coerceAtMost(height.toLong()).toInt()
+        if (rowsPerStrip <= 0) return null
+        val strips = (height.toLong() + rowsPerStrip - 1) / rowsPerStrip
+        if (strips !in 1..RawDecodeLimits.MAX_SEGMENTS.toLong()) return null
+        val offsets = raw.longs(273, RawDecodeLimits.MAX_SEGMENTS) ?: return null
+        val counts = raw.longs(279, RawDecodeLimits.MAX_SEGMENTS) ?: return null
+        if (offsets.size != strips.toInt() || counts.size != offsets.size) return null
+        val n = width * 3
+        val rowBytes = n * 2
+        for (i in offsets.indices) {
+            val off = offsets[i]; val len = counts[i]
+            if (off <= 0 || off >= bytes.size || len <= 0 || len > bytes.size - off) return null
+            val rows = minOf(rowsPerStrip, height - i * rowsPerStrip)
+            if (compression == 1 && len < rows.toLong() * rowBytes) return null
+        }
+        val data = ShortArray(width * height * 3)
+        for (i in offsets.indices) {
+            val rows = minOf(rowsPerStrip, height - i * rowsPerStrip)
+            val at = i * rowsPerStrip * n
+            if (compression == 1) {
+                ByteBuffer.wrap(bytes, offsets[i].toInt(), rows * rowBytes)
+                    .order(if (raw.littleEndian) ByteOrder.LITTLE_ENDIAN else ByteOrder.BIG_ENDIAN)
+                    .asShortBuffer().get(data, at, rows * n)
+                continue
+            }
+            val buf = ByteArray(rows * rowBytes)
+            val inf = java.util.zip.Inflater()
+            try {
+                inf.setInput(bytes, offsets[i].toInt(), counts[i].toInt())
+                var got = 0
+                while (got < buf.size && !inf.finished()) {
+                    val count = inf.inflate(buf, got, buf.size - got)
+                    if (count == 0) return null
+                    got += count
+                }
+                if (got != buf.size) return null
+                // Consume the trailer and reject excess decompressed samples.
+                if (!inf.finished() && inf.inflate(ByteArray(1)) != 0) return null
+                if (!inf.finished()) return null
+            } finally { inf.end() }
+            if (float) {
+                for (r in 0 until rows) {
+                    val o = r * rowBytes
+                    for (k in 3 until 2 * n) buf[o + k] = (buf[o + k] + buf[o + k - 3]).toByte()
+                    for (k in 0 until n) {
+                        val half = ((buf[o + k].toInt() and 255) shl 8) or (buf[o + n + k].toInt() and 255)
+                        val v = app.spektralab.engine.Half.toFloat(half.toShort())
+                        if (!v.isFinite()) return null
+                        data[at + r * n + k] = (v.coerceIn(0f, 1f) * 65535f + 0.5f).toInt().toShort()
+                    }
+                }
+            } else {
+                ByteBuffer.wrap(buf).order(if (raw.littleEndian) ByteOrder.LITTLE_ENDIAN else ByteOrder.BIG_ENDIAN)
+                    .asShortBuffer().get(data, at, rows * n)
+                if (predictor == 2) for (r in 0 until rows) {
+                    val start = at + r * n
+                    for (k in 3 until n) data[start + k] = (data[start + k] + data[start + k - 3]).toShort()
+                }
+            }
+        }
+        return data
+    }
+
+    /** Decodes one lossless-JPEG tile: the sample stream fills the tile row by row, [tw] samples per row. */
+    private fun ljpegTile(bytes: ByteArray, off: Int, len: Int, data: ShortArray, width: Int, tx: Int, ty: Int, tw: Int, cols: Int, rows: Int): Boolean {
+        var r = 0
+        var c = 0
+        val h = LosslessJpeg.decode(bytes, off, len) { _, s ->
+            for (v in s.indices) {
+                if (r >= rows) break
+                if (c < cols) data[(ty + r) * width + tx + c] = s[v].toShort()
+                if (++c >= tw) { c = 0; r++ }
+            }
+        } ?: return false
+        return h.rowSamples.toLong() * h.height >= (rows - 1).toLong() * tw + cols
+    }
+
+    // ---------------------------------------------------------------- colour
+    private fun colour(raw: TiffIfd, ifd0: TiffIfd): RawColor.Result? {
+        fun mat(tag: Int) = (ifd0.doubles(tag) ?: raw.doubles(tag))?.takeIf { it.size == 9 }
+        fun illum(tag: Int) = (ifd0.int(tag) ?: raw.int(tag)) ?: 0
+        val cm1 = mat(TiffTags.COLOR_MATRIX_1); val cm2 = mat(TiffTags.COLOR_MATRIX_2)
+        val t1 = illuminantKelvin(illum(TiffTags.CALIBRATION_ILLUMINANT_1))
+        val t2 = illuminantKelvin(illum(TiffTags.CALIBRATION_ILLUMINANT_2))
+        val shot = (ifd0.doubles(TiffTags.AS_SHOT_NEUTRAL) ?: raw.doubles(TiffTags.AS_SHOT_NEUTRAL))
+            ?.takeIf { it.size == 3 && it.all { v -> v > 0 && v.isFinite() } }
+        var w1 = if (cm1 != null && cm2 == null) 1.0 else 0.0
+        if (cm1 != null && cm2 != null && shot != null && t1 != null && t2 != null && t1 != t2) {
+            w1 = 0.5
+            repeat(8) {
+                val white = Mat3.invert(lerp(cm1, cm2, w1))?.let { Mat3.mulVec(it, shot) } ?: return@repeat
+                val sum = white.sum()
+                if (sum > 0) {
+                    val kelvin = mccamy(white[0] / sum, white[1] / sum)
+                    w1 = ((1.0 / kelvin - 1.0 / t2) / (1.0 / t1 - 1.0 / t2)).coerceIn(0.0, 1.0)
+                }
+            }
+        }
+        fun blend(a: DoubleArray?, b: DoubleArray?): DoubleArray? =
+            if (a != null && b != null) lerp(a, b, w1) else a ?: b
+        val fm = blend(mat(TiffTags.FORWARD_MATRIX_1), mat(TiffTags.FORWARD_MATRIX_2))
+        val cm = blend(cm1, cm2) ?: if (fm != null) Mat3.IDENTITY else return null
+        val cc = blend(mat(TiffTags.CAMERA_CALIBRATION_1), mat(TiffTags.CAMERA_CALIBRATION_2))
+        val ab = (ifd0.doubles(TiffTags.ANALOG_BALANCE) ?: raw.doubles(TiffTags.ANALOG_BALANCE))?.takeIf { it.size == 3 }
+        val neutral = (ifd0.doubles(TiffTags.AS_SHOT_NEUTRAL) ?: raw.doubles(TiffTags.AS_SHOT_NEUTRAL))?.takeIf { it.size == 3 && it.all { v -> v > 0 } }
+            ?: (ifd0.doubles(TiffTags.AS_SHOT_WHITE_XY) ?: raw.doubles(TiffTags.AS_SHOT_WHITE_XY))?.takeIf { it.size == 2 && it[1] > 0 }?.let { xy ->
+                val abcc = Mat3.mul(ab?.let { doubleArrayOf(it[0], 0.0, 0.0, 0.0, it[1], 0.0, 0.0, 0.0, it[2]) } ?: Mat3.IDENTITY, cc ?: Mat3.IDENTITY)
+                Mat3.mulVec(Mat3.mul(abcc, cm), RawColor.xyToXyz(xy[0], xy[1])).takeIf { n -> n.all { it > 0 } }
+            }
+            ?: doubleArrayOf(1.0, 1.0, 1.0)
+        return RawColor.fromDng(cm, fm, neutral, cc, ab)
+    }
+
+    private fun lerp(a: DoubleArray, b: DoubleArray, wa: Double) = DoubleArray(9) { a[it] * wa + b[it] * (1 - wa) }
+
+    /** Correlated colour temperature from chromaticity (McCamy). */
+    private fun mccamy(x: Double, y: Double): Double {
+        val n = (x - 0.3320) / (0.1858 - y)
+        return (449.0 * n * n * n + 3525.0 * n * n + 6823.3 * n + 5520.33).coerceIn(1500.0, 25000.0)
+    }
+
+    /** Temperature of an EXIF LightSource / DNG CalibrationIlluminant code. */
+    private fun illuminantKelvin(code: Int): Double? = when (code) {
+        17, 3 -> 2856.0; 24 -> 3200.0; 2, 14 -> 4150.0; 13 -> 3450.0; 12 -> 6430.0; 15 -> 6500.0
+        23 -> 5003.0; 20 -> 5503.0; 1, 4, 9 -> 5500.0; 18 -> 4874.0; 19 -> 6774.0; 21 -> 6504.0; 22 -> 7504.0; 10 -> 6500.0; 11 -> 7500.0
+        else -> null
+    }
+
+    private val KEEP = intArrayOf(271, 272, 306, 50708, 50721, 50722, 50723, 50724, 50727,
+        50728, 50730, 50778, 50779, 50964, 50965)
+
+    private fun keepTags(ifd0: TiffIfd, raw: TiffIfd): Map<Int, DngTag> = buildMap {
+        for (tag in KEEP) {
+            val source = if (tag in ifd0) ifd0 else raw
+            val e = source[tag] ?: continue
+            if (e.type == 2) put(tag, DngTag(2, DoubleArray(0), source.bytes.copyOfRange(e.dataOffset, e.dataOffset + minOf(e.count, 256))))
+            else source.doubles(tag)?.let { put(tag, DngTag(e.type, it)) }
+        }
+    }
+
+    // ---------------------------------------------------------------- opcodes
+    private fun parseGainMaps(bytes: ByteArray, start: Int, length: Int): List<GainMap> {
+        val out = ArrayList<GainMap>()
+        runCatching {
+            // opcode lists are always big endian
+            val o = ByteBuffer.wrap(bytes, start, length).order(ByteOrder.BIG_ENDIAN)
+            val n = o.int
+            repeat(n.coerceIn(0, 1024)) {
+                val id = o.int; o.int; o.int
+                val size = o.int
+                if (size < 0 || size > o.remaining()) return out
+                val next = o.position() + size
+                if (id == 9) {
+                    val top = o.int; val left = o.int; val bottom = o.int; val right = o.int
+                    val plane = o.int; o.int                                       // plane, planes
+                    val rowPitch = o.int; val colPitch = o.int
+                    val pv = o.int; val ph = o.int
+                    val sv = o.double; val sh = o.double; val ov = o.double; val oh = o.double
+                    val mapPlanes = o.int
+                    if (pv >= 1 && ph >= 1 && mapPlanes >= 1 && pv.toLong() * ph * mapPlanes * 4 <= o.remaining()) {
+                        val gains = FloatArray(pv * ph)
+                        for (i in 0 until pv * ph) { gains[i] = o.float; repeat(mapPlanes - 1) { o.float } }
+                        if (rowPitch > 0 && colPitch > 0 && sv > 0 && sh > 0)
+                            out += GainMap(top, left, bottom, right, rowPitch, colPitch, pv, ph, sv, sh, ov, oh, gains, plane)
+                    }
+                }
+                o.position(next)
+            }
         }
         return out
     }
 
-    // ---------------------------------------------------------------- TIFF plumbing
-    private fun readIfd(b: ByteBuffer, offset: Int): Ifd? {
-        if (offset <= 0 || offset + 2 > b.capacity()) return null
-        val n = b.getShort(offset).toInt() and 0xffff
-        val map = HashMap<Int, Entry>()
-        for (i in 0 until n) {
-            val p = offset + 2 + i * 12
-            if (p + 12 > b.capacity()) return null
-            val tag = b.getShort(p).toInt() and 0xffff
-            val type = b.getShort(p + 2).toInt() and 0xffff
-            val count = b.getInt(p + 4)
-            val bytes = count.toLong() * typeSize(type)
-            map[tag] = Entry(type, count, if (bytes <= 4) p + 8 else b.getInt(p + 8))
-        }
-        return Ifd(map)
-    }
-
-    private fun typeSize(type: Int) = when (type) { 1, 2, 6, 7 -> 1; 3, 8 -> 2; 4, 9, 11 -> 4; 5, 10, 12 -> 8; else -> 1 }
-
-    private fun values(b: ByteBuffer, e: Entry): DoubleArray {
-        val n = e.count.coerceAtMost(4096)
-        return DoubleArray(n) { i ->
-            val p = e.valueOffset + i * typeSize(e.type)
-            when (e.type) {
-                1, 7 -> (b.get(p).toInt() and 0xff).toDouble()
-                6 -> b.get(p).toDouble()
-                3 -> (b.getShort(p).toInt() and 0xffff).toDouble()
-                8 -> b.getShort(p).toDouble()
-                4 -> (b.getInt(p).toLong() and 0xffffffffL).toDouble()
-                9 -> b.getInt(p).toDouble()
-                5 -> (b.getInt(p).toLong() and 0xffffffffL).toDouble() / (b.getInt(p + 4).toLong() and 0xffffffffL).coerceAtLeast(1)
-                10 -> b.getInt(p).toDouble() / b.getInt(p + 4).let { if (it == 0) 1 else it }
-                11 -> b.getFloat(p).toDouble()
-                12 -> b.getDouble(p)
-                else -> 0.0
-            }
-        }
-    }
-
-    private fun doubles(b: ByteBuffer, ifd: Ifd, tag: Int): DoubleArray? = ifd.entries[tag]?.let { values(b, it) }?.takeIf { it.isNotEmpty() }
-    private fun ints(b: ByteBuffer, ifd: Ifd, tag: Int): IntArray? = doubles(b, ifd, tag)?.let { d -> IntArray(d.size) { d[it].toInt() } }
-
-    // ---------------------------------------------------------------- colour math
-    private val D50 = doubleArrayOf(0.9642, 1.0, 0.8251)
-    /** XYZ (D50) -> linear sRGB (D65), Bradford adapted. */
-    private val XYZ_D50_TO_SRGB = doubleArrayOf(
-        3.1338561, -1.6168667, -0.4906146,
-        -0.9787684, 1.9161415, 0.0334540,
-        0.0719453, -0.2289914, 1.4052427)
-    private val BRADFORD = doubleArrayOf(0.8951, 0.2664, -0.1614, -0.7502, 1.7135, 0.0367, 0.0389, -0.0685, 1.0296)
-
-    internal fun mul(a: DoubleArray, b: DoubleArray) = DoubleArray(9) { i ->
-        val r = i / 3; val c = i % 3
-        a[r * 3] * b[c] + a[r * 3 + 1] * b[3 + c] + a[r * 3 + 2] * b[6 + c]
-    }
-
-    private fun mulVec(m: DoubleArray, v: DoubleArray) = DoubleArray(3) { m[it * 3] * v[0] + m[it * 3 + 1] * v[1] + m[it * 3 + 2] * v[2] }
-
-    internal fun invert(m: DoubleArray): DoubleArray? {
-        val a = m[0]; val b = m[1]; val c = m[2]; val d = m[3]; val e = m[4]; val f = m[5]; val g = m[6]; val h = m[7]; val i = m[8]
-        val det = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g)
-        if (kotlin.math.abs(det) < 1e-12) return null
-        return doubleArrayOf(
-            (e * i - f * h) / det, (c * h - b * i) / det, (b * f - c * e) / det,
-            (f * g - d * i) / det, (a * i - c * g) / det, (c * d - a * f) / det,
-            (d * h - e * g) / det, (b * g - a * h) / det, (a * e - b * d) / det)
-    }
-
-    private fun bradford(from: DoubleArray, to: DoubleArray): DoubleArray {
-        val s = mulVec(BRADFORD, from)
-        val t = mulVec(BRADFORD, to)
-        val scale = doubleArrayOf(t[0] / s[0], 0.0, 0.0, 0.0, t[1] / s[1], 0.0, 0.0, 0.0, t[2] / s[2])
-        return mul(invert(BRADFORD)!!, mul(scale, BRADFORD))
-    }
+    // ---------------------------------------------------------------- kept for existing callers
+    internal fun mul(a: DoubleArray, b: DoubleArray) = Mat3.mul(a, b)
+    internal fun invert(m: DoubleArray): DoubleArray? = Mat3.invert(m)
 }

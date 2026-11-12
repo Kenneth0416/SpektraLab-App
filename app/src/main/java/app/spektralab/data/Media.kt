@@ -13,9 +13,9 @@ import android.provider.OpenableColumns
 import androidx.exifinterface.media.ExifInterface
 import app.spektralab.engine.AutoExposure
 import app.spektralab.engine.Look
-import app.spektralab.raw.DngReader
 import app.spektralab.raw.LinearImage
 import app.spektralab.raw.RawDeveloper
+import app.spektralab.raw.RawReader
 import kotlin.math.max
 import kotlin.math.pow
 
@@ -55,7 +55,7 @@ object Media {
         if (tryRaw) {
             val linear = runCatching {
                 val bytes = context.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
-                DngReader.read(bytes)?.let { RawDeveloper.develop(it, maxLongEdge, fast) }
+                RawReader.read(bytes)?.takeIf { RawDeveloper.supports(it) }?.let { RawDeveloper.develop(it, maxLongEdge, fast) }
             }.getOrNull()
             if (linear != null) return SourceImage(null, linear)
         }
@@ -127,6 +127,8 @@ object Media {
         }
         return AutoExposure.centerWeightedEv(lin, w, h).toFloat()
     }
+
+    fun name(context: Context, uri: Uri): String = displayName(context.contentResolver, uri)
 
     private fun displayName(cr: ContentResolver, uri: Uri): String =
         runCatching {
@@ -204,7 +206,7 @@ object Media {
     /** Full upright size of a DNG we can develop. */
     private fun rawScale(context: Context, uri: Uri): Pair<Int, Int>? = runCatching {
         val bytes = context.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
-        DngReader.read(bytes)?.let { it.uprightWidth to it.uprightHeight }
+        RawReader.read(bytes)?.takeIf { RawDeveloper.supports(it) }?.let { it.uprightWidth to it.uprightHeight }
     }.getOrNull()
 
     private fun parseExifDate(s: String?): Long? {

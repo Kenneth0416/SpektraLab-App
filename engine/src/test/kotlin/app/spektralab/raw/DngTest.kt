@@ -72,22 +72,42 @@ class DngTest {
         return out.array()
     }
 
+    /** Scene override, exposure gain and sensor noise for the newer tests. */
+    private var sceneFn: ((Int, Int) -> DoubleArray)? = null
+    private var exposure = 1.0
+    private var noise: Pair<Double, Double>? = null          // NoiseProfile (scale, offset)
+    private var tungsten = false                              // dual-illuminant profile shot under illuminant A
+    private val rnd = java.util.Random(11)
+
     private fun buildDng(forward: Boolean, orientation: Int, shading: Boolean, cfa: IntArray = intArrayOf(0, 1, 1, 2)): ByteArray {
         val neutral: DoubleArray
         val toCam: (DoubleArray) -> DoubleArray
         val colourTags = ArrayList<Tag>()
-        if (forward) {
+        if (tungsten) {
+            // calibration 1 = illuminant A, calibration 2 = D65, each with its own matrices
+            val fmA = doubleArrayOf(0.70, 0.18, 0.08, 0.30, 0.78, -0.08, 0.03, -0.25, 1.05)
+            val fmD = doubleArrayOf(0.60, 0.25, 0.11, 0.25, 0.80, -0.05, 0.02, -0.15, 0.95)
+            val cmA = doubleArrayOf(1.1, -0.45, -0.05, -0.45, 1.35, 0.1, -0.02, 0.15, 0.5)
+            val a = doubleArrayOf(1.09850, 1.0, 0.35585)
+            val inv = DngReader.invert(fmA)!!
+            neutral = mv(cmA, a)
+            toCam = { rgb -> mv(inv, mv(srgbToXyz50, rgb)).let { c -> DoubleArray(3) { c[it] * neutral[it] / neutral[1] } } }
+            colourTags += srationals(50721, cmA); colourTags += srationals(50722, colorMatrix)
+            colourTags += srationals(50964, fmA); colourTags += srationals(50965, fmD)
+            colourTags += shorts(50778, 17); colourTags += shorts(50779, 21)
+        } else if (forward) {
             // ForwardMatrix: white-balanced camera -> XYZ D50
             val fm = doubleArrayOf(0.60, 0.25, 0.11, 0.25, 0.80, -0.05, 0.02, -0.15, 0.95)
             val inv = DngReader.invert(fm)!!
             neutral = doubleArrayOf(0.52, 1.0, 0.66)
-            toCam = { rgb -> mv(inv, mv(srgbToXyz50, rgb)).let { c -> DoubleArray(3) { c[it] * neutral[it] } } }
+            toCam = { rgb -> mv(inv, mv(srgbToXyz50, rgb)).let { c -> DoubleArray(3) { c[it] * neutral[it] / neutral[1] } } }
             colourTags += srationals(50964, fm)
             colourTags += srationals(50721, colorMatrix)
             colourTags += shorts(50778, 21)
         } else {
             neutral = mv(colorMatrix, d65)
-            toCam = { rgb -> mv(colorMatrix, mv(d50ToD65, mv(srgbToXyz50, rgb))) }
+            // Green-normalised exposure, independent of the metadata matrix scale.
+            toCam = { rgb -> mv(colorMatrix, mv(d50ToD65, mv(srgbToXyz50, rgb))).let { c -> DoubleArray(3) { c[it] / neutral[1] } } }
             colourTags += srationals(50721, colorMatrix)
             colourTags += shorts(50778, 21)
         }
@@ -95,9 +115,11 @@ class DngTest {
 
         val px = le(w * h * 2)
         for (y in 0 until h) for (x in 0 until w) {
-            val cam = toCam(scene(x, y))
+            val cam = toCam((sceneFn ?: ::scene)(x, y))
             val c = cfa[(y % 2) * 2 + x % 2]
-            val v = cam[c] / gainAt(x, y, shading) * (white - black) + black
+            var n = (cam[c] * exposure / gainAt(x, y, shading)).coerceIn(0.0, 1.0)
+            noise?.let { (s, o) -> n += rnd.nextGaussian() * Math.sqrt(s * n + o) }
+            val v = n.coerceIn(0.0, 1.0) * (white - black) + black
             px.putShort(Math.round(v).coerceIn(0, 65535).toShort())
         }
         val tags = arrayListOf(
@@ -111,6 +133,7 @@ class DngTest {
         )
         tags += colourTags
         if (shading) tags += Tag(51009, 7, gainMapOpcodes().size, gainMapOpcodes())
+        noise?.let { (s, o) -> tags += Tag(51041, 12, 2, le(16).apply { putDouble(s); putDouble(o) }.array()) }
         tags.sortBy { it.id }
 
         // layout: header, IFD, out-of-line tag data, pixel strip
@@ -186,6 +209,79 @@ class DngTest {
             println("colour matrix + gain map, orientation $o: max error %.4f".format(e))
             assertTrue(e < 0.015, "orientation $o error $e")
         }
+    }
+
+    @Test
+    fun dualIlluminantProfileUsesTheTungstenCalibrationUnderTungstenLight() {
+        tungsten = true
+        val dng = assertNotNull(DngReader.read(buildDng(forward = true, orientation = 1, shading = false)))
+        val e = maxError(RawDeveloper.develop(dng, 4096), 1, 1)
+        println("dual illuminant, shot under illuminant A: max error %.4f".format(e))
+        // picking the daylight matrices instead gives an error of about 0.1 here
+        assertTrue(e < 0.012, "error $e")
+    }
+
+    @Test
+    fun rebuildsClippedHighlights() {
+        // neutral ramp, 2.2 stops over: green clips first, red and blue (lower sensitivity) keep going
+        sceneFn = { x, _ -> DoubleArray(3) { 0.3 + 1.5 * x / w } }
+        val bytes = buildDng(forward = true, orientation = 1, shading = false)
+        val dng = assertNotNull(DngReader.read(bytes))
+        val on = RawDeveloper.develop(dng, 4096)
+        val off = RawDeveloper.develop(dng, 4096, options = RawDeveloper.Options(reconstructHighlights = false))
+        var maxOn = 0f; var maxOff = 0f; var tint = 0f; var worst = 0.0
+        val y = h / 2
+        for (x in 4 until w - 4) {
+            val truth = 0.3 + 1.5 * x / w
+            maxOn = maxOf(maxOn, on.green(x, y)); maxOff = maxOf(maxOff, off.green(x, y))
+            val r = on.red(x, y); val g = on.green(x, y); val b = on.blue(x, y)
+            tint = maxOf(tint, (maxOf(r, g, b) - minOf(r, g, b)) / maxOf(g, 1e-3f))
+            // exact until the last channel clips (blue here, neutral 0.66 -> scene 1 / 0.66)
+            if (truth < 1.0 / 0.66 * 0.8) worst = max(worst, abs(g - truth))
+        }
+        println("highlights: brightest value %.2f with reconstruction vs %.2f clipped; error below the last clip %.3f; tint %.3f"
+            .format(maxOn, maxOff, worst, tint))
+        assertTrue(maxOff <= 1.02f)
+        assertTrue(maxOn > 1.4f, "recovers more than half a stop: $maxOn")
+        assertTrue(worst < 0.06, "follows the true ramp: $worst")
+        assertTrue(tint < 0.08f, "highlights stay neutral: $tint")
+    }
+
+    @Test
+    fun removesChromaNoiseButKeepsColourEdges() {
+        // two flat colours with a hard edge, at a noise level typical of a phone at high ISO
+        sceneFn = { x, _ -> if (x < w / 2) doubleArrayOf(0.20, 0.18, 0.15) else doubleArrayOf(0.10, 0.22, 0.30) }
+        noise = 2.5e-3 to 2e-5
+        val bytes = buildDng(forward = true, orientation = 1, shading = false)
+        val dng = assertNotNull(DngReader.read(bytes))
+        assertNotNull(dng.noiseScale)
+        fun stats(img: LinearImage): Triple<Double, Double, Double> {
+            // chroma noise on each flat side, luminance noise, and the mean colour next to the edge
+            var c2 = 0.0; var l2 = 0.0; var n = 0; var edgeR = 0.0; var en = 0
+            for (side in 0..1) {
+                val x0 = if (side == 0) 6 else w / 2 + 8; val x1 = if (side == 0) w / 2 - 8 else w - 6
+                var mr = 0.0; var mb = 0.0; var ml = 0.0; var k = 0
+                for (y in 6 until h - 6) for (x in x0 until x1) {
+                    val l = 0.2126 * img.red(x, y) + 0.7152 * img.green(x, y) + 0.0722 * img.blue(x, y)
+                    mr += img.red(x, y) - l; mb += img.blue(x, y) - l; ml += l; k++
+                }
+                mr /= k; mb /= k; ml /= k
+                for (y in 6 until h - 6) for (x in x0 until x1) {
+                    val l = 0.2126 * img.red(x, y) + 0.7152 * img.green(x, y) + 0.0722 * img.blue(x, y)
+                    c2 += (img.red(x, y) - l - mr).let { it * it } + (img.blue(x, y) - l - mb).let { it * it }
+                    l2 += (l - ml) * (l - ml); n++
+                }
+            }
+            for (y in 6 until h - 6) for (x in w / 2 - 7 until w / 2 - 3) { edgeR += img.red(x, y); en++ }
+            return Triple(Math.sqrt(c2 / n / 2), Math.sqrt(l2 / n), edgeR / en)
+        }
+        val off = stats(RawDeveloper.develop(dng, 4096, options = RawDeveloper.Options(chromaDenoise = false)))
+        val on = stats(RawDeveloper.develop(dng, 4096))
+        println("chroma noise %.4f -> %.4f, luminance noise %.4f -> %.4f, red just left of the edge %.3f -> %.3f (true 0.200)"
+            .format(off.first, on.first, off.second, on.second, off.third, on.third))
+        assertTrue(on.first < off.first * 0.6, "chroma noise should drop by at least 40%")
+        assertTrue(abs(on.second - off.second) < off.second * 0.1, "luminance is left alone")
+        assertTrue(abs(on.third - 0.20) < 0.02, "no colour bleeding across the edge")
     }
 
     @Test

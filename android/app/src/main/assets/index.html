@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#0c0b0a">
+  <title>銀鹽工坊</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="brand">
+        <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="8" fill="#191612"/><path d="M10 29V11h4v18z" fill="#f05a40"/><path d="M17 29V11h4v18z" fill="#e8b34e"/><path d="M24 29V11h4v18z" fill="#90ad96"/><path d="M8 7h22M8 33h22" stroke="#f3efe5" stroke-width="1.5"/></svg>
+        <div><strong data-i18n="brand">銀鹽工坊</strong><span>DIGITAL DARKROOM</span></div>
+      </div>
+      <button id="languageButton" class="language-button" type="button" aria-label="切換語言">繁</button>
+    </header>
+
+    <main id="main">
+      <section id="darkroomView" class="view">
+        <div class="section-topline"><span><i></i><b data-i18n="darkroom">暗房</b></span><button id="resetButton" type="button" data-i18n="reset">重設</button></div>
+        <div class="stage">
+          <div class="stage-meta"><span id="sceneCode">NEON / 500T</span><span>135 — 12A</span></div>
+          <button id="preview" class="preview" type="button" aria-label="按住看原圖">
+            <img id="sceneImage" class="scene-image" src="assets/snow-tree.jpg" alt="雪坡孤樹" draggable="false">
+            <img id="halationImage" class="halation-image" src="assets/snow-tree.jpg" alt="" draggable="false">
+            <span id="grainLayer" class="grain-layer"></span>
+            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+            <span id="compareLabel" class="compare-label">HOLD TO COMPARE / 按住看原圖</span>
+            <span class="date-back">'26 11 11</span>
+          </button>
+          <div class="stage-caption"><span id="filmReadout">VISION3 500T</span><span id="exposureReadout">+0.3 EV</span></div>
+        </div>
+
+        <div class="current-film"><div><strong id="currentFilm">Vision3 500T</strong><span id="filmNote">霓虹夜景 · 冷調暗部</span></div><span id="liveLabel" data-i18n="live">即時預覽</span></div>
+        <div id="filmList" class="film-list" role="group" aria-label="選擇膠片"></div>
+
+        <div class="controls">
+          <label><span data-i18n="exposure">曝光</span><input id="exposure" type="range" min="-2" max="2" step="0.1" value="0.3"><output id="exposureOutput">+0.3</output></label>
+          <label><span data-i18n="grain">顆粒</span><input id="grain" type="range" min="0" max="1.5" step="0.05" value="0.65"><output id="grainOutput">43%</output></label>
+          <label><span data-i18n="halation">光暈</span><input id="halation" type="range" min="0" max="1.5" step="0.05" value="0.7"><output id="halationOutput">47%</output></label>
+        </div>
+        <div class="scene-heading"><span data-i18n="chooseScene">切換場景</span><small>SCENE LIBRARY</small></div>
+        <div id="sceneList" class="scene-list"></div>
+      </section>
+
+      <section id="recipesView" class="view" hidden>
+        <div class="view-heading"><span>INDEX CARDS / 004</span><h1 data-i18n="recipesTitle">留給下一個雨夜。</h1><p data-i18n="recipesIntro">選一張配方卡，把它的光線與質感帶回暗房。</p></div>
+        <div id="recipeList" class="recipe-list"></div>
+      </section>
+
+      <section id="aboutView" class="view" hidden>
+        <div class="about-mark"><svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="8" fill="#191612"/><path d="M10 29V11h4v18z" fill="#f05a40"/><path d="M17 29V11h4v18z" fill="#e8b34e"/><path d="M24 29V11h4v18z" fill="#90ad96"/></svg></div>
+        <span class="about-kicker">ANDROID INTERACTION PROTOTYPE</span>
+        <h1 data-i18n="aboutTitle">一卷尚未沖完的實驗。</h1>
+        <p id="aboutBody" data-i18n="aboutBody"></p>
+        <dl class="about-specs">
+          <div><dt>BRAND</dt><dd data-i18n="brandSpec">銀鹽工坊</dd></div>
+          <div><dt>VERSION</dt><dd>0.1.0 · DEBUG</dd></div>
+          <div><dt>ANDROID</dt><dd>8.0+ / API 26</dd></div>
+          <div><dt>NETWORK</dt><dd data-i18n="offline">無需網絡 · 無網絡權限</dd></div>
+          <div><dt>PACKAGE</dt><dd>app.spektralab.prototype</dd></div>
+          <div><dt>SOURCE</dt><dd>github.com/Kenneth0416/SpektraLab-App</dd></div>
+          <div><dt>UPSTREAM</dt><dd>Andrea Volpato · github.com/andreavolpato/spektrafilm</dd></div>
+        </dl>
+
+        <div id="legalNotices" class="legal-notices"></div>
+
+        <div class="license-section-head">
+          <span data-i18n="licensesHeading">本地完整授權與聲明原文</span>
+          <small>OFFLINE BUNDLED TEXTS</small>
+        </div>
+        <div id="licenseButtons" class="license-buttons"></div>
+
+        <p class="about-footnote">FILM × PAPER · HANDLE EVERY FRAME WITH CARE</p>
+      </section>
+    </main>
+
+    <section id="licenseModal" class="license-modal" hidden aria-modal="true" role="dialog" aria-labelledby="licenseModalTitle">
+      <header class="license-modal-head">
+        <button id="licenseCloseButton" type="button" class="license-close-btn" data-i18n="closeLicense">‹ 返回</button>
+        <div class="license-modal-meta">
+          <strong id="licenseModalTitle"></strong>
+          <small id="licenseModalPath"></small>
+        </div>
+      </header>
+      <pre id="licenseModalText" class="license-modal-text"></pre>
+    </section>
+
+    <nav class="bottom-nav" aria-label="主要導航">
+      <button type="button" data-view="darkroom" class="selected"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg><span data-i18n="darkroom">暗房</span></button>
+      <button type="button" data-view="recipes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v18H5zM8 8h8M8 12h8M8 16h5"/></svg><span data-i18n="recipes">配方</span></button>
+      <button type="button" data-view="about"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v1"/></svg><span data-i18n="about">關於</span></button>
+    </nav>
+  </div>
+  <script src="licenses-data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

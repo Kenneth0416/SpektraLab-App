@@ -132,6 +132,7 @@ class GlWorker {
         /** Tile size of [renderPhotoTiled]: 65-80 MB of GPU buffers in all at 50-108 MP (TilePlanTest). */
         const val TILE = 1024
 
+        /** Uploads pixels only. The caller closes [source] when it owns the only handle. */
         fun upload(source: SourceImage): Int = source.linear?.let { uploadLinear(it) } ?: uploadSrgb(source.bitmap!!)
 
         /** Scene-linear half-float image (developed raw) as an RGBA16F texture. */

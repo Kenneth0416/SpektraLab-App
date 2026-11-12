@@ -132,6 +132,7 @@
 
     <string name="no_camera">沒有可用的相機</string>
     <string name="camera_open_failed">相機打不開：%1$s</string>
+    <string name="raw_preview_notice">原色取景 · 膠片效果在成片生效</string>
     <string name="unknown_error">未知錯誤</string>
     <string name="camera_not_ready">相機還沒準備好</string>
     <string name="camera_permission_required">需要相機權限</string>

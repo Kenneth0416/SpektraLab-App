@@ -16,11 +16,24 @@ object HeavyWork {
 
     /** From a plain worker thread (the burst merge executor); never call on the main thread. */
     fun <T> blocking(block: () -> T): T {
-        kotlinx.coroutines.runBlocking { mutex.lock() }
+        lockBlocking()
         try {
             return block()
         } finally {
-            mutex.unlock()
+            unlock()
         }
+    }
+
+    /**
+     * Split form of [blocking] for a lease that must outlive one function, such as a
+     * developed image handed back to the caller. The mutex is not reentrant: a thread
+     * that already holds it must not lock again. Never call on the main thread.
+     */
+    internal fun lockBlocking() {
+        kotlinx.coroutines.runBlocking { mutex.lock() }
+    }
+
+    internal fun unlock() {
+        mutex.unlock()
     }
 }

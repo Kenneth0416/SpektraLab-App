@@ -142,11 +142,13 @@ class Thumbnails(private val app: SpektraApp) {
                 else Media.loadSource(app, uri, 640, tryRaw = item.isRaw)
             }.getOrNull()
         } ?: return null
+        src.use { loaded ->
         val setup = withContext(Dispatchers.Default) { app.looks.get(item.look) }
         val look = item.look.copy(border = "none", dateStamp = false)
-        val framing = Framing.compute(src.width, src.height, look, 480)
+        val framing = Framing.compute(loaded.width, loaded.height, look, 480)
         return runCatching {
-            app.glWorker.run { renderPhoto(src, setup, item.autoEv, framing, null, item.id.toInt()) }
+            app.glWorker.run { renderPhoto(loaded, setup, item.autoEv, framing, null, item.id.toInt()) }
         }.getOrNull()
+        }
     }
 }

@@ -291,7 +291,7 @@ class ExportManager(private val app: SpektraApp) {
                     // decode a bit larger than the target so the format crop keeps resolution
                     // raw: full-resolution demosaic unless the sensor has pixels to spare for binning
                     Media.loadSource(app, Uri.parse(item.uri), if (item.isRaw) limit else (limit * 1.5).toInt().coerceAtMost(cap), tryRaw = item.isRaw,
-                        fast = maxOf(item.width, item.height) > maxTex, rawHeapBudget = RAW_HEAP_BUDGET)
+                        fast = maxOf(item.width, item.height) > maxTex, rawHeapBudget = RAW_HEAP_BUDGET, heavyWorkHeld = true)
                 }
                 try {
                     if (cancelled()) throw CancellationException("cancelled")
@@ -305,6 +305,7 @@ class ExportManager(private val app: SpektraApp) {
                     }
                 } finally {
                     src.bitmap?.recycle()
+                    src.close()
                 }
             }
             if (cancelled()) {
@@ -368,7 +369,8 @@ class ExportManager(private val app: SpektraApp) {
         try {
             if (cancelled()) throw CancellationException("cancelled")
             src = withContext(Dispatchers.IO) {
-                Media.loadSource(app, Uri.parse(item.uri), FULL_SIZE_CAP, tryRaw = item.isRaw, fast = false, rawHeapBudget = RAW_HEAP_BUDGET)
+                Media.loadSource(app, Uri.parse(item.uri), FULL_SIZE_CAP, tryRaw = item.isRaw, fast = false,
+                    rawHeapBudget = RAW_HEAP_BUDGET, heavyWorkHeld = true)
             }
             if (cancelled()) throw CancellationException("cancelled")
             progress(0.3f)
@@ -400,6 +402,7 @@ class ExportManager(private val app: SpektraApp) {
             return null
         } finally {
             src?.bitmap?.recycle()
+            src?.close()
         }
     }
 

@@ -132,6 +132,7 @@
 
     <string name="no_camera">没有可用的相机</string>
     <string name="camera_open_failed">相机打不开：%1$s</string>
+    <string name="raw_preview_notice">原色取景 · 胶片效果在成片生效</string>
     <string name="unknown_error">未知错误</string>
     <string name="camera_not_ready">相机还没准备好</string>
     <string name="camera_permission_required">需要相机权限</string>

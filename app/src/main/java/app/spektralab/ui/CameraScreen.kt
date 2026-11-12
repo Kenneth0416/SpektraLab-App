@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Environment
 import android.provider.MediaStore
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.Camera
@@ -92,6 +93,23 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+private const val CAMERA_LOG_TAG = "SilvercamCamera"
+
+@androidx.annotation.OptIn(androidx.camera.camera2.interop.ExperimentalCamera2Interop::class)
+private fun logRawCameraCapabilities(cameraInfo: androidx.camera.core.CameraInfo) {
+    runCatching {
+        val info = androidx.camera.camera2.interop.Camera2CameraInfo.from(cameraInfo)
+        val capabilities = info.getCameraCharacteristic(
+            android.hardware.camera2.CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)
+        val rawSizes = info.getCameraCharacteristic(
+            android.hardware.camera2.CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+            ?.getOutputSizes(android.graphics.ImageFormat.RAW_SENSOR)
+        Log.i(CAMERA_LOG_TAG, "Camera2 id=${info.cameraId} capabilities=${capabilities?.contentToString()} " +
+            "rawAdvertised=${capabilities?.contains(android.hardware.camera2.CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_RAW)} " +
+            "rawSensorSizes=${rawSizes?.contentToString()}")
+    }.onFailure { Log.w(CAMERA_LOG_TAG, "Camera2 RAW diagnostics unavailable", it) }
+}
+
 private class CameraSession(val camera: Camera, val capture: ImageCapture, val raw: Boolean,
                             /** For raw capture into memory; null when the camera would not tell. */
                             val chars: android.hardware.camera2.CameraCharacteristics? = null)
@@ -150,10 +168,13 @@ fun CameraScreen(state: AppState) {
         }
     }
     val lookState = rememberUpdatedState(look)
-    LaunchedEffect(Unit) {
+    val filmPreview = session?.raw != true
+    LaunchedEffect(filmPreview) {
+        if (!filmPreview) return@LaunchedEffect
         snapshotFlow { lookState.value }.distinctUntilChanged().collectLatest { l ->
+            // Building a LookSetup runs the print stage. Skip it while RAW has detached the effect.
             val setup = withContext(Dispatchers.Default) { runCatching { state.app.looks.get(l) }.getOrNull() }
-            if (setup != null) viewfinder.setLook(setup)
+            if (setup != null && filmPreview) viewfinder.setLook(setup)
         }
     }
 
@@ -179,11 +200,18 @@ fun CameraScreen(state: AppState) {
                 val fourThree = ResolutionSelector.Builder()
                     .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY).build()
                 val rawSupported = runCatching {
-                    ImageCapture.getImageCaptureCapabilities(p.getCameraInfo(selector)).supportedOutputFormats
-                        .contains(ImageCapture.OUTPUT_FORMAT_RAW)
+                    val info = p.getCameraInfo(selector)
+                    logRawCameraCapabilities(info)
+                    val formats = ImageCapture.getImageCaptureCapabilities(info).supportedOutputFormats
+                    val supported = formats.contains(ImageCapture.OUTPUT_FORMAT_RAW)
+                    Log.i(CAMERA_LOG_TAG, "CameraX outputFormats=$formats rawSupported=$supported")
+                    supported
+                }.onFailure {
+                    Log.e(CAMERA_LOG_TAG, "RAW capability query failed; defaulting to JPEG", it)
                 }.getOrDefault(false)
 
                 fun bind(raw: Boolean): CameraSession {
+                    Log.i(CAMERA_LOG_TAG, "Binding preview + image capture: raw=$raw filmEffect=${!raw}")
                     val preview = Preview.Builder().setResolutionSelector(fourThree).build()
                         .also { it.surfaceProvider = previewView.surfaceProvider }
                     val capture = ImageCapture.Builder()
@@ -194,15 +222,24 @@ fun CameraScreen(state: AppState) {
                             else { setOutputFormat(ImageCapture.OUTPUT_FORMAT_JPEG); setResolutionSelector(fourThree) }
                             if (raw) requestRawMetadata(this, state.shooter.results)
                         }.build()
-                    val group = UseCaseGroup.Builder().addUseCase(preview).addUseCase(capture).addEffect(viewfinder.effect).build()
+                    // CameraX rejects RAW together with any CameraEffect, including a preview-only one.
+                    // The saved photo still receives its film look. Exposure feedback is a direct overlay.
+                    val group = UseCaseGroup.Builder().addUseCase(preview).addUseCase(capture)
+                        .apply { if (!raw) addEffect(viewfinder.effect) }.build()
                     p.unbindAll()
                     val camera = p.bindToLifecycle(owner, selector, group)
-                    return CameraSession(camera, capture, raw, if (raw) cameraCharacteristics(context, camera) else null)
+                    return CameraSession(camera, capture, raw, if (raw) cameraCharacteristics(context, camera) else null).also {
+                        Log.i(CAMERA_LOG_TAG, "Camera bound: raw=$raw rawCharacteristicsAvailable=${it.chars != null}")
+                    }
                 }
                 session = runCatching { bind(rawSupported) }.recoverCatching {
                     // some devices list raw but cannot stream it next to the preview
-                    if (rawSupported) bind(false) else throw it
+                    if (rawSupported) {
+                        Log.e(CAMERA_LOG_TAG, "RAW binding failed; retrying JPEG", it)
+                        bind(false)
+                    } else throw it
                 }.onFailure {
+                    Log.e(CAMERA_LOG_TAG, "Camera binding failed", it)
                     state.say(R.string.camera_open_failed, it.message ?: context.getString(R.string.unknown_error))
                     // Recover the default lens when an auxiliary camera cannot host our use cases.
                     if (selectedCameraId != null) selectedCameraId = null
@@ -221,7 +258,19 @@ fun CameraScreen(state: AppState) {
         }
     }
     DisposableEffect(Unit) { onDispose { viewfinder.release() } }
-    LaunchedEffect(evBias) { viewfinder.evBias = evBias }
+    LaunchedEffect(evBias, session?.raw) {
+        viewfinder.evBias = evBias
+        // RAW cannot run the film preview, so the sensor exposure itself has to show the gesture.
+        val camera = session?.camera ?: return@LaunchedEffect
+        if (session?.raw != true) {
+            runCatching { camera.cameraControl.setExposureCompensationIndex(0) }
+            return@LaunchedEffect
+        }
+        val state = camera.cameraInfo.exposureState
+        val step = state.exposureCompensationStep.toFloat().takeIf { it > 0f } ?: return@LaunchedEffect
+        val index = (evBias / step).toInt().coerceIn(state.exposureCompensationRange.lower, state.exposureCompensationRange.upper)
+        runCatching { camera.cameraControl.setExposureCompensationIndex(index) }
+    }
     LaunchedEffect(front) { focusLocked = false }
     // zoom range of the bound lens (0.5x ultra-wide, tele steps)
     var zoomRange by remember { mutableStateOf(1f to 1f) }
@@ -340,7 +389,9 @@ fun CameraScreen(state: AppState) {
             val previousBlur = viewfinder.blurredTimestamp
             clarity.snapTo(0f)
             viewfinder.clarity = 0f
-            if (previewView.awaitBlurredPreview(viewfinder, previousBlur)) {
+            // RAW has no processed preview buffers. The Compose dim still marks a spent frame,
+            // so the curtain reopens without waiting for a GL blur that will never arrive.
+            if (s.raw || previewView.awaitBlurredPreview(viewfinder, previousBlur)) {
                 blades.animateTo(0f, tween(260, easing = LinearOutSlowInEasing))
             } else {
                 state.say(R.string.viewfinder_stalled)
@@ -554,8 +605,11 @@ fun CameraScreen(state: AppState) {
                         if (b < size.height) drawRect(mask, Offset(0f, b), Size(size.width, size.height - b))
                         if (l > 0f) drawRect(mask, Offset(0f, t), Size(l, b - t))
                         if (r < size.width) drawRect(mask, Offset(r, t), Size(size.width - r, b - t))
-                        // frame not advanced: the finder is dim ground glass
-                        if (clarity.value < 1f) drawRect(Pal.dark.copy(alpha = 0.5f * (1f - clarity.value)))
+                        // frame not advanced: film sessions wait for ground glass; RAW dims the direct preview here
+                        if (clarity.value < 1f) drawRect(Pal.dark.copy(alpha = (if (session?.raw == true) 0.62f else 0.5f) * (1f - clarity.value)))
+                        // RAW exposure cannot pass through the film effect, so the direct preview is shaded to match the gesture.
+                        if (session?.raw == true && evBias != 0f) drawRect(if (evBias > 0f) Color.White.copy(alpha = (evBias / 4f).coerceIn(0f, 0.45f))
+                            else Color.Black.copy(alpha = (-evBias / 4f).coerceIn(0f, 0.55f)))
                         // shutter blades
                         if (blades.value > 0f) {
                             val hgt = size.height / 2 * blades.value
@@ -591,8 +645,12 @@ fun CameraScreen(state: AppState) {
                                 modifier = Modifier.padding(top = 4.dp).graphicsLayer { rotationZ = iconTurn }.background(accent, RoundedCornerShape(3.dp)).padding(horizontal = 5.dp, vertical = 1.dp))
                         }
                     }
-                    Text(summary(look).uppercase(Locale.ROOT), fontFamily = Fonts.mono, fontSize = 9.sp, color = Pal.text,
-                        modifier = Modifier.align(Alignment.TopStart).padding(10.dp).background(Color(0x99140807)).padding(horizontal = 6.dp, vertical = 2.dp))
+                    Column(Modifier.align(Alignment.TopStart).padding(10.dp)) {
+                        Text(summary(look).uppercase(Locale.ROOT), fontFamily = Fonts.mono, fontSize = 9.sp, color = Pal.text,
+                            modifier = Modifier.background(Color(0x99140807)).padding(horizontal = 6.dp, vertical = 2.dp))
+                        if (session?.raw == true) Text(stringResource(R.string.raw_preview_notice), fontSize = 10.sp, color = Pal.text,
+                            modifier = Modifier.padding(top = 4.dp).background(Color(0x99140807)).padding(horizontal = 6.dp, vertical = 2.dp))
+                    }
                     // zoom steps sit on the lower edge of the finder, where thumbs expect them
                     val stops = lensChoices
                     Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp)

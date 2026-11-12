@@ -3,6 +3,7 @@ package app.spektralab.data
 import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
+import android.content.res.AssetFileDescriptor
 import android.graphics.Bitmap
 import android.graphics.ColorSpace
 import android.graphics.ImageDecoder
@@ -26,10 +27,76 @@ import kotlin.math.max
 import kotlin.math.pow
 
 /** A decoded photo: either a display-referred sRGB bitmap or a scene-linear raw development. */
-class SourceImage(val bitmap: Bitmap?, val linear: LinearImage?) {
+class SourceImage internal constructor(val bitmap: Bitmap?, val linear: LinearImage?,
+                  val originalWidth: Int, val originalHeight: Int,
+                  private val memory: java.io.Closeable?, private val owners: java.util.concurrent.atomic.AtomicInteger) : java.io.Closeable {
+    constructor(bitmap: Bitmap?, linear: LinearImage?,
+                originalWidth: Int = bitmap?.width ?: linear!!.width,
+                originalHeight: Int = bitmap?.height ?: linear!!.height,
+                memory: java.io.Closeable? = null) :
+        this(bitmap, linear, originalWidth, originalHeight, memory, java.util.concurrent.atomic.AtomicInteger(if (memory == null) 0 else 1))
+
     val width get() = bitmap?.width ?: linear!!.width
     val height get() = bitmap?.height ?: linear!!.height
+    private val closed = java.util.concurrent.atomic.AtomicBoolean()
+
+    /** Another owner of the same pixels. Each handle closes once; the lease ends with the last one. */
+    fun share(): SourceImage {
+        while (true) {
+            val current = owners.get()
+            if (current <= 0) return SourceImage(bitmap, linear, originalWidth, originalHeight, null)
+            if (owners.compareAndSet(current, current + 1)) {
+                return SourceImage(bitmap, linear, originalWidth, originalHeight, memory, owners)
+            }
+        }
+    }
+
+    /** Hands this lease to the returned image. The receiver must be closed; this one must not. */
+    internal fun releasing(memory: java.io.Closeable) = SourceImage(bitmap, linear, originalWidth, originalHeight, memory)
+
+    /** Drops this handle. Closing the same handle twice does nothing. */
+    override fun close() {
+        if (!closed.compareAndSet(false, true)) return
+        if (owners.decrementAndGet() == 0) memory?.close()
+    }
 }
+
+/**
+ * Read exactly one declared byte range. A content provider can expose a slice of a larger
+ * file: its offset and length are authoritative, and [AssetFileDescriptor.getLength] of
+ * [AssetFileDescriptor.UNKNOWN_LENGTH] means the stream must be consumed instead.
+ * Known sizes are filled in place, so there is no second growing copy of the compressed file.
+ */
+internal fun readDeclaredBytes(input: java.io.InputStream, offset: Long, length: Long): ByteArray {
+    require(offset >= 0) { "RAW slice starts before the file" }
+    // A file stream reports where it already is. AssetFileDescriptor.createInputStream()
+    // starts at the slice; a plain stream starts at zero and must skip to it.
+    val position = (input as? java.io.FileInputStream)?.channel?.position()
+    var skipped = if (position != null && position <= offset) position else 0L
+    while (skipped < offset) {
+        val n = input.skip(offset - skipped)
+        if (n > 0) skipped += n
+        else if (input.read() < 0) throw java.io.EOFException("RAW slice starts beyond its file")
+        else skipped++
+    }
+    if (length < 0) return input.readBytes()
+    require(length <= Int.MAX_VALUE) { "RAW file is too large" }
+    val bytes = ByteArray(length.toInt())
+    var filled = 0
+    while (filled < bytes.size) {
+        val count = input.read(bytes, filled, bytes.size - filled)
+        if (count < 0) throw java.io.EOFException("RAW file ended before its declared size")
+        if (count == 0) {
+            val value = input.read()
+            if (value < 0) throw java.io.EOFException("RAW file ended before its declared size")
+            bytes[filled++] = value.toByte()
+        } else filled += count
+    }
+    return bytes
+}
+
+/** Known-size streams need one buffer; a negative length is a pipe whose end is the EOF. */
+internal fun readRawBytes(input: java.io.InputStream, size: Long): ByteArray = readDeclaredBytes(input, 0, size)
 
 object Media {
     private val RAW_EXT = setOf("dng", "cr2", "cr3", "nef", "arw", "orf", "rw2", "raf", "pef", "srw")
@@ -60,23 +127,35 @@ object Media {
      *   and binned if its development would still allocate more Java heap than this, in bytes
      */
     fun loadSource(context: Context, uri: Uri, maxLongEdge: Int, tryRaw: Boolean, fast: Boolean = true,
-                   rawHeapBudget: Long = 0): SourceImage {
+                   rawHeapBudget: Long = 0, heavyWorkHeld: Boolean = false): SourceImage {
         if (tryRaw) {
-            val linear = runCatching {
-                readRaw(context, uri)?.let { raw ->
-                    if (rawHeapBudget <= 0) RawDeveloper.develop(raw, maxLongEdge, fast)
-                    else RawDeveloper.develop(raw, RawDeveloper.longEdgeWithin(raw, maxLongEdge, fast, rawHeapBudget, outputOnHeap = false),
-                        fast, allocate = { mappedBuffer(context, it) })
-                }
-            }.getOrNull()
-            if (linear != null) return SourceImage(null, linear)
+            // Parsing expands the full sensor even for a small rendition. The permit covers
+            // that work only: the returned image does not keep it, so a preview can stay open
+            // while an export or a sharper decode waits its turn. Cancellation still runs finally.
+            RawMemoryGate.acquire(alreadyHeld = heavyWorkHeld).use {
+                val source = runCatching {
+                    readRaw(context, uri)?.let { raw ->
+                        val linear = if (rawHeapBudget <= 0) RawDeveloper.develop(raw, maxLongEdge, fast)
+                            else RawDeveloper.develop(raw, RawDeveloper.longEdgeWithin(raw, maxLongEdge, fast, rawHeapBudget, outputOnHeap = false),
+                                fast, allocate = { mappedBuffer(context, it) })
+                        SourceImage(null, linear, raw.uprightWidth, raw.uprightHeight)
+                    }
+                }.getOrNull()
+                if (source != null) return source
+            }
         }
         return SourceImage(decodeImage(context, uri, maxLongEdge), null)
     }
 
-    /** Parse a supported raw file; the file's bytes are garbage once this returns. */
+    /**
+     * Parse a supported raw file. [AssetFileDescriptor] preserves a provider slice;
+     * openFileDescriptor would instead report the whole file. Bytes are dropped once parsing returns.
+     */
     private fun readRaw(context: Context, uri: Uri): RawImage? {
-        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
+        val descriptor = context.contentResolver.openAssetFileDescriptor(uri, "r") ?: return null
+        val bytes = descriptor.use {
+            readDeclaredBytes(it.createInputStream(), it.startOffset, it.declaredLength)
+        }
         return RawReader.read(bytes)?.takeIf { RawDeveloper.supports(it) }
     }
 
@@ -203,7 +282,8 @@ object Media {
                     date ?: System.currentTimeMillis(), frame?.let { autoExposure(it) } ?: 0f, Look.DEFAULT, name)
             } else {
                 val src = loadSource(context, uri, 512, tryRaw = isRaw)
-                if (src.linear != null) {
+                src.use { loaded ->
+                if (loaded.linear != null) {
                     // developed from sensor data: size and exposure come from the raw frame
                     var date: Long? = null
                     runCatching {
@@ -212,11 +292,10 @@ object Media {
                             date = parseExifDate(exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL) ?: exif.getAttribute(ExifInterface.TAG_DATETIME))
                         }
                     }
-                    val scale = rawScale(context, uri)
-                    return LibraryItem(id, uri.toString(), false, true, scale?.first ?: src.width, scale?.second ?: src.height, 0, 0,
-                        date ?: System.currentTimeMillis(), autoExposure(src.linear), Look.DEFAULT, name)
+                    return LibraryItem(id, uri.toString(), false, true, loaded.originalWidth, loaded.originalHeight, 0, 0,
+                        date ?: System.currentTimeMillis(), autoExposure(loaded.linear), Look.DEFAULT, name)
                 }
-                val bmp = src.bitmap!!
+                val bmp = loaded.bitmap!!
                 var date: Long? = null
                 var w = bmp.width
                 var h = bmp.height
@@ -237,17 +316,12 @@ object Media {
                 if (w <= bmp.width) { w = bmp.width; h = bmp.height }
                 LibraryItem(id, uri.toString(), false, isRaw, w, h, 0, 0, date ?: System.currentTimeMillis(),
                     autoExposure(bmp), Look.DEFAULT, name)
+                }
             }
         } catch (e: Exception) {
             null
         }
     }
-
-    /** Full upright size of a DNG we can develop. */
-    private fun rawScale(context: Context, uri: Uri): Pair<Int, Int>? = runCatching {
-        val bytes = context.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
-        RawReader.read(bytes)?.takeIf { RawDeveloper.supports(it) }?.let { it.uprightWidth to it.uprightHeight }
-    }.getOrNull()
 
     private fun parseExifDate(s: String?): Long? {
         if (s.isNullOrBlank()) return null

@@ -133,6 +133,7 @@
 
     <string name="no_camera">No camera is available</string>
     <string name="camera_open_failed">Unable to open camera: %1$s</string>
+    <string name="raw_preview_notice">Natural-color preview · film look applies to the saved photo</string>
     <string name="unknown_error">Unknown error</string>
     <string name="camera_not_ready">Camera is not ready yet</string>
     <string name="camera_permission_required">Camera permission is required</string>

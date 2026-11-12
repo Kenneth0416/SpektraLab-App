@@ -44,14 +44,14 @@ internal fun PhotoSourceEffects(
                 image == null -> if (!quickShown) onError()
                 quickShown -> onRefine(image, source)
                 else -> onPreview(image, source)
-            }
+            } else image?.close()
         }
         if (worthFull) launch {
             snapshotFlow { currentZoomed }.first { it }
             // Zooming out does not cancel this load. A source change cancels both loads,
             // and the identity guard also rejects decoders that finish after cancellation.
             val image = load(true)
-            if (image != null && currentSource == source) onFull(image, source)
+            if (image != null && currentSource == source) onFull(image, source) else image?.close()
         }
     }
 }

@@ -21,6 +21,7 @@ import androidx.camera.core.ImageProxy
 import androidx.core.content.ContextCompat
 import androidx.exifinterface.media.ExifInterface
 import app.spektralab.HeavyWork
+import app.spektralab.data.RawMemoryGate
 import app.spektralab.gl.BurstGl
 import app.spektralab.raw.BurstMerge
 import app.spektralab.raw.DngReader
@@ -37,7 +38,9 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 class CaptureResults : CameraCaptureSession.CaptureCallback() {
     private val lock = Object()
-    private val recent = LinkedHashMap<Long, TotalCaptureResult>()
+    private val recent = LinkedHashMap<Long, Any>()
+    /** Timestamps a shot still needs. Eviction must not drop the result that makes its DNG. */
+    private val pinned = HashSet<Long>()
 
     /** Sensor sensitivity (ISO) of the latest frame, null before the first one. */
     @Volatile var iso: Int? = null
@@ -48,21 +51,81 @@ class CaptureResults : CameraCaptureSession.CaptureCallback() {
         val ts = result.get(CaptureResult.SENSOR_TIMESTAMP) ?: return
         synchronized(lock) {
             recent[ts] = result
-            while (recent.size > 48) recent.remove(recent.keys.first())
+            evict()
             lock.notifyAll()
         }
     }
 
+    /**
+     * Keep [count] results that complete from now on. A shot calls this before starting
+     * exposure: matching can then wait as long as decoding needs without the 48-entry
+     * preview cache forgetting the frame.
+     */
+    fun pinIncoming(count: Int): CapturePin {
+        require(count > 0)
+        return CapturePin(count)
+    }
+
     /** The result of the exposure that started at [timestamp]; it may arrive a little after the image. */
     fun await(timestamp: Long, timeoutMs: Long = 800): TotalCaptureResult? = synchronized(lock) {
-        val end = SystemClock.elapsedRealtime() + timeoutMs
-        while (true) {
-            recent[timestamp]?.let { return it }
-            val left = end - SystemClock.elapsedRealtime()
-            if (left <= 0) return null
-            lock.wait(left)
+        // A result can complete before its image callback. Pin it too, or the wait below
+        // is safe while every other preview frame still pushes it out of the cache.
+        pinned.add(timestamp)
+        evict()
+        try {
+            val end = SystemClock.elapsedRealtime() + timeoutMs
+            while (true) {
+                @Suppress("UNCHECKED_CAST")
+                recent[timestamp]?.let { return it as TotalCaptureResult }
+                val left = end - SystemClock.elapsedRealtime()
+                if (left <= 0) return null
+                lock.wait(left)
+            }
+            @Suppress("UNREACHABLE_CODE") null
+        } finally {
+            pinned.remove(timestamp)
+            evict()
         }
-        @Suppress("UNREACHABLE_CODE") null
+    }
+
+    /** Test seam: one completed preview result. The token stands in for a capture result. */
+    internal fun completed(timestamp: Long, token: Any) = synchronized(lock) {
+        recent[timestamp] = token
+        evict()
+        lock.notifyAll()
+    }
+
+    /** Test seam: the token currently cached for [timestamp], without waiting or pinning. */
+    internal fun cached(timestamp: Long): Any? = synchronized(lock) { recent[timestamp] }
+
+    private fun evict() {
+        val it = recent.keys.iterator()
+        while (recent.size > 48 && it.hasNext()) {
+            val ts = it.next()
+            if (ts !in pinned) it.remove()
+        }
+    }
+
+    /** Releases the timestamps this shot pinned, including frames that never arrived. */
+    inner class CapturePin internal constructor(private var remaining: Int) : java.io.Closeable {
+        private val owned = ArrayList<Long>(remaining)
+        private var closed = false
+
+        fun completed(timestamp: Long) { synchronized(lock) {
+            if (closed || remaining == 0 || timestamp in owned) return
+            owned.add(timestamp)
+            pinned.add(timestamp)
+            remaining--
+        } }
+
+        override fun close() { synchronized(lock) {
+            if (closed) return
+            closed = true
+            remaining = 0
+            owned.forEach { pinned.remove(it) }
+            owned.clear()
+            evict()
+        } }
     }
 }
 
@@ -121,12 +184,15 @@ class RawShooter(private val context: Context) {
               onExposed: (ok: Boolean, retry: Boolean) -> Unit): Boolean {
         require(frames in 1..MAX_FRAMES)
         val lease = admission.acquire() ?: return false
-        val shot = Shot(frames, name, evBias, onExposed, lease)
+        // Pin before takePicture. The callback may wait on the memory budget long after
+        // this exposure, and preview traffic must not evict the result needed for its DNG.
+        val shot = Shot(frames, name, evBias, onExposed, lease, results.pinIncoming(frames))
+        Log.i(TAG, "RAW shot=$name requestedFrames=$frames iso=${results.iso}")
         // At most MAX_FRAMES callbacks/tasks exist: admission stays closed through merging.
         repeat(frames) { index ->
             try {
                 capture.takePicture(io, object : ImageCapture.OnImageCapturedCallback() {
-                    override fun onCaptureSuccess(image: ImageProxy) = shot.frame(toDng(image, chars, shot.dead), null)
+                    override fun onCaptureSuccess(image: ImageProxy) = shot.capture(image, chars)
                     override fun onError(exception: ImageCaptureException) = shot.frame(null, exception)
                 })
             } catch (e: Exception) {
@@ -140,12 +206,15 @@ class RawShooter(private val context: Context) {
         return true
     }
 
+    /** Why [toDng] produced no bytes. A late metadata result is not proof the device cannot do RAW. */
+    private enum class DngMiss { NONE, NOT_RAW, NO_RESULT }
+
     @androidx.annotation.OptIn(ExperimentalGetImage::class)
-    private fun toDng(image: ImageProxy, chars: CameraCharacteristics, skip: Boolean): ByteArray? = try {
+    private fun toDng(image: ImageProxy, chars: CameraCharacteristics, skip: Boolean): Pair<ByteArray?, DngMiss> = try {
         val img = image.image
-        if (skip || img == null || img.format != ImageFormat.RAW_SENSOR) null else {
+        if (skip || img == null || img.format != ImageFormat.RAW_SENSOR) null to DngMiss.NOT_RAW else {
             val result = results.await(img.timestamp)
-            if (result == null) null else {
+            if (result == null) null to DngMiss.NO_RESULT else {
                 val out = ByteArrayOutputStream(img.width * img.height * 2 + (1 shl 20))
                 DngCreator(chars, result).use { dng ->
                     dng.setOrientation(when (image.imageInfo.rotationDegrees) {
@@ -154,53 +223,104 @@ class RawShooter(private val context: Context) {
                     })
                     dng.writeImage(out, img)
                 }
-                out.toByteArray()
+                out.toByteArray() to DngMiss.NONE
             }
         }
     } catch (t: Throwable) {
         Log.w(TAG, "raw frame could not be written", t)
-        null
+        null to DngMiss.NOT_RAW
     } finally {
         image.close()
     }
 
     /** One press of the shutter. [frame] runs on the io thread, in capture order. */
     private inner class Shot(val frames: Int, val name: String, val evBias: Float,
-                             val onExposed: (Boolean, Boolean) -> Unit, val lease: ShotAdmission.Lease) {
+                             val onExposed: (Boolean, Boolean) -> Unit, val lease: ShotAdmission.Lease,
+                             private val capturePin: CaptureResults.CapturePin) {
         @Volatile var dead = false
         private var arrived = 0
         private var first: Uri? = null
+        private var sawSensorRaw = false
+        private var missingResult = false
         // touched on the work thread only
         private var planner: BurstMerge.Planner? = null
+        /** Held from the first retained frame until merge targets and planner arrays are gone. */
+        private var memory: java.io.Closeable? = null
 
-        fun frame(dng: ByteArray?, error: ImageCaptureException?) {
+        @androidx.annotation.OptIn(ExperimentalGetImage::class)
+        fun capture(image: ImageProxy, chars: CameraCharacteristics) {
+            val sensorRaw = image.image?.format == ImageFormat.RAW_SENSOR
+            if (sensorRaw) image.image?.timestamp?.let { capturePin.completed(it) }
+            // Runs on io. Keep this permit through every retained frame and the merge.
+            // Thumbnail, import and export decodes take the same lock and therefore wait.
+            try {
+                if (!dead && memory == null) memory = RawMemoryGate.acquire()
+            } catch (e: InterruptedException) {
+                image.close()
+                Thread.currentThread().interrupt()
+                frame(null, ImageCaptureException(ImageCapture.ERROR_UNKNOWN, "RAW memory wait interrupted", e), DngMiss.NONE)
+                return
+            }
+            val (dng, miss) = toDng(image, chars, dead)
+            frame(dng, null, if (sensorRaw && dng != null) DngMiss.NONE else if (sensorRaw) miss else DngMiss.NOT_RAW)
+        }
+
+        private var finished = false
+
+        private fun processingDone() {
+            if (finished) return
+            finished = true
+            capturePin.close()
+            memory?.close()
+            memory = null
+            lease.processingDone()
+        }
+
+        fun frame(dng: ByteArray?, error: ImageCaptureException?, miss: DngMiss = DngMiss.NOT_RAW) {
             arrived++
+            Log.i(TAG, "RAW shot=$name received=$arrived/$frames dngReady=${dng != null} dead=$dead error=${error?.imageCaptureError}")
+            if (error != null) Log.w(TAG, "RAW frame capture failed shot=$name", error)
             if (arrived == frames) lease.capturesDone()
-            if (dead) return
+            if (dead) {
+                if (arrived == frames) processingDone()
+                return
+            }
+            if (miss != DngMiss.NOT_RAW) sawSensorRaw = true
+            if (miss == DngMiss.NO_RESULT) missingResult = true
             if (first == null) {
                 if (dng == null) {
-                    // nothing usable yet: a camera error ends the shot, a frame that could not be
-                    // turned into a DNG means this way of capturing does not work here
-                    if (arrived == 1 && error == null) unsupported = true
-                    if (arrived == 1 || arrived == frames) {
+                    // A camera error or a non-RAW buffer ends this way of capturing. A sensor frame
+                    // whose own result was not ready can happen once; it must not disable RAW.
+                    val giveUp = arrived == frames || error != null
+                    if (giveUp) {
                         dead = true
-                        lease.processingDone()
-                        main.execute { onExposed(false, error == null) }
+                        if (error == null && !sawSensorRaw) unsupported = true
+                        // Release now. A later callback only sees dead and must not be the
+                        // sole owner of the memory lease; processingDone is idempotent.
+                        processingDone()
+                        val retry = error == null && (!sawSensorRaw || missingResult)
+                        main.execute { onExposed(false, retry) }
                     }
                     return
                 }
                 val uri = save("$name.dng") { it.write(dng) }
-                if (uri == null) { dead = true; lease.processingDone(); main.execute { onExposed(false, false) }; return }
+                if (uri == null) { dead = true; processingDone(); main.execute { onExposed(false, false) }; return }
                 first = uri
                 main.execute { onSaved(uri, evBias) }
                 if (frames > 1) {
                     merging.incrementAndGet(); onProgress(0f)
-                    // merge steps take the process-wide heavy-work lock: never alongside an export (memory)
-                    work.execute { HeavyWork.blocking { runCatching { planner = DngReader.read(dng)?.takeIf { !it.linear }?.let { BurstMerge.Planner(it) } } } }
+                    // Already inside the memory lease; the work thread must not lock HeavyWork again.
+                    work.execute {
+                        runCatching { planner = DngReader.read(dng)?.takeIf { !it.linear }?.let { BurstMerge.Planner(it) } }
+                            .onFailure { Log.w(TAG, "RAW planner initialization failed shot=$name", it) }
+                        Log.i(TAG, "RAW shot=$name plannerFrames=${planner?.frames ?: 0}")
+                    }
                 }
             } else if (dng != null) {
                 work.execute {
-                    HeavyWork.blocking { runCatching { DngReader.read(dng)?.let { planner?.add(it) } } }
+                    runCatching { DngReader.read(dng)?.let { planner?.add(it) } }
+                        .onFailure { Log.w(TAG, "RAW planner add failed shot=$name", it) }
+                    Log.i(TAG, "RAW shot=$name plannerFrames=${planner?.frames ?: 0}")
                     onProgress(0.5f * ((planner?.frames ?: 1) - 1) / (frames - 1))
                 }
             }
@@ -208,7 +328,7 @@ class RawShooter(private val context: Context) {
                 main.execute { onExposed(true, false) }
                 val uri = first!!
                 if (frames > 1) work.execute { finish(uri) } else {
-                    lease.processingDone()
+                    processingDone()
                     main.execute { onFinished(uri, null, 1f) }
                 }
             }
@@ -216,27 +336,27 @@ class RawShooter(private val context: Context) {
 
         private fun finish(first: Uri) {
             var merged: Uri? = null; var used = 1f
-            // plan, gather and DNG write are the heaviest part: hold the lock throughout
-            HeavyWork.blocking {
-                try {
-                    val p = planner?.takeIf { it.frames >= 2 }?.build()
-                    planner = null
-                    if (p != null) {
-                        val gather = { f: Float -> onProgress(0.5f + 0.4f * f) }
-                        val rgb = BurstGl.gather(p, gather) ?: BurstMerge.gather(p, progress = gather)
-                        val m = BurstMerge.finish(p, rgb)
-                        merged = save("${name}_M.dng") { DngWriter.writeLinear(it, m.width, m.height, m.rgb, p.frames[0], m.gainMaps, m.noise) }
-                        used = m.framesUsed
-                    }
-                } catch (t: Throwable) {
-                    // also out of memory: the first frame stays the original
-                    Log.w(TAG, "burst not merged", t)
-                    planner = null
-                } finally {
-                    planner = null
-                    if (merging.decrementAndGet() == 0) onProgress(null)
-                    lease.processingDone()
-                }
+            try {
+                Log.i(TAG, "RAW shot=$name merge planning received=$arrived requested=$frames plannerFrames=${planner?.frames ?: 0}")
+                val p = planner?.takeIf { it.frames >= 2 }?.build()
+                planner = null
+                if (p != null) {
+                    val gather = { f: Float -> onProgress(0.5f + 0.4f * f) }
+                    val gpuRgb = BurstGl.gather(p, gather)
+                    Log.i(TAG, "RAW shot=$name gatherBackend=${if (gpuRgb != null) "GPU" else "CPU"}")
+                    val rgb = gpuRgb ?: BurstMerge.gather(p, progress = gather)
+                    val m = BurstMerge.finish(p, rgb)
+                    merged = save("${name}_M.dng") { DngWriter.writeLinear(it, m.width, m.height, m.rgb, p.frames[0], m.gainMaps, m.noise) }
+                    used = m.framesUsed
+                    Log.i(TAG, "RAW shot=$name mergeCompleted dimensions=${m.width}x${m.height} framesUsed=$used saved=${merged != null}")
+                } else Log.w(TAG, "RAW shot=$name merge skipped: fewer than two usable planner frames")
+            } catch (t: Throwable) {
+                // also out of memory: the first frame stays the original
+                Log.w(TAG, "burst not merged", t)
+            } finally {
+                planner = null
+                if (merging.decrementAndGet() == 0) onProgress(null)
+                processingDone()
             }
             main.execute { onFinished(first, merged, used) }
         }

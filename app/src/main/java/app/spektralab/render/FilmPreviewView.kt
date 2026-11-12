@@ -77,9 +77,9 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
     fun setSource(key: Pair<Long, String>) = queueEvent {
         if (r.sourceKey != key) {
             r.sourceKey = key
-            r.pendingBitmap = null
-            r.currentBitmap = null
-            r.pendingFull = null
+            r.pendingBitmap?.close(); r.pendingBitmap = null
+            r.currentBitmap?.close(); r.currentBitmap = null
+            r.pendingFull?.close(); r.pendingFull = null
             GlUtil.deleteTexture(r.fullTex); r.fullTex = 0
             GlUtil.deleteTexture(r.photoTex); r.photoTex = 0
             r.printDirty = true
@@ -92,7 +92,8 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
     }
 
     fun setFullPhoto(source: SourceImage, key: Pair<Long, String>) = queueEvent {
-        if (r.sourceKey == key) { r.pendingFull = source; requestRender() }
+        if (r.sourceKey == key) { r.pendingFull?.close(); r.pendingFull = source; requestRender() }
+        else source.close()
     }
 
     /**
@@ -100,18 +101,26 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
      * exposure): the developing animation and the first-frame state carry on undisturbed.
      */
     fun refinePhoto(source: SourceImage, key: Pair<Long, String>) = queueEvent {
-        if (r.sourceKey != key) return@queueEvent
+        if (r.sourceKey != key) { source.close(); return@queueEvent }
         r.printDirty = true
+        if (r.pendingBitmap !== source) r.pendingBitmap?.close()
         r.pendingBitmap = source
-        r.currentBitmap = source
+        if (r.currentBitmap !== source) {
+            r.currentBitmap?.close()
+            r.currentBitmap = source.share()
+        }
         requestRender()
     }
 
     fun setPhoto(bitmap: SourceImage, autoEv: Float, seed: Int, key: Pair<Long, String>) = queueEvent {
-        if (r.sourceKey != key) return@queueEvent
+        if (r.sourceKey != key) { bitmap.close(); return@queueEvent }
         r.printDirty = true
+        if (r.pendingBitmap !== bitmap) r.pendingBitmap?.close()
         r.pendingBitmap = bitmap
-        r.currentBitmap = bitmap
+        if (r.currentBitmap !== bitmap) {
+            r.currentBitmap?.close()
+            r.currentBitmap = bitmap.share()
+        }
         r.autoEv = autoEv
         r.seed = seed
         r.video = null
@@ -281,7 +290,10 @@ void main() {
             overlayKey = ""
             if (restore) {
                 pendingSetup = currentSetup
-                if (video == null) pendingBitmap = currentBitmap
+                if (video == null && pendingBitmap !== currentBitmap) {
+                    pendingBitmap?.close()
+                    pendingBitmap = currentBitmap?.share()
+                }
                 video?.let { v ->
                     val p = player
                     videoRequest = VideoRequest(v.uri, v.rotation, v.width, v.height,
@@ -316,15 +328,20 @@ void main() {
             val fr = renderer ?: return
             pendingSetup?.let { fr.setLook(it); pendingSetup = null }
             pendingBitmap?.let { bmp ->
+                val uploaded = runCatching { GlWorker.upload(bmp) }
+                bmp.close()
+                val tex = uploaded.getOrThrow()
                 GlUtil.deleteTexture(photoTex)
-                photoTex = GlWorker.upload(bmp)
+                photoTex = tex
                 photoW = bmp.width; photoH = bmp.height
                 pendingBitmap = null
             }
             pendingFull?.let { src ->
                 pendingFull = null
+                val uploaded = runCatching { GlWorker.upload(src) }
+                src.close()
                 GlUtil.deleteTexture(fullTex)
-                fullTex = runCatching { GlWorker.upload(src) }.getOrDefault(0)
+                fullTex = uploaded.getOrDefault(0)
                 fullW = src.width; fullH = src.height; fullLinear = src.linear != null
                 printDirty = true
             }
@@ -559,7 +576,9 @@ void main() {
             print?.release(); print = null
             blit?.release(); blit = null
             GlUtil.deleteTexture(fullTex); fullTex = 0
-            pendingFull = null
+            pendingFull?.close(); pendingFull = null
+            pendingBitmap?.close(); pendingBitmap = null
+            currentBitmap?.close(); currentBitmap = null
             GlUtil.deleteTexture(photoTex); photoTex = 0
             GlUtil.deleteTexture(overlayTex); overlayTex = 0
             surfaceTexture?.release(); surfaceTexture = null

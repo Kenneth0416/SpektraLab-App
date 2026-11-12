@@ -276,28 +276,50 @@ class AppState(application: Application) : AndroidViewModel(application) {
     // ----------------------------------------------------------- export
     fun openExport(ids: List<Long>) {
         if (ids.isEmpty()) return say("先圈出要导出的项目")
-        if (exports.isRunning()) { sheet.value = Sheet.PROGRESS; return }
         exportTargets.value = ids
         sheet.value = Sheet.EXPORT
     }
 
+    /** Waits for the queue to drain once a manual export joined it, then reports. */
+    private var exportWatch: Job? = null
+
     fun startExport(share: Boolean) {
         val items = exportTargets.value.mapNotNull { library.item(it) }
-        if (items.isEmpty() || exports.isRunning()) { sheet.value = Sheet.NONE; return say("没有可以导出的项目") }
+        if (items.isEmpty()) { sheet.value = Sheet.NONE; return say("没有可以导出的项目") }
+        // a running batch takes the new items at its end
+        val joined = exports.isRunning()
         exports.start(items, exportOptions.value, share)
         sheet.value = Sheet.PROGRESS
         selecting.value = false
         picked.value = emptyList()
-        viewModelScope.launch {
+        if (joined) say("已加入冲印队列 · ${items.size} 项")
+        watchExport()
+    }
+
+    fun retryExports() {
+        if (exports.retry() == 0) { sheet.value = Sheet.NONE; return say("原片已不在灯箱，无法重试") }
+        sheet.value = Sheet.PROGRESS
+        watchExport()
+    }
+
+    fun dismissExports() {
+        exports.dismiss()
+        sheet.value = Sheet.NONE
+    }
+
+    private fun watchExport() {
+        if (exportWatch?.isActive == true) return
+        exportWatch = viewModelScope.launch {
             val st = exports.state.first { it != null && !it.running }!!
-            if (sheet.value == Sheet.PROGRESS) sheet.value = Sheet.NONE
+            // failures stay on screen (sheet or pill) until retried or dismissed
+            if (sheet.value == Sheet.PROGRESS && st.failures.isEmpty()) sheet.value = Sheet.NONE
             val msg = when {
                 st.saved.isEmpty() -> "导出失败"
                 st.share -> "已交给系统分享 · ${st.saved.size} 项"
                 else -> "已存到相册 · ${st.saved.size} 项"
             } + if (st.failed > 0 && st.saved.isNotEmpty()) "（${st.failed} 项失败）" else ""
             say(msg)
-            exports.dismiss()
+            if (st.failures.isEmpty()) exports.dismiss()
         }
     }
 }

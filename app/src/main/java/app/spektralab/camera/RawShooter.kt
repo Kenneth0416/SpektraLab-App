@@ -20,6 +20,7 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.core.content.ContextCompat
 import androidx.exifinterface.media.ExifInterface
+import app.spektralab.HeavyWork
 import app.spektralab.gl.BurstGl
 import app.spektralab.raw.BurstMerge
 import app.spektralab.raw.DngReader
@@ -171,11 +172,12 @@ class RawShooter(private val context: Context) {
                 main.execute { onSaved(uri, evBias) }
                 if (frames > 1) {
                     merging.incrementAndGet(); onProgress(0f)
-                    work.execute { runCatching { planner = DngReader.read(dng)?.takeIf { !it.linear }?.let { BurstMerge.Planner(it) } } }
+                    // merge steps take the process-wide heavy-work lock: never alongside an export (memory)
+                    work.execute { HeavyWork.blocking { runCatching { planner = DngReader.read(dng)?.takeIf { !it.linear }?.let { BurstMerge.Planner(it) } } } }
                 }
             } else if (dng != null) {
                 work.execute {
-                    runCatching { DngReader.read(dng)?.let { planner?.add(it) } }
+                    HeavyWork.blocking { runCatching { DngReader.read(dng)?.let { planner?.add(it) } } }
                     onProgress(0.5f * ((planner?.frames ?: 1) - 1) / (frames - 1))
                 }
             }
@@ -188,20 +190,23 @@ class RawShooter(private val context: Context) {
 
         private fun finish(first: Uri) {
             var merged: Uri? = null; var used = 1f
-            try {
-                val p = planner?.takeIf { it.frames >= 2 }?.build()
-                planner = null
-                if (p != null) {
-                    val gather = { f: Float -> onProgress(0.5f + 0.4f * f) }
-                    val rgb = BurstGl.gather(p, gather) ?: BurstMerge.gather(p, progress = gather)
-                    val m = BurstMerge.finish(p, rgb)
-                    merged = save("${name}_M.dng") { DngWriter.writeLinear(it, m.width, m.height, m.rgb, p.frames[0], m.gainMaps, m.noise) }
-                    used = m.framesUsed
+            // plan, gather and DNG write are the heaviest part: hold the lock throughout
+            HeavyWork.blocking {
+                try {
+                    val p = planner?.takeIf { it.frames >= 2 }?.build()
+                    planner = null
+                    if (p != null) {
+                        val gather = { f: Float -> onProgress(0.5f + 0.4f * f) }
+                        val rgb = BurstGl.gather(p, gather) ?: BurstMerge.gather(p, progress = gather)
+                        val m = BurstMerge.finish(p, rgb)
+                        merged = save("${name}_M.dng") { DngWriter.writeLinear(it, m.width, m.height, m.rgb, p.frames[0], m.gainMaps, m.noise) }
+                        used = m.framesUsed
+                    }
+                } catch (t: Throwable) {
+                    // also out of memory: the first frame stays the original
+                    Log.w(TAG, "burst not merged", t)
+                    planner = null
                 }
-            } catch (t: Throwable) {
-                // also out of memory: the first frame stays the original
-                Log.w(TAG, "burst not merged", t)
-                planner = null
             }
             if (merging.decrementAndGet() == 0) onProgress(null)
             main.execute { onFinished(first, merged, used) }

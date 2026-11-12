@@ -53,6 +53,8 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import app.spektralab.data.Library
 import app.spektralab.engine.Catalog
+import app.spektralab.export.ExportFailure
+import app.spektralab.export.ExportState
 import app.spektralab.export.PhotoFormat
 
 @Composable
@@ -223,6 +225,11 @@ private fun Label(t: String) = Text(t, color = Pal.dim, fontSize = 12.sp, modifi
 @Composable
 private fun ProgressSheet(state: AppState) {
     val st = state.exports.state.collectAsState().value ?: return
+    if (!st.running && st.failures.isNotEmpty()) FailedSheet(state, st) else PrintingSheet(state, st)
+}
+
+@Composable
+private fun PrintingSheet(state: AppState, st: ExportState) {
     Text("正在冲印" + busyDots(), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Pal.text)
     Row(Modifier.padding(vertical = 8.dp)) {
         RollingNumber(minOf(st.total, st.done + 1), Fonts.mono, 14.sp, Pal.text)
@@ -245,6 +252,7 @@ private fun ProgressSheet(state: AppState) {
     }
     Spacer(Modifier.height(10.dp))
     Text("每一项都要完整算一遍，全尺寸需要几秒，视频需要更久。可以先回去继续修图。", color = Pal.dim, fontSize = 12.sp)
+    if (st.failures.isNotEmpty()) Failures(st.failures)
     Spacer(Modifier.height(14.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("停止", color = Pal.dim, fontSize = 15.sp, modifier = Modifier.clickable { state.exports.cancel() }.padding(12.dp))
@@ -255,6 +263,37 @@ private fun ProgressSheet(state: AppState) {
     }
 }
 
+/** The queue is done but some prints failed: they stay here until retried or dismissed. */
+@Composable
+private fun FailedSheet(state: AppState, st: ExportState) {
+    Text("${st.failed} 项没冲出来", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Pal.text)
+    if (st.saved.isNotEmpty()) Text("其余 ${st.saved.size} 项已存好", color = Pal.dim, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+    Failures(st.failures)
+    Spacer(Modifier.height(14.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("知道了", color = Pal.dim, fontSize = 15.sp, modifier = Modifier.clickable { state.dismissExports() }.padding(12.dp))
+        Spacer(Modifier.weight(1f))
+        Text("重试", color = Pal.dink, fontSize = 15.sp, fontWeight = FontWeight.Bold,
+            modifier = Modifier.clip(RoundedCornerShape(22.dp)).background(Pal.text)
+                .springClick { state.retryExports() }.padding(horizontal = 18.dp, vertical = 12.dp))
+    }
+}
+
+@Composable
+private fun Failures(failures: List<ExportFailure>) {
+    Label("失败 ${failures.size} 项")
+    Column(Modifier.heightIn(max = 160.dp).verticalScroll(rememberScrollState())) {
+        failures.forEach { f ->
+            Row(Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(f.job.item.name.ifEmpty { "#${f.job.item.id}" }, color = Pal.text, fontSize = 13.sp, maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Spacer(Modifier.width(12.dp))
+                Text(f.reason, color = Pal.dim, fontSize = 12.sp)
+            }
+        }
+    }
+}
+
 @Composable
 private fun ProgressPill(state: AppState, modifier: Modifier) {
     val st = state.exports.state.collectAsState().value
@@ -262,19 +301,22 @@ private fun ProgressPill(state: AppState, modifier: Modifier) {
     // drops down from the top edge while printing continues in the background
     var last by remember { mutableStateOf(st) }
     if (st != null) last = st
-    AnimatedVisibility(st != null && st.running && sheet != Sheet.PROGRESS, modifier,
+    // also stays once the queue is done with failures, so they are not lost with the sheet
+    AnimatedVisibility(st != null && (st.running || st.failed > 0) && sheet != Sheet.PROGRESS, modifier,
         enter = slideInVertically(Motion.settleOffset) { -it * 2 } + fadeIn(), exit = slideOutVertically(tween(200)) { -it * 2 } + fadeOut()) {
         val s = last ?: return@AnimatedVisibility
         val pulse by rememberInfiniteTransition(label = "pill").animateFloat(0.35f, 1f,
             infiniteRepeatable(tween(700), RepeatMode.Reverse), label = "pulse")
         Row(Modifier.clip(RoundedCornerShape(16.dp)).background(Pal.ink).springClick { state.sheet.value = Sheet.PROGRESS }
             .padding(horizontal = 14.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(7.dp).graphicsLayer { alpha = pulse; scaleX = 0.7f + 0.3f * pulse; scaleY = 0.7f + 0.3f * pulse }
+            Box(Modifier.size(7.dp).graphicsLayer { val a = if (s.running) pulse else 1f; alpha = a; scaleX = 0.7f + 0.3f * a; scaleY = 0.7f + 0.3f * a }
                 .clip(CircleShape).background(Pal.safelight))
             Spacer(Modifier.width(8.dp))
-            Text("冲印中 ", color = Pal.paper, fontSize = 13.sp, fontFamily = Fonts.mono)
-            RollingNumber(minOf(s.total, s.done + 1), Fonts.mono, 13.sp, Pal.paper)
-            Text(" / ${s.total}", color = Pal.paper, fontSize = 13.sp, fontFamily = Fonts.mono)
+            if (s.running) {
+                Text("冲印中 ", color = Pal.paper, fontSize = 13.sp, fontFamily = Fonts.mono)
+                RollingNumber(minOf(s.total, s.done + 1), Fonts.mono, 13.sp, Pal.paper)
+                Text(" / ${s.total}", color = Pal.paper, fontSize = 13.sp, fontFamily = Fonts.mono)
+            } else Text("冲印失败 ${s.failed} 项", color = Pal.paper, fontSize = 13.sp, fontFamily = Fonts.mono)
         }
     }
 }

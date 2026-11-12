@@ -47,6 +47,8 @@ class MainActivity : ComponentActivity() {
         // "share" exports when we are (back) on screen
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                // prints left from a previous run: only now may the export service be started
+                state.exports.resume()
                 state.exports.pendingShare.collect { uris ->
                     if (uris != null) {
                         state.exports.pendingShare.value = null

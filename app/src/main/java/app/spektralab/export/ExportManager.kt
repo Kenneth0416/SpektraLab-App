@@ -16,6 +16,7 @@ import android.os.IBinder
 import android.provider.MediaStore
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
+import app.spektralab.HeavyWork
 import app.spektralab.R
 import app.spektralab.SpektraApp
 import app.spektralab.data.LibraryItem
@@ -24,7 +25,6 @@ import app.spektralab.gl.GlUtil
 import app.spektralab.render.Framing
 import app.spektralab.render.OverlayPainter
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -32,9 +32,11 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.Executors
 
 enum class PhotoFormat(val label: String, val mime: String, val ext: String) {
     JPEG("JPEG", "image/jpeg", "jpg"), PNG("PNG", "image/png", "png")
@@ -54,75 +56,166 @@ data class ExportState(
     val current: Float,
     val running: Boolean,
     val saved: List<Uri> = emptyList(),
-    val failed: Int = 0,
+    /** Jobs that did not print; kept (also across batches) until retried or dismissed. */
+    val failures: List<ExportFailure> = emptyList(),
+    /** The batch has "share" jobs. */
     val share: Boolean = false,
-)
+) {
+    val failed get() = failures.size
+}
 
-/** Background exports ("冲印"): every item is rendered in full through the pipeline. */
+/**
+ * Background exports ("冲印"): every item is rendered in full through the pipeline.
+ * One queue for the whole app: manual exports and camera prints append to it, and it is
+ * written to [file] on every change so a process death does not lose pending prints.
+ */
 class ExportManager(private val app: SpektraApp) {
     private val _state = MutableStateFlow<ExportState?>(null)
     val state: StateFlow<ExportState?> = _state
-    private var job: Job? = null
-    private val extra = java.util.concurrent.ConcurrentLinkedQueue<Pair<LibraryItem, ExportOptions>>()
     /** Finished share exports waiting for an activity in the foreground to open the chooser. */
     val pendingShare = MutableStateFlow<List<Uri>?>(null)
-    @Volatile private var cancel = false
 
-    fun isRunning() = _state.value?.running == true
+    // guarded by [lock]: the queue is changed from the UI, the camera callbacks and the worker
+    private val lock = Any()
+    /** Waiting jobs; the head is the one printing and stays until done, so a process death resumes it. */
+    private val pending = ArrayDeque<ExportJob>()
+    private var failures = emptyList<ExportFailure>()
+    private var active = false
+    /** Bumped by [cancel]: the job printing at that moment stops early. */
+    @Volatile private var generation = 0
+    private val resumed = java.util.concurrent.atomic.AtomicBoolean(false)
 
-    fun start(items: List<LibraryItem>, options: ExportOptions, share: Boolean) {
-        if (isRunning() || items.isEmpty()) return
-        cancel = false
-        _state.value = ExportState(items.size, 0, 0f, true, share = share)
-        runCatching {
-            androidx.core.content.ContextCompat.startForegroundService(app, Intent(app, ExportService::class.java))
-        }
-        job = app.appScope.launch {
-            val saved = ArrayList<Uri>()
-            var failed = 0
-            val queue = ArrayDeque(items)
-            var i = 0
-            var finished = false
-            while (!finished) {
-                while (!cancel) {
-                    // shots taken while printing join the batch
-                    // each with the options it was queued with, not the batch's
-                    val (item, o) = queue.removeFirstOrNull()?.let { it to options } ?: extra.poll() ?: break
-                    // update {}: enqueue() changes the total from another thread
-                    _state.update { it?.copy(done = i, current = 0f) }
-                    val uri = runCatching { exportOne(item, o) { p -> _state.update { it?.copy(current = p) } } }
-                        .onFailure { android.util.Log.e("SpektraExport", "export failed", it) }
-                        .getOrNull()
-                    if (uri != null) saved += uri else failed++
-                    i++
-                }
-                // finish under the same lock as enqueue(), so a late shot is never dropped
-                synchronized(this@ExportManager) {
-                    if (cancel || extra.isEmpty()) {
-                        val total = _state.value?.total ?: items.size
-                        if (share && saved.isNotEmpty()) pendingShare.value = saved
-                        // the service watches [state] and stops itself once it has gone foreground
-                        _state.value = ExportState(total, total, 1f, false, saved, failed, share)
-                        finished = true
-                    }
-                }
+    private val file = File(app.filesDir, "export_queue.json")
+    private val saver = Executors.newSingleThreadExecutor { Thread(it, "spektra-exports") }
+
+    init {
+        // restored now (the library is loaded), started by resume() once the UI is up
+        if (file.exists()) runCatching {
+            val (jobs, failed) = ExportQueue.resolve(ExportQueue.decode(file.readText())) { app.library.item(it) }
+            synchronized(lock) {
+                pending.addAll(jobs)
+                failures = failed
+                if (failed.isNotEmpty()) _state.value = ExportState(0, 0, 0f, false, failures = failed)
+                persist()
             }
         }
     }
 
-    /** Print one more item: joins the running batch, or starts one. */
-    @Synchronized fun enqueue(item: LibraryItem, options: ExportOptions) {
-        if (isRunning()) {
-            extra.add(item to options)
-            _state.update { it?.copy(total = it.total + 1) }
-        } else start(listOf(item), options, share = false)
+    fun isRunning() = _state.value?.running == true
+
+    /**
+     * Print the jobs restored from the last run. Call from the foreground UI: the
+     * foreground service may only be started while the app is visible.
+     */
+    fun resume() {
+        if (resumed.getAndSet(true)) return
+        synchronized(lock) { if (!active && pending.isNotEmpty()) startLocked() }
     }
 
-    fun cancel() { cancel = true; extra.clear() }
+    /** Print [items]: joins the running batch, or starts one. */
+    fun start(items: List<LibraryItem>, options: ExportOptions, share: Boolean) =
+        submit(items.map { ExportJob(it, options, share) })
 
-    fun dismiss() { if (!isRunning()) _state.value = null }
+    /** Print one more item (camera shots): joins the running batch, or starts one. */
+    fun enqueue(item: LibraryItem, options: ExportOptions) = submit(listOf(ExportJob(item, options)))
 
-    private suspend fun exportOne(item: LibraryItem, o: ExportOptions, progress: (Float) -> Unit): Uri? {
+    /** Queue the failed jobs again, with their own options; returns how many could be. */
+    fun retry(): Int = synchronized(lock) {
+        // the item as it is now: its look may have changed, it may have been removed
+        val jobs = failures.mapNotNull { f -> app.library.item(f.job.item.id)?.let { f.job.copy(item = it) } }
+        failures = emptyList()
+        if (jobs.isEmpty()) {
+            if (active) _state.update { it?.copy(failures = failures) } else _state.value = null
+            persist()
+        } else submitLocked(jobs)
+        jobs.size
+    }
+
+    private fun submit(jobs: List<ExportJob>) = synchronized(lock) { submitLocked(jobs) }
+
+    private fun submitLocked(jobs: List<ExportJob>) {
+        if (jobs.isEmpty()) return
+        pending.addAll(jobs)
+        // update {}: the worker changes progress from another thread
+        if (active) _state.update { it?.copy(total = it.total + jobs.size, share = it.share || jobs.any { j -> j.share }, failures = failures) }
+        else startLocked()
+        persist()
+    }
+
+    private fun startLocked() {
+        active = true
+        _state.value = ExportState(pending.size, 0, 0f, true, failures = failures, share = pending.any { it.share })
+        runCatching {
+            androidx.core.content.ContextCompat.startForegroundService(app, Intent(app, ExportService::class.java))
+        }
+        app.appScope.launch { work() }
+    }
+
+    private suspend fun work() {
+        val saved = ArrayList<Uri>()
+        val shared = ArrayList<Uri>()
+        var done = 0
+        while (true) {
+            val job = synchronized(lock) {
+                pending.firstOrNull() ?: run {
+                    // drained: finish under the lock, so a job submitted now starts a new batch instead of being dropped
+                    if (shared.isNotEmpty()) pendingShare.update { (it ?: emptyList()) + shared }
+                    // the service watches [state] and stops itself once it has gone foreground
+                    _state.update { s -> ExportState(s?.total ?: done, s?.total ?: done, 1f, false, saved.toList(), failures, s?.share == true) }
+                    active = false
+                    return
+                }
+            }
+            val gen = generation
+            _state.update { it?.copy(done = done, current = 0f) }
+            // never at the same time as a burst merge (memory)
+            val result = runCatching {
+                HeavyWork.run { exportOne(job.item, job.options, { generation != gen }) { p -> _state.update { it?.copy(current = p) } } }
+            }
+            result.exceptionOrNull()?.let { android.util.Log.e("SpektraExport", "export failed", it) }
+            val uri = result.getOrNull()
+            synchronized(lock) {
+                if (pending.firstOrNull() === job) pending.removeFirst()
+                when {
+                    uri != null -> { saved += uri; if (job.share) shared += uri }
+                    // stopped by the user: not a failure to retry
+                    generation != gen -> {}
+                    else -> failures = failures + ExportFailure(job, ExportQueue.reason(result.exceptionOrNull()))
+                }
+                done++
+                _state.update { it?.copy(done = done, saved = saved.toList(), failures = failures) }
+                persist()
+            }
+        }
+    }
+
+    /** Stop after the current item and drop the rest of the queue. */
+    fun cancel() = synchronized(lock) {
+        generation++
+        pending.clear()
+        persist()
+    }
+
+    /** Forget the finished batch and its failures. */
+    fun dismiss() = synchronized(lock) {
+        failures = emptyList()
+        if (active) _state.update { it?.copy(failures = failures) } else _state.value = null
+        persist()
+    }
+
+    /** Call under [lock]; the write itself is off the caller's thread, in order. */
+    private fun persist() {
+        val text = ExportQueue.encode(pending.toList(), failures)
+        saver.execute {
+            runCatching {
+                val tmp = File(file.parentFile, file.name + ".tmp")
+                tmp.writeText(text)
+                tmp.renameTo(file)
+            }.onFailure { android.util.Log.w("SpektraExport", "queue not saved", it) }
+        }
+    }
+
+    private suspend fun exportOne(item: LibraryItem, o: ExportOptions, cancelled: () -> Boolean, progress: (Float) -> Unit): Uri? {
         val setup = withContext(Dispatchers.Default) { app.looks.get(item.look, lutSize = 48) }
         val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
         val film = app.engine.film(item.look.film).name.replace(' ', '_')
@@ -139,7 +232,7 @@ class ExportManager(private val app: SpektraApp) {
             try {
                 cr.openFileDescriptor(uri, "rw")!!.use { pfd ->
                     app.glWorker.run {
-                        VideoExporter(app, this, item, setup, o.videoLongEdge, pfd.fileDescriptor, progress) { cancel }.run()
+                        VideoExporter(app, this, item, setup, o.videoLongEdge, pfd.fileDescriptor, progress, cancelled).run()
                     }
                 }
                 cr.update(uri, ContentValues().apply { put(MediaStore.Video.Media.IS_PENDING, 0) }, null, null)

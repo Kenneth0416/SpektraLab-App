@@ -258,19 +258,9 @@ fun CameraScreen(state: AppState) {
         }
     }
     DisposableEffect(Unit) { onDispose { viewfinder.release() } }
-    LaunchedEffect(evBias, session?.raw) {
-        viewfinder.evBias = evBias
-        // RAW cannot run the film preview, so the sensor exposure itself has to show the gesture.
-        val camera = session?.camera ?: return@LaunchedEffect
-        if (session?.raw != true) {
-            runCatching { camera.cameraControl.setExposureCompensationIndex(0) }
-            return@LaunchedEffect
-        }
-        val state = camera.cameraInfo.exposureState
-        val step = state.exposureCompensationStep.toFloat().takeIf { it > 0f } ?: return@LaunchedEffect
-        val index = (evBias / step).toInt().coerceIn(state.exposureCompensationRange.lower, state.exposureCompensationRange.upper)
-        runCatching { camera.cameraControl.setExposureCompensationIndex(index) }
-    }
+    LaunchedEffect(evBias) { viewfinder.evBias = evBias }
+    // The gesture is film exposure, applied once as autoEv + evBias on the saved frame.
+    // RAW must not also set camera exposure compensation, or the sensor and the film each add it.
     LaunchedEffect(front) { focusLocked = false }
     // zoom range of the bound lens (0.5x ultra-wide, tele steps)
     var zoomRange by remember { mutableStateOf(1f to 1f) }

@@ -57,9 +57,9 @@ class CaptureResults : CameraCaptureSession.CaptureCallback() {
     }
 
     /**
-     * A budget for [count] results. Creating it does not retain anything: the shot pins each
-     * sensor timestamp when that frame's image callback arrives, before waiting on the memory
-     * gate. [await] also pins a timestamp that completed before its image was delivered.
+     * A budget for [count] results. Creating this does not retain any timestamp. A timestamp
+     * is pinned only from the camera callback, before that frame is queued for decode.
+     * [await] also pins a timestamp that completed before its image was delivered.
      */
     fun pinIncoming(count: Int): CapturePin {
         require(count > 0)
@@ -150,13 +150,15 @@ class RawShooter(private val context: Context) {
     var onFinished: (first: Uri, merged: Uri?, framesUsed: Float) -> Unit = { _, _, _ -> }
 
     private val main = ContextCompat.getMainExecutor(context)
-    /** Image -> DNG bytes; quick, so the camera gets its buffers back. */
-    private val io = Executors.newSingleThreadExecutor()
+    /** Camera callbacks only. Must not block: it pins metadata and hands the frame to [io]. */
+    private val callbacks = Executors.newSingleThreadExecutor { Thread(it, "spektra-raw-callback") }
+    /** DNG bytes and the memory-gate wait. One frame at a time, so the camera buffer is released. */
+    private val io = Executors.newSingleThreadExecutor { Thread(it, "spektra-raw-decode") }
     /** Alignment and merging, one shot after the other (memory). */
-    private val work = Executors.newSingleThreadExecutor()
+    private val work = Executors.newSingleThreadExecutor { Thread(it, "spektra-raw-merge") }
     private val merging = AtomicInteger()
     // A lease lasts through capture AND merge; no later shot can queue more RAW arrays.
-    private val admission = ShotAdmission { io.shutdown(); work.shutdown() }
+    private val admission = ShotAdmission { callbacks.shutdown(); io.shutdown(); work.shutdown() }
     val available get() = admission.available
 
     /** Stop new shots; queued callbacks still close their ImageProxy and drain safely. */
@@ -184,16 +186,23 @@ class RawShooter(private val context: Context) {
               onExposed: (ok: Boolean, retry: Boolean) -> Unit): Boolean {
         require(frames in 1..MAX_FRAMES)
         val lease = admission.acquire() ?: return false
-        // The pin object exists before takePicture, but a timestamp is pinned only when its
-        // image callback arrives. That is still before the memory-gate wait and DNG matching.
+        // pinIncoming does not retain timestamps. Each callback pins its own timestamp on
+        // [callbacks], then queues decode on [io]. [io] may block in HeavyWork; later callbacks
+        // must still pin while it does, or the 48-entry cache can drop their results.
         val shot = Shot(frames, name, evBias, onExposed, lease, results.pinIncoming(frames))
         Log.i(TAG, "RAW shot=$name requestedFrames=$frames iso=${results.iso}")
         // At most MAX_FRAMES callbacks/tasks exist: admission stays closed through merging.
         repeat(frames) { index ->
             try {
-                capture.takePicture(io, object : ImageCapture.OnImageCapturedCallback() {
-                    override fun onCaptureSuccess(image: ImageProxy) = shot.capture(image, chars)
-                    override fun onError(exception: ImageCaptureException) = shot.frame(null, exception)
+                capture.takePicture(callbacks, object : ImageCapture.OnImageCapturedCallback() {
+                    override fun onCaptureSuccess(image: ImageProxy) = shot.accept(image, chars)
+                    override fun onError(exception: ImageCaptureException) {
+                        try {
+                            io.execute { shot.frame(null, exception) }
+                        } catch (rejected: java.util.concurrent.RejectedExecutionException) {
+                            Log.w(TAG, "RAW error arrived after decode stopped", rejected)
+                        }
+                    }
                 })
             } catch (e: Exception) {
                 // Requests that threw synchronously will never deliver callbacks. Count those
@@ -246,6 +255,19 @@ class RawShooter(private val context: Context) {
         private var planner: BurstMerge.Planner? = null
         /** Held from the first retained frame until merge targets and planner arrays are gone. */
         private var memory: java.io.Closeable? = null
+
+        /** Camera callback thread: pin first, then queue the blocking decode. Never waits here. */
+        @androidx.annotation.OptIn(ExperimentalGetImage::class)
+        fun accept(image: ImageProxy, chars: CameraCharacteristics) {
+            val sensorRaw = image.image?.format == ImageFormat.RAW_SENSOR
+            val timestamp = if (sensorRaw) image.image?.timestamp else null
+            try {
+                RawFrameDispatch.retainThenDecode(timestamp, capturePin, io) { capture(image, chars) }
+            } catch (rejected: java.util.concurrent.RejectedExecutionException) {
+                image.close()
+                Log.w(TAG, "RAW frame arrived after decode stopped", rejected)
+            }
+        }
 
         @androidx.annotation.OptIn(ExperimentalGetImage::class)
         fun capture(image: ImageProxy, chars: CameraCharacteristics) {
@@ -386,5 +408,17 @@ class RawShooter(private val context: Context) {
     companion object {
         private const val TAG = "SpektraShot"
         const val MAX_FRAMES = 5
+    }
+}
+
+/**
+ * Pins a capture timestamp before queueing work that may block. The camera callback
+ * executor and the decode executor are different threads; sharing one lets the first
+ * frame's memory wait hide every later timestamp from the preview cache.
+ */
+internal object RawFrameDispatch {
+    fun retainThenDecode(timestamp: Long?, pin: CaptureResults.CapturePin, decode: java.util.concurrent.Executor, block: () -> Unit) {
+        if (timestamp != null) pin.completed(timestamp)
+        decode.execute(block)
     }
 }

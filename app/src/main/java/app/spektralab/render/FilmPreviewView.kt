@@ -94,6 +94,18 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
         if (r.sourceKey == key) { r.pendingFull = source; requestRender() }
     }
 
+    /**
+     * Swap in a sharper rendition of the photo already on screen (same picture, same
+     * exposure): the developing animation and the first-frame state carry on undisturbed.
+     */
+    fun refinePhoto(source: SourceImage, key: Pair<Long, String>) = queueEvent {
+        if (r.sourceKey != key) return@queueEvent
+        r.printDirty = true
+        r.pendingBitmap = source
+        r.currentBitmap = source
+        requestRender()
+    }
+
     fun setPhoto(bitmap: SourceImage, autoEv: Float, seed: Int, key: Pair<Long, String>) = queueEvent {
         if (r.sourceKey != key) return@queueEvent
         r.printDirty = true

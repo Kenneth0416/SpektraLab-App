@@ -165,6 +165,12 @@ class AppState(application: Application) : AndroidViewModel(application) {
         history.value = emptyList(); redo.value = emptyList()
         sheet.value = Sheet.NONE
         editId.value = id
+        // start on the two slow parts of opening a frame before the darkroom is even composed:
+        // the first rendition of the picture and the look's tables (both are cached)
+        library.item(id)?.let { item ->
+            if (app.quick.worth(item)) app.appScope.launch(Dispatchers.IO) { app.quick.load(item) }
+            app.appScope.launch { runCatching { app.looks.get(item.look) } }
+        }
     }
 
     fun back() {
@@ -235,6 +241,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
         if (picked.value.isEmpty()) return say("先圈出要移除的项目")
         val n = picked.value.size
         app.thumbs.forget(picked.value)
+        app.quick.forget(picked.value)
         library.remove(picked.value)
         picked.value = emptyList(); selecting.value = false
         say("已移除 $n 项，相册原片不受影响")

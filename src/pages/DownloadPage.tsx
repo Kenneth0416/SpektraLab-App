@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clipboard, Copy, Download, FileArchive, FolderOpen, Github, Image, ShieldCheck, SlidersHorizontal, Smartphone, Terminal } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
+import { canDownload } from '../support/gate';
 import { downloadMeta } from '../generated/download-meta';
 import { Reveal } from '../components/Reveal';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -58,6 +59,8 @@ export function DownloadPage() {
       setCopyFailed(target);
     }
   };
+
+  if (!canDownload()) return <Navigate to="/coffee" replace />;
 
   return (
     <main id="main-content" className="download-page">

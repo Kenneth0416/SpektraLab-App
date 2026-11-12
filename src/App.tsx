@@ -6,6 +6,8 @@ import { HomePage } from './pages/HomePage';
 import { useLanguage } from './i18n/LanguageContext';
 
 const DownloadPage = lazy(() => import('./pages/DownloadPage').then((module) => ({ default: module.DownloadPage })));
+const CoffeePage = lazy(() => import('./pages/CoffeePage').then((module) => ({ default: module.CoffeePage })));
+const ThanksPage = lazy(() => import('./pages/ThanksPage').then((module) => ({ default: module.ThanksPage })));
 const CreditsPage = lazy(() => import('./pages/CreditsPage').then((module) => ({ default: module.CreditsPage })));
 
 function RouteEffects() {
@@ -16,6 +18,10 @@ function RouteEffects() {
     let page = messages.meta.homeTitle;
     if (location.pathname === '/download') {
       page = messages.meta.downloadTitle;
+    } else if (location.pathname === '/coffee') {
+      page = locale === 'en' ? 'Buy me a coffee' : locale === 'zh-Hans' ? '请我喝一杯' : '請我喝一杯';
+    } else if (location.pathname === '/thanks') {
+      page = locale === 'en' ? 'Thank you' : locale === 'zh-Hans' ? '感谢支持' : '感謝支持';
     } else if (location.pathname === '/credits' || location.pathname === '/licenses') {
       page = messages.meta.creditsTitle;
     }
@@ -52,6 +58,8 @@ export default function App() {
       <Suspense fallback={<div className="route-fallback" />}>
         <Routes>
           <Route path="/" element={<HomePage />} />
+          <Route path="/coffee" element={<CoffeePage />} />
+          <Route path="/thanks" element={<ThanksPage />} />
           <Route path="/download" element={<DownloadPage />} />
           <Route path="/credits" element={<CreditsPage />} />
           <Route path="/licenses" element={<CreditsPage />} />

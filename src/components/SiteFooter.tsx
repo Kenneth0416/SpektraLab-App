@@ -20,7 +20,7 @@ export function SiteFooter() {
             <span>{messages.footer.explore}</span>
             <Link to="/#darkroom">{messages.footer.lab}</Link>
             <Link to="/#craft">{messages.footer.craft}</Link>
-            <Link to="/download">{messages.footer.download}</Link>
+            <Link to="/coffee">{messages.footer.download}</Link>
             <Link to="/credits">{messages.footer.credits}</Link>
           </div>
           <div>

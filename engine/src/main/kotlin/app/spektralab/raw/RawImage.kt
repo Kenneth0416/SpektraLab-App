@@ -129,8 +129,9 @@ class RawImage(
      * DNG: WhiteLevel. Canon (CR2, CR3): the ColorData SpecularWhiteLevel, since LibRaw's `maximum`
      * (colour table / bit depth) is above the clip point at many ISOs. Panasonic RawFormat 6 / 7: the
      * largest linearity limit. Everything else: LibRaw's `maximum` (colour-table value, else the
-     * format's white tag or bit depth), which is where the real Nikon, Sony, Olympus and Fuji samples
-     * clip; their lower recorded linearity limits (LibRaw `linear_max`) are not used.
+     * format's white tag or bit depth), which is what LibRaw renders with and what the real Nikon,
+     * Sony and Fuji samples' clipped highlights reach; their lower recorded linearity limits (LibRaw
+     * `linear_max`) are not used.
      */
     val white: Float,
     /**

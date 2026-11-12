@@ -16,5 +16,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "SpektraLab"
+rootProject.name = "Silvercam"
 include(":engine", ":app")

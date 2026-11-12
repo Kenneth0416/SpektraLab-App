@@ -20,11 +20,12 @@ import kotlin.math.sin
 
 /**
  * Back of a virtual photo paper: port of spektrafilm_gui `virtual_photo_paper_back.py`
- * (logo stamps on a rotated rhombic lattice, light paper glare). spektrafilm shows it as
- * the canvas before a picture is developed; here it is the placeholder while a frame loads.
+ * (stamps on a rotated rhombic lattice, light paper glare). spektrafilm shows it as
+ * the canvas before a picture is developed; here it is the placeholder while a frame loads,
+ * using a neutral geometric archival mark rather than the upstream spektrafilm logo.
  */
 object PaperBack {
-    private const val GRID_SCALE = 0.22          // logo long edge / canvas long edge
+    private const val GRID_SCALE = 0.22          // mark long edge / canvas long edge
     private const val CENTER_DISTANCE = 0.25     // tile-centre spacing / canvas long edge
     private const val ROMBIC_GRID_ANGLE = 72.0   // degrees
     private const val GLOBAL_ROTATION = 16.0     // degrees
@@ -41,7 +42,7 @@ object PaperBack {
     fun render(context: Context, width: Int, height: Int, seed: Int = 0): Bitmap {
         val key = "${width}x$height/$seed"
         cache.get(key)?.let { return it }
-        val src = logo ?: BitmapFactory.decodeResource(context.resources, R.drawable.spektrafilm_paper_watermark,
+        val src = logo ?: BitmapFactory.decodeResource(context.resources, R.drawable.paper_back_mark,
             BitmapFactory.Options().apply { inScaled = false }).also { logo = it }
         val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)

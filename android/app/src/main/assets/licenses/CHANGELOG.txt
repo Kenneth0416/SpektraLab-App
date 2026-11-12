@@ -1,0 +1,33 @@
+================================================================================
+CHANGELOG — Upstream spektrafilm Profiles & LUT Collection Notice
+================================================================================
+
+Upstream Work:
+  spektrafilm by Andrea Volpato
+  Canonical Source: https://github.com/andreavolpato/spektrafilm
+  Upstream Commit: 3bb2c2d2801ff68b92019cf1dbcbb133d60832bc (v0.3.4)
+  Data License: Creative Commons Attribution-ShareAlike 4.0 International
+                (CC BY-SA 4.0) — see SPEKTRAFILM_LICENSE.txt (unmodified)
+
+Downstream Project:
+  Silvercam / 银盐工坊 / 銀鹽工坊
+  Source Repository: https://github.com/Kenneth0416/SpektraLab-App
+
+--------------------------------------------------------------------------------
+Notes on Prototype vs. Native Engine Data
+--------------------------------------------------------------------------------
+
+2026-11-10 — Native Engine Profile & LUT Baking (app/ & engine/)
+  - In the repository's native Android build (app/ + engine/), upstream
+    spektrafilm v0.3.4 profiles (src/spektrafilm/data/profiles/*.json),
+    Hanatos 2025 tc_lut tables, CAT16 matrices, scan_lut 3D LUTs, and optical
+    tables were baked into SPK1 binary files (*.spk) via tools/bake/bake_spektrafilm.py.
+
+2026-11-11 — WebView Prototype Wrapper Notices (android/)
+  - This APK (app.spektralab.prototype) is the offline CSS/SVG WebView
+    interaction prototype. It does NOT bundle .spk binary profile/LUT files;
+    film treatments here are approximate CSS filters over built-in SVG scenes.
+  - Because the repository derives from spektrafilm and documents both the
+    interactive prototype and the native engine, the full unmodified
+    SPEKTRAFILM_LICENSE.txt (CC BY-SA 4.0 + preamble) and this CHANGELOG.txt
+    are bundled locally alongside GPL-3.0.txt and NOTICE.txt.

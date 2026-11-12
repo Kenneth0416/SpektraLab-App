@@ -1,5 +1,7 @@
 <resources>
-    <string name="app_name">SpektraLab</string>
+    <string name="app_name">银盐工坊</string>
+    <string name="brand_kicker">银盐工坊 · CONTACT SHEET</string>
+    <string name="about_title">关于 银盐工坊 与开源许可</string>
     <string name="export_channel">冲印</string>
     <string name="export_running">正在冲印…</string>
 </resources>

@@ -17,6 +17,10 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.FloatExponentialDecaySpec
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.animateDecay
+import kotlinx.coroutines.Job
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.graphics.Brush
@@ -32,7 +36,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -54,7 +57,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -120,11 +122,11 @@ fun EditorScreen(state: AppState, id: Long) {
     val preview = remember { FilmPreviewView(context) }
     DisposableEffect(Unit) { onDispose { preview.release() } }
     val engine = state.app.engine
-    var developed by remember(item.id) { mutableStateOf(false) }
+    var developed by remember(item.id, item.uri) { mutableStateOf(false) }
     val gray18 by state.gray18.collectAsState()
     val revealOn by state.reveal.collectAsState()
     LaunchedEffect(revealOn) { preview.revealEnabled = revealOn }
-    DisposableEffect(preview) {
+    DisposableEffect(preview, item.id, item.uri) {
         preview.onFirstFrame = { developed = true }
         preview.onVideoState = { isPlaying, _ -> playing = isPlaying }
         preview.onGpuError = { msg -> state.say(msg) }
@@ -145,15 +147,6 @@ fun EditorScreen(state: AppState, id: Long) {
     }
     LaunchedEffect(item.id) { preview.setFrameInfo(item.id.toInt() % 36 + 1, item.dateTaken) }
 
-    // source
-    LaunchedEffect(item.id) {
-        playing = false
-        if (item.isVideo) preview.setVideo(Uri.parse(item.uri), item.rotation, item.width, item.height, item.autoEv)
-        else {
-            val bmp = withContext(Dispatchers.IO) { runCatching { Media.loadSource(context, Uri.parse(item.uri), previewDecodeEdge(context), tryRaw = item.isRaw) }.getOrNull() }
-            if (bmp != null) preview.setPhoto(bmp, item.autoEv, item.id.toInt()) else state.say("无法读取原片")
-        }
-    }
     // look -> spektrafilm tables (spectral print stage), off the main thread
     val lookState = rememberUpdatedState(look)
     LaunchedEffect(Unit) {
@@ -163,6 +156,42 @@ fun EditorScreen(state: AppState, id: Long) {
         }
     }
     LaunchedEffect(hold) { preview.setOriginal(hold) }
+    // zoom lives in the renderer (sharp re-developed print, see FilmPreviewView.setZoom)
+    var zoom by remember { mutableStateOf(PreviewZoom.NONE) }
+    var zoomAnim by remember { mutableStateOf<Job?>(null) }
+    val zoomScope = rememberCoroutineScope()
+    LaunchedEffect(Unit) { snapshotFlow { zoom }.collect { preview.setZoom(it.window()) } }
+    fun zoomTo(target: PreviewZoom) {
+        zoomAnim?.cancel()
+        val from = zoom
+        zoomAnim = zoomScope.launch {
+            // critically damped like the rest of the darkroom: an overshoot would uncover the frame
+            animate(0f, 1f, animationSpec = Motion.glide) { t, _ -> zoom = lerp(from, target, t) }
+            zoom = target
+        }
+    }
+
+    if (item.isVideo) {
+        LaunchedEffect(item.id, item.uri) {
+            preview.setSource(item.id to item.uri)
+            playing = false
+            preview.setVideo(Uri.parse(item.uri), item.rotation, item.width, item.height, item.autoEv)
+        }
+    } else PhotoSourceEffects(
+        source = item.id to item.uri, zoomed = zoom.zoomed,
+        worthFull = item.isRaw || maxOf(item.width, item.height) > previewDecodeEdge(context),
+        load = { full ->
+            withContext(Dispatchers.IO) {
+                runCatching { Media.loadSource(context, Uri.parse(item.uri),
+                    if (full) FilmPreviewView.FULL_EDGE else previewDecodeEdge(context),
+                    tryRaw = item.isRaw, fast = !full) }.getOrNull()
+            }
+        },
+        onSource = { playing = false; preview.setSource(it) },
+        onPreview = { src, key -> preview.setPhoto(src, item.autoEv, item.id.toInt(), key) },
+        onFull = { src, key -> preview.setFullPhoto(src, key) },
+        onError = { state.say("无法读取原片") },
+    )
 
     val fold = LocalFold.current
     val wide = widthClass() != WidthClass.COMPACT
@@ -197,11 +226,28 @@ fun EditorScreen(state: AppState, id: Long) {
                 Framing.compute(item.width.coerceAtLeast(1), item.height.coerceAtLeast(1), look, 2048)
             }
             val aspect = framing.outWidth.toFloat() / framing.outHeight
+            // another photo or another frame shape: start from the whole print again
+            LaunchedEffect(item.id, item.uri, framing) { zoomAnim?.cancel(); zoom = PreviewZoom.NONE }
             BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 // fit the frame into whatever the pane gives us (portrait or landscape pane)
                 val boxAspect = if (maxHeight.value > 0f) maxWidth.value / maxHeight.value else 1f
                 Box(Modifier.aspectRatio(aspect, matchHeightConstraintsFirst = aspect < boxAspect)
-                    .pointerInput(Unit) { detectTapGestures(onPress = { hold = true; tryAwaitRelease(); hold = false }) }) {
+                    .previewGestures(
+                        zoom = { zoom },
+                        onZoom = { zoomAnim?.cancel(); zoom = it },
+                        onRelease = { anchor, v ->
+                            val rest = zoom.settled(anchor.x, anchor.y)
+                            if (rest != zoom || v.getDistance() < 0.3f) zoomTo(rest)
+                            else zoomAnim = zoomScope.launch {
+                                // fling: glide on and stop at the edges (clamped every frame)
+                                val decay = FloatExponentialDecaySpec(frictionMultiplier = 1.6f, absVelocityThreshold = 0.01f)
+                                launch { animateDecay(zoom.x, v.x, decay) { x, _ -> zoom = zoom.copy(x = x).clamped() } }
+                                launch { animateDecay(zoom.y, v.y, decay) { y, _ -> zoom = zoom.copy(y = y).clamped() } }
+                            }
+                        },
+                        onDoubleTap = { p -> zoomTo(zoom.doubleTapTarget(p.x, p.y)) },
+                        onHold = { hold = it },
+                    )) {
                     AndroidView({ preview }, Modifier.fillMaxSize())
                     // spektrafilm's virtual photo-paper back until the first frame is developed
                     androidx.compose.animation.AnimatedVisibility(!developed, enter = EnterTransition.None, exit = fadeOut(tween(350))) {
@@ -218,6 +264,13 @@ fun EditorScreen(state: AppState, id: Long) {
                                 (slideOutVertically(tween(140)) { -it } + fadeOut(tween(100)))
                         }) { label ->
                         Text(label, fontFamily = Fonts.mono, fontSize = 9.sp, color = Pal.text,
+                            modifier = Modifier.background(Color(0x99140807)).padding(horizontal = 6.dp, vertical = 2.dp))
+                    }
+                    // zoom readout; only its text reads the per-frame zoom, not the whole preview
+                    val showZoom by remember { derivedStateOf { zoom.scale > 1.05f } }
+                    androidx.compose.animation.AnimatedVisibility(showZoom, Modifier.align(Alignment.TopStart).padding(10.dp),
+                        enter = fadeIn(tween(150)), exit = fadeOut(tween(250))) {
+                        Text(String.format(Locale.ROOT, "%.1f×", zoom.scale), fontFamily = Fonts.mono, fontSize = 9.sp, color = Pal.text,
                             modifier = Modifier.background(Color(0x99140807)).padding(horizontal = 6.dp, vertical = 2.dp))
                     }
                 }
@@ -247,17 +300,18 @@ fun EditorScreen(state: AppState, id: Long) {
         }
         // 3. tools: tabs + panel
         ToolDeck(state, tool, { tool = it }, look, accent, engine.film(LookMapper.filmStock(look)).isPositive, item.isVideo,
-            onSet = { key, l -> state.setLook(key, l) }, onApply = { state.applyLook(it) })
+            onSet = { key, l -> state.setLook(key, l) }, onApply = { state.applyLook(it) }, source = item)
     }
 }
 
 /**
  * Tool tabs + the panel of the selected tool, bound to any look (an item in the editor,
- * or the look loaded in the camera).
+ * or the look loaded in the camera). The film and paper pickers show [source] through
+ * each stock; without one (the camera) they show a built-in test scene.
  */
 @Composable
 fun ToolDeck(state: AppState, tool: String, onTool: (String) -> Unit, look: Look, accent: Color, positive: Boolean, isVideo: Boolean,
-             onSet: (String, Look) -> Unit, onApply: (Look) -> Unit) {
+             onSet: (String, Look) -> Unit, onApply: (Look) -> Unit, source: LibraryItem? = null) {
     Column(Modifier.fillMaxSize().dealIn(2, fromY = 120f)) {
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp)) {
             TOOLS.forEach { t ->
@@ -282,7 +336,7 @@ fun ToolDeck(state: AppState, tool: String, onTool: (String) -> Unit, look: Look
                 (slideOutHorizontally(Motion.glideOffset) { -dir * it / 5 } + fadeOut(tween(110)))
         }) { t ->
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 12.dp)) {
-                ToolPanel(state, t, isVideo, look, accent, positive, onSet, onApply)
+                ToolPanel(state, t, isVideo, look, accent, positive, source, onSet, onApply)
             }
         }
     }
@@ -412,7 +466,7 @@ internal fun Safelight(modifier: Modifier) {
 }
 
 @Composable
-private fun ToolPanel(state: AppState, tool: String, isVideo: Boolean, look: Look, accent: Color, positive: Boolean,
+private fun ToolPanel(state: AppState, tool: String, isVideo: Boolean, look: Look, accent: Color, positive: Boolean, source: LibraryItem?,
                       onSet: (String, Look) -> Unit, onApply: (Look) -> Unit) {
     val (title, desc) = when (tool) {
         "film" -> "胶片 · ${Catalog.film(look.film).name}" to "决定色彩与影调的底子。"
@@ -439,29 +493,8 @@ private fun ToolPanel(state: AppState, tool: String, isVideo: Boolean, look: Loo
     Spacer(Modifier.height(10.dp))
     when (tool) {
         "film" -> {
-            Row(Modifier.horizontalScroll(rememberScrollState())) {
-                Catalog.films.forEach { f ->
-                    val on = f.stock == look.film
-                    val c = Color(f.accent)
-                    // the loaded roll lifts out of the row; its canister cap fills with the roll's colour
-                    val lift by animateFloatAsState(if (on) 1f else 0f, Motion.settle, label = "lift")
-                    val cardBg by animateColorAsState(if (on) Color(0xFF24100D) else Color.Transparent, tween(250), label = "cardBg")
-                    val ring by animateColorAsState(if (on) c else Pal.line, tween(250), label = "ring")
-                    Column(Modifier.padding(end = 10.dp, top = 6.dp).width(92.dp)
-                        .graphicsLayer { translationY = -5.dp.toPx() * lift; scaleX = 1f + 0.04f * lift; scaleY = 1f + 0.04f * lift }
-                        .springClick(0.93f) { set("film", look.copy(film = f.stock)) }
-                        .clip(RoundedCornerShape(10.dp)).background(cardBg)
-                        .border(1.dp, ring, RoundedCornerShape(10.dp)).padding(8.dp)) {
-                        Box(Modifier.size(30.dp).graphicsLayer { rotationZ = 360f * lift }.clip(CircleShape)
-                            .background(c.copy(alpha = 0.22f * lift.coerceIn(0f, 1f))).border(2.dp, c, CircleShape), contentAlignment = Alignment.Center) {
-                            Text(f.iso, color = c, fontFamily = Fonts.mono, fontSize = 8.sp)
-                        }
-                        Spacer(Modifier.height(6.dp))
-                        Text(f.name, color = Pal.text, fontSize = 12.sp, maxLines = 1)
-                        Text(f.kind, color = Pal.dim, fontSize = 10.sp)
-                    }
-                }
-            }
+            // every roll as a square frame of this picture, so the choice is made by eye
+            FrameRow(state.app, source, filmChoices(look), look.film) { set("film", look.copy(film = it)) }
             Spacer(Modifier.height(8.dp))
             Crossfade(Catalog.film(look.film).note, animationSpec = tween(250), label = "note") { n ->
                 Text(n, color = Pal.dim, fontSize = 12.sp)
@@ -470,8 +503,12 @@ private fun ToolPanel(state: AppState, tool: String, isVideo: Boolean, look: Loo
         "paper" -> {
             if (positive) Text("反转片冲出来就是正像，直接扫描，不再印相。", color = Pal.dim, fontSize = 12.sp)
             else {
-                FlowRow { Catalog.papers.forEach { p -> Chip(p.label, p.id == look.paper, accent) { set("paper", look.copy(paper = p.id)) } } }
-                Text(Catalog.paper(look.paper).note, color = Pal.dim, fontSize = 12.sp)
+                // the same negative printed on each paper
+                FrameRow(state.app, source, paperChoices(look, accent), look.paper) { set("paper", look.copy(paper = it)) }
+                Spacer(Modifier.height(8.dp))
+                Crossfade(Catalog.paper(look.paper).note, animationSpec = tween(250), label = "paperNote") { n ->
+                    Text(n, color = Pal.dim, fontSize = 12.sp)
+                }
                 RulerSlider("印相曝光", look.printEv, -2.0..2.0, 0.1, 0.0, accent, { signed(it, 1, " EV") }) { set("pexp", look.copy(printEv = it)) }
                 RulerSlider("眩光", look.glare, 0.0..1.0, 0.01, 0.0, accent, { "${(it * 100).toInt()}%" }) { set("glare", look.copy(glare = it)) }
             }
@@ -525,11 +562,6 @@ private fun ToolPanel(state: AppState, tool: String, isVideo: Boolean, look: Loo
             FlowRow { Catalog.borders.forEach { b -> Chip(b.label, b.id == look.border, accent) { set("border", look.copy(border = b.id)) } } }
             Text(Catalog.border(look.border).note, color = Pal.dim, fontSize = 12.sp)
             ToggleRow("日期后背", look.dateStamp, accent) { set("date", look.copy(dateStamp = !look.dateStamp)) }
-            Text("显示（不影响导出）", color = Pal.dim, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
-            val gray18 by state.gray18.collectAsState()
-            val reveal by state.reveal.collectAsState()
-            ToggleRow("18% 灰背景", gray18, accent) { state.setGray18(!gray18) }
-            ToggleRow("显影动画（拍立得式）", reveal, accent) { state.setReveal(!reveal) }
         }
     }
 }

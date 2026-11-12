@@ -1,5 +1,20 @@
+node_modules/
+dist/
+.DS_Store
+*.local
+.vite/
+public/downloads/*.zip
+# Keep the verified corresponding-source snapshot with the versioned APK.
+!public/downloads/Silvercam-App-source.zip
+src/generated/download-meta.ts
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
 .gradle/
 build/
+app/build/
+engine/build/
 local.properties
 .idea/
 *.iml

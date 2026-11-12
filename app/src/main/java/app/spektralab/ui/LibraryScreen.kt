@@ -45,11 +45,13 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.spektralab.R
 import app.spektralab.data.LibraryItem
 import app.spektralab.engine.Catalog
 import app.spektralab.engine.Look
@@ -85,7 +87,7 @@ fun LibraryScreen(state: AppState) {
             // header
             Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 16.dp, top = 14.dp), verticalAlignment = Alignment.Bottom) {
                 Column(Modifier.weight(1f)) {
-                    Text("SPEKTRALAB · CONTACT SHEET", fontFamily = Fonts.mono, fontSize = 9.sp, color = Pal.grey, letterSpacing = 1.5.sp)
+                    Text(stringResource(R.string.brand_kicker), fontFamily = Fonts.mono, fontSize = 9.sp, color = Pal.grey, letterSpacing = 1.5.sp)
                     // the printed title is swapped for a handwritten note when circling frames
                     AnimatedContent(selecting, label = "title", transitionSpec = {
                         (slideInVertically(Motion.glideOffset) { if (targetState) it / 2 else -it / 2 } + fadeIn(tween(180))) togetherWith
@@ -106,9 +108,15 @@ fun LibraryScreen(state: AppState) {
                         }
                     }
                 }
-                Text(if (selecting) "完成" else "选择", color = Pal.ink, fontSize = 15.sp,
-                    modifier = Modifier.clip(RoundedCornerShape(16.dp)).border(1.dp, Pal.ink, RoundedCornerShape(16.dp))
-                        .springClick { state.toggleSelecting() }.padding(horizontal = 14.dp, vertical = 6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("关于", color = Pal.ink, fontSize = 14.sp,
+                        modifier = Modifier.clip(RoundedCornerShape(16.dp)).border(1.dp, Pal.grey.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
+                            .semantics { contentDescription = "关于与开源许可" }
+                            .springClick { state.sheet.value = Sheet.ABOUT }.padding(horizontal = 12.dp, vertical = 6.dp))
+                    Text(if (selecting) "完成" else "选择", color = Pal.ink, fontSize = 15.sp,
+                        modifier = Modifier.clip(RoundedCornerShape(16.dp)).border(1.dp, Pal.ink, RoundedCornerShape(16.dp))
+                            .springClick { state.toggleSelecting() }.padding(horizontal = 14.dp, vertical = 6.dp))
+                }
             }
             // filters with a red crayon underline
             Row(Modifier.padding(start = 20.dp, top = 10.dp, bottom = 4.dp)) {

@@ -1,0 +1,18 @@
+{
+  "commit": "b93f6e45c194f5df9b02a43b1af9a54b4f41f33f",
+  "files": {
+    "src/tables/colordata.cpp": "621d6a7e1a1904095d27087cf10ac7e935c6a984ec336816b79c273a8eaca768",
+    "src/metadata/identify.cpp": "715cfb9904b8b657f3f658e653da5fea4efa4bc78d16bd955c796843b1696e14",
+    "src/metadata/normalize_model.cpp": "1e12886c679c8941eb4f84e447ba89c7c88c31f3b2a05508fd1510939eb3fdfa",
+    "libraw/libraw_version.h": "b693f77b382dc4b9920625cc30671c99f336b16ba8bd4601474cebc1e7b3d0c5",
+    "COPYRIGHT": "574c88f5dd59414cfc896293a63defbc2d525a418ed413d7ab7dcc43cf79c509",
+    "LICENSE.LGPL": "eea173a556abac0370461e57e12aab266894ea6be3874c2be05fd87871f75449",
+    "LICENSE.CDDL": "0e3098d2d54a12434715f6679ea408d57da5e8d613c385c58ecc6fe5d30cc81f"
+  },
+  "release": "0.22.2",
+  "repository": "https://github.com/LibRaw/LibRaw",
+  "generatedTableRows": 808,
+  "regeneratedByteIdentical": true,
+  "verifiedDate": "2026-11-12",
+  "licenseRoute": "LGPL-2.1 section 3 conversion of downstream derived code to GPL-3.0"
+}

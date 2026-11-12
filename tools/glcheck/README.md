@@ -8,7 +8,7 @@ browser settings, or require an HTTP server.
 Generate the production shader exports (coordinate Gradle with other workers):
 
 ```bash
-./gradlew :engine:test -Dspektra.gldump=/tmp/glcheck
+./gradlew :engine:test -Dspektra.gldump=/tmp/glcheck   # shaders + look tables + CPU expectations
 ```
 
 Then, from the repository root:
@@ -112,7 +112,8 @@ These commands remain available unchanged; they require Node, Playwright, and Ch
 
 ```bash
 cp tools/glcheck/*.js /tmp/glcheck/
-node /tmp/glcheck/pipeline.js
-node /tmp/glcheck/grain.js
-node /tmp/glcheck/blur.js /tmp/glcheck
+node /tmp/glcheck/pipeline.js   # expose -> couplers -> develop -> print/scan LUT, vs CPU (8-bit error)
+node /tmp/glcheck/grain.js      # sublayer Poisson grain: mean / std vs CPU model
+node /tmp/glcheck/blur.js /tmp/glcheck   # pyramid Gaussian: sigma and energy
+node /tmp/glcheck/merge.js /tmp/glcheck  # burst merge gather vs CPU (16-bit error)
 ```

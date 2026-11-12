@@ -10,6 +10,7 @@
     <string name="export_notification_progress">沖印中 %1$d / %2$d</string>
     <string name="export_result_channel">沖印結果</string>
     <string name="export_failed_items">%1$d 項沒沖出來</string>
+    <string name="export_stopped">沖印已停止</string>
     <string name="export_failed_saved">另有 %1$d 項已存到相簿</string>
     <string name="export_queued_count">已加入沖印佇列 · %1$d 項</string>
     <string name="retry_source_missing">原片已不在燈箱，無法重試</string>

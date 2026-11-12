@@ -10,6 +10,7 @@
     <string name="export_notification_progress">Developing %1$d / %2$d</string>
     <string name="export_result_channel">Development results</string>
     <string name="export_failed_items">%1$d items did not develop</string>
+    <string name="export_stopped">Development stopped</string>
     <string name="export_failed_saved">Another %1$d items were saved to the gallery</string>
     <string name="export_queued_count">Added to the development queue · %1$d items</string>
     <string name="retry_source_missing">The originals are no longer in the library, so they cannot be retried</string>

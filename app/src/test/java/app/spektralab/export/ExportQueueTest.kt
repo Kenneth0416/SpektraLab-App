@@ -65,6 +65,17 @@ class ExportQueueTest {
         assertTrue(saved.failed.isEmpty())
     }
 
+    @Test fun storedReasonNamesSurviveRoundTripAndUnknownNamesFallBack() {
+        // the queue file stores the stable enum name, so a queue saved under one
+        // language restores the same reason under another
+        val f = ExportFailure(ExportJob(item(3), ExportOptions()), ExportReason.MEMORY)
+        val (_, failed) = ExportQueue.resolve(ExportQueue.decode(ExportQueue.encode(emptyList(), listOf(f)))) { item(it) }
+        assertEquals(ExportReason.MEMORY, failed.single().reason)
+        // a queue written by an unknown future version still restores, as OTHER
+        val unknown = ExportQueue.decode("""{"failed":[{"id":3,"reason":"NO_SPACE_LEFT"}]}""")
+        assertEquals(ExportReason.OTHER, ExportQueue.resolve(unknown) { item(it) }.second.single().reason)
+    }
+
     @Test fun failureReasons() {
         assertEquals(ExportReason.MEMORY, ExportQueue.reason(OutOfMemoryError()))
         assertEquals(ExportReason.MEMORY, ExportQueue.reason(IllegalArgumentException("image too large for GPU")))

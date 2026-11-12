@@ -351,7 +351,9 @@ class AppState(application: Application) : AndroidViewModel(application) {
             // failures stay on screen (sheet or pill) until retried or dismissed
             if (sheet.value == Sheet.PROGRESS && st.failures.isEmpty()) sheet.value = Sheet.NONE
             val msg = when {
-                st.saved.isEmpty() -> app.getString(R.string.export_failed)
+                // nothing saved and nothing failed: the user stopped the queue
+                st.saved.isEmpty() && st.failures.isEmpty() -> app.getString(R.string.export_stopped)
+                st.saved.isEmpty() -> app.getString(R.string.export_failed_items, st.failed)
                 st.share -> app.getString(R.string.export_shared_count, st.saved.size)
                 else -> app.getString(R.string.export_saved_count, st.saved.size)
             } + if (st.failed > 0 && st.saved.isNotEmpty()) app.getString(R.string.export_failed_count, st.failed) else ""

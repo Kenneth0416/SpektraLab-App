@@ -44,8 +44,12 @@ class QuickSources(private val context: Context) {
         return src
     }
 
-    /** Keep a proxy of a raw that has just been developed for the preview. Blocking. */
-    fun keep(item: LibraryItem, developed: SourceImage) {
+    /**
+     * Keep a proxy of a raw that has just been developed for the preview. Blocking.
+     * Synchronized like [load]: two opens of the same raw must not shrink and write
+     * the same proxy file twice at once.
+     */
+    @Synchronized fun keep(item: LibraryItem, developed: SourceImage) {
         val linear = developed.linear ?: return
         val f = proxy(item)
         if (f.exists()) return

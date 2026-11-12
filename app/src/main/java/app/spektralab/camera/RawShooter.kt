@@ -121,6 +121,7 @@ class RawShooter(private val context: Context) {
         require(frames in 1..MAX_FRAMES)
         val lease = admission.acquire() ?: return false
         val shot = Shot(frames, name, evBias, onExposed, lease)
+        Log.i(TAG, "RAW shot=$name requestedFrames=$frames iso=${results.iso}")
         // At most MAX_FRAMES callbacks/tasks exist: admission stays closed through merging.
         repeat(frames) { index ->
             try {
@@ -174,6 +175,8 @@ class RawShooter(private val context: Context) {
 
         fun frame(dng: ByteArray?, error: ImageCaptureException?) {
             arrived++
+            Log.i(TAG, "RAW shot=$name received=$arrived/$frames dngReady=${dng != null} dead=$dead error=${error?.imageCaptureError}")
+            if (error != null) Log.w(TAG, "RAW frame capture failed shot=$name", error)
             if (arrived == frames) lease.capturesDone()
             if (dead) return
             if (first == null) {
@@ -194,11 +197,17 @@ class RawShooter(private val context: Context) {
                 main.execute { onSaved(uri, evBias) }
                 if (frames > 1) {
                     merging.incrementAndGet(); onProgress(0f)
-                    work.execute { runCatching { planner = DngReader.read(dng)?.takeIf { !it.linear }?.let { BurstMerge.Planner(it) } } }
+                    work.execute {
+                        runCatching { planner = DngReader.read(dng)?.takeIf { !it.linear }?.let { BurstMerge.Planner(it) } }
+                            .onFailure { Log.w(TAG, "RAW planner initialization failed shot=$name", it) }
+                        Log.i(TAG, "RAW shot=$name plannerFrames=${planner?.frames ?: 0}")
+                    }
                 }
             } else if (dng != null) {
                 work.execute {
                     runCatching { DngReader.read(dng)?.let { planner?.add(it) } }
+                        .onFailure { Log.w(TAG, "RAW planner add failed shot=$name", it) }
+                    Log.i(TAG, "RAW shot=$name plannerFrames=${planner?.frames ?: 0}")
                     onProgress(0.5f * ((planner?.frames ?: 1) - 1) / (frames - 1))
                 }
             }
@@ -215,15 +224,19 @@ class RawShooter(private val context: Context) {
         private fun finish(first: Uri) {
             var merged: Uri? = null; var used = 1f
             try {
+                Log.i(TAG, "RAW shot=$name merge planning received=$arrived requested=$frames plannerFrames=${planner?.frames ?: 0}")
                 val p = planner?.takeIf { it.frames >= 2 }?.build()
                 planner = null
                 if (p != null) {
                     val gather = { f: Float -> onProgress(0.5f + 0.4f * f) }
-                    val rgb = BurstGl.gather(p, gather) ?: BurstMerge.gather(p, progress = gather)
+                    val gpuRgb = BurstGl.gather(p, gather)
+                    Log.i(TAG, "RAW shot=$name gatherBackend=${if (gpuRgb != null) "GPU" else "CPU"}")
+                    val rgb = gpuRgb ?: BurstMerge.gather(p, progress = gather)
                     val m = BurstMerge.finish(p, rgb)
                     merged = save("${name}_M.dng") { DngWriter.writeLinear(it, m.width, m.height, m.rgb, p.frames[0], m.gainMaps, m.noise) }
                     used = m.framesUsed
-                }
+                    Log.i(TAG, "RAW shot=$name mergeCompleted dimensions=${m.width}x${m.height} framesUsed=$used saved=${merged != null}")
+                } else Log.w(TAG, "RAW shot=$name merge skipped: fewer than two usable planner frames")
             } catch (t: Throwable) {
                 // also out of memory: the first frame stays the original
                 Log.w(TAG, "burst not merged", t)

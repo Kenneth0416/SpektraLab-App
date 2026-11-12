@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Environment
 import android.provider.MediaStore
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.Camera
@@ -90,6 +91,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+private const val CAMERA_LOG_TAG = "SilvercamCamera"
+
 private class CameraSession(val camera: Camera, val capture: ImageCapture, val raw: Boolean,
                             /** For raw capture into memory; null when the camera would not tell. */
                             val chars: android.hardware.camera2.CameraCharacteristics? = null)
@@ -171,11 +174,18 @@ fun CameraScreen(state: AppState) {
                 val fourThree = ResolutionSelector.Builder()
                     .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY).build()
                 val rawSupported = runCatching {
-                    ImageCapture.getImageCaptureCapabilities(p.getCameraInfo(selector)).supportedOutputFormats
-                        .contains(ImageCapture.OUTPUT_FORMAT_RAW)
+                    val info = p.getCameraInfo(selector)
+                    logRawCameraCapabilities(info)
+                    val formats = ImageCapture.getImageCaptureCapabilities(info).supportedOutputFormats
+                    val supported = formats.contains(ImageCapture.OUTPUT_FORMAT_RAW)
+                    Log.i(CAMERA_LOG_TAG, "CameraX outputFormats=$formats rawSupported=$supported requestedFront=$front")
+                    supported
+                }.onFailure {
+                    Log.e(CAMERA_LOG_TAG, "RAW capability query failed; defaulting to JPEG", it)
                 }.getOrDefault(false)
 
                 fun bind(raw: Boolean): CameraSession {
+                    Log.i(CAMERA_LOG_TAG, "Binding preview + image capture: raw=$raw filmEffect=${!raw}")
                     val preview = Preview.Builder().setResolutionSelector(fourThree).build()
                         .also { it.surfaceProvider = previewView.surfaceProvider }
                     val capture = ImageCapture.Builder()
@@ -186,15 +196,26 @@ fun CameraScreen(state: AppState) {
                             else { setOutputFormat(ImageCapture.OUTPUT_FORMAT_JPEG); setResolutionSelector(fourThree) }
                             if (raw) requestRawMetadata(this, state.shooter.results)
                         }.build()
-                    val group = UseCaseGroup.Builder().addUseCase(preview).addUseCase(capture).addEffect(viewfinder.effect).build()
+                    // CameraX rejects RAW with any CameraEffect, even a preview-only effect.
+                    // Keep the direct preview for RAW; the saved photo still receives its film look.
+                    val group = UseCaseGroup.Builder().addUseCase(preview).addUseCase(capture)
+                        .apply { if (!raw) addEffect(viewfinder.effect) }.build()
                     p.unbindAll()
                     val camera = p.bindToLifecycle(owner, selector, group)
-                    return CameraSession(camera, capture, raw, if (raw) cameraCharacteristics(context, camera) else null)
+                    return CameraSession(camera, capture, raw, if (raw) cameraCharacteristics(context, camera) else null).also {
+                        Log.i(CAMERA_LOG_TAG, "Camera bound: raw=$raw rawCharacteristicsAvailable=${it.chars != null}")
+                    }
                 }
                 session = runCatching { bind(rawSupported) }.recoverCatching {
                     // some devices list raw but cannot stream it next to the preview
-                    if (rawSupported) bind(false) else throw it
-                }.onFailure { state.say(R.string.camera_open_failed, it.message ?: context.getString(R.string.unknown_error)) }.getOrNull()
+                    if (rawSupported) {
+                        Log.e(CAMERA_LOG_TAG, "RAW binding failed; retrying JPEG", it)
+                        bind(false)
+                    } else throw it
+                }.onFailure {
+                    Log.e(CAMERA_LOG_TAG, "Camera binding failed", it)
+                    state.say(R.string.camera_open_failed, it.message ?: context.getString(R.string.unknown_error))
+                }.getOrNull()
                 session?.camera?.cameraControl?.setZoomRatio(zoom)
             }, ContextCompat.getMainExecutor(context))
         }
@@ -323,7 +344,9 @@ fun CameraScreen(state: AppState) {
             val previousBlur = viewfinder.blurredTimestamp
             clarity.snapTo(0f)
             viewfinder.clarity = 0f
-            if (previewView.awaitBlurredPreview(viewfinder, previousBlur)) {
+            // RAW has no processed preview buffers. The Compose dimming overlay still
+            // marks a spent frame, so reopen the curtain without waiting for GL blur.
+            if (s.raw || previewView.awaitBlurredPreview(viewfinder, previousBlur)) {
                 blades.animateTo(0f, tween(260, easing = LinearOutSlowInEasing))
             } else {
                 state.say(R.string.viewfinder_stalled)
@@ -556,8 +579,12 @@ fun CameraScreen(state: AppState) {
                                 modifier = Modifier.padding(top = 4.dp).graphicsLayer { rotationZ = iconTurn }.background(accent, RoundedCornerShape(3.dp)).padding(horizontal = 5.dp, vertical = 1.dp))
                         }
                     }
-                    Text(summary(look).uppercase(Locale.ROOT), fontFamily = Fonts.mono, fontSize = 9.sp, color = Pal.text,
-                        modifier = Modifier.align(Alignment.TopStart).padding(10.dp).background(Color(0x99140807)).padding(horizontal = 6.dp, vertical = 2.dp))
+                    Column(Modifier.align(Alignment.TopStart).padding(10.dp)) {
+                        Text(summary(look).uppercase(Locale.ROOT), fontFamily = Fonts.mono, fontSize = 9.sp, color = Pal.text,
+                            modifier = Modifier.background(Color(0x99140807)).padding(horizontal = 6.dp, vertical = 2.dp))
+                        if (session?.raw == true) Text(stringResource(R.string.raw_preview_notice), fontSize = 10.sp, color = Pal.text,
+                            modifier = Modifier.padding(top = 4.dp).background(Color(0x99140807)).padding(horizontal = 6.dp, vertical = 2.dp))
+                    }
                     // zoom steps sit on the lower edge of the finder, where thumbs expect them
                     val stops = zoomStops
                     Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp)
@@ -737,6 +764,21 @@ private fun requestRawMetadata(builder: ImageCapture.Builder, results: android.h
             // the capture result of every frame: a raw frame becomes a DNG with its own
             .setSessionCaptureCallback(results)
     }
+}
+
+@androidx.annotation.OptIn(androidx.camera.camera2.interop.ExperimentalCamera2Interop::class)
+private fun logRawCameraCapabilities(cameraInfo: androidx.camera.core.CameraInfo) {
+    runCatching {
+        val info = androidx.camera.camera2.interop.Camera2CameraInfo.from(cameraInfo)
+        val capabilities = info.getCameraCharacteristic(
+            android.hardware.camera2.CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)
+        val rawSizes = info.getCameraCharacteristic(
+            android.hardware.camera2.CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+            ?.getOutputSizes(android.graphics.ImageFormat.RAW_SENSOR)
+        Log.i(CAMERA_LOG_TAG, "Camera2 id=${info.cameraId} capabilities=${capabilities?.contentToString()} " +
+            "rawAdvertised=${capabilities?.contains(android.hardware.camera2.CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_RAW)} " +
+            "rawSensorSizes=${rawSizes?.contentToString()}")
+    }.onFailure { Log.w(CAMERA_LOG_TAG, "Camera2 RAW diagnostics unavailable", it) }
 }
 
 @androidx.annotation.OptIn(androidx.camera.camera2.interop.ExperimentalCamera2Interop::class)

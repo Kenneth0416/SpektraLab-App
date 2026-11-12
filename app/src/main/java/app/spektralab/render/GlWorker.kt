@@ -75,7 +75,63 @@ class GlWorker {
         }
     }
 
+    /**
+     * [renderPhoto] for images too large for single textures: the pipeline runs in tiles
+     * (see [app.spektralab.gl.TilePlan]) and each output tile is read straight into the
+     * returned bitmap, the only full-size copy. No overlay: draw it on the bitmap.
+     */
+    fun renderPhotoTiled(source: SourceImage, setup: LookSetup, autoEv: Float, framing: Framing, seed: Int,
+                         border: FloatArray = Borders.color(setup.look, setup),
+                         cancelled: () -> Boolean = { false }, progress: (Float) -> Unit = {}): Bitmap {
+        renderer.setLook(setup)
+        val plan = renderer.planTiled(framing.imageWidth, framing.imageHeight, framing.outWidth, framing.outHeight, framing.imageRect,
+            source.width, source.height, Framing.bitmapUvTransform(framing.crop), TILE)
+        val out = Bitmap.createBitmap(framing.outWidth, framing.outHeight, Bitmap.Config.ARGB_8888)
+        try {
+            var scratch: ByteBuffer? = null
+            var argb = IntArray(0)
+            renderer.renderTiled(plan, autoEv, seed, border, upload = { x, y, w, h ->
+                val linear = source.linear
+                if (linear != null) uploadLinearWindow(linear, x, y, w, h) else {
+                    val bmp = source.bitmap!!
+                    val rawSub = Bitmap.createBitmap(bmp, x, y, w, h)
+                    val sub = if (rawSub.config == Bitmap.Config.ARGB_8888) rawSub else {
+                        rawSub.copy(Bitmap.Config.ARGB_8888, false).also { if (rawSub !== bmp) rawSub.recycle() }
+                    }
+                    try {
+                        val need = sub.rowBytes * h
+                        val buf = scratch?.takeIf { it.capacity() >= need } ?: ByteBuffer.allocateDirect(need).order(ByteOrder.nativeOrder())
+                        scratch = buf
+                        buf.clear()
+                        sub.copyPixelsToBuffer(buf)
+                        buf.position(0)
+                        uploadSrgbRows(buf, w, h, sub.rowBytes / 4)
+                    } finally {
+                        if (sub !== bmp) sub.recycle()
+                    }
+                }
+            }, sink = { x, y, w, h, rgba ->
+                // RGBA bytes -> ARGB ints (opaque: premultiplied or not is the same)
+                if (argb.size < w * h) argb = IntArray(w * h)
+                val ints = rgba.order(ByteOrder.LITTLE_ENDIAN).asIntBuffer()
+                for (i in 0 until w * h) {
+                    val v = ints.get(i)
+                    argb[i] = (v and 0xff00ff00.toInt()) or ((v and 0xff) shl 16) or ((v ushr 16) and 0xff)
+                }
+                // framebuffer row 0 is the bitmap's top row (the plan renders with flipY)
+                out.setPixels(argb, 0, w, x, y, w, h)
+            }, cancelled = cancelled, progress = progress)
+            return out
+        } catch (t: Throwable) {
+            out.recycle()
+            throw t
+        }
+    }
+
     companion object {
+        /** Tile size of [renderPhotoTiled]: 65-80 MB of GPU buffers in all at 50-108 MP (TilePlanTest). */
+        const val TILE = 1024
+
         fun upload(source: SourceImage): Int = source.linear?.let { uploadLinear(it) } ?: uploadSrgb(source.bitmap!!)
 
         /** Scene-linear half-float image (developed raw) as an RGBA16F texture. */
@@ -84,6 +140,30 @@ class GlWorker {
             img.halfRgba.position(0)
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, img.width, img.height, 0, GL_RGBA, GL_HALF_FLOAT, img.halfRgba)
+            return tex
+        }
+
+        /** Pixels [x, x + w) x [y, y + h) of [img], read in place from its buffer. */
+        fun uploadLinearWindow(img: app.spektralab.raw.LinearImage, x: Int, y: Int, w: Int, h: Int): Int {
+            val tex = GlUtil.texture2d()
+            img.halfRgba.position(0)
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
+            glPixelStorei(GL_UNPACK_ROW_LENGTH, img.width)
+            glPixelStorei(GL_UNPACK_SKIP_PIXELS, x)
+            glPixelStorei(GL_UNPACK_SKIP_ROWS, y)
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_HALF_FLOAT, img.halfRgba)
+            glPixelStorei(GL_UNPACK_ROW_LENGTH, 0)
+            glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0)
+            glPixelStorei(GL_UNPACK_SKIP_ROWS, 0)
+            return tex
+        }
+
+        private fun uploadSrgbRows(buf: ByteBuffer, w: Int, h: Int, rowLength: Int): Int {
+            val tex = GlUtil.texture2d()
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
+            glPixelStorei(GL_UNPACK_ROW_LENGTH, rowLength)
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, buf)
+            glPixelStorei(GL_UNPACK_ROW_LENGTH, 0)
             return tex
         }
 

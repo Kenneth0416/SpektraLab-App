@@ -166,6 +166,8 @@ class Program(vertex: String, fragment: String) {
     fun set3f(n: String, a: Float, b: Float, c: Float) = glUniform3f(loc(n), a, b, c)
     fun set3fv(n: String, v: FloatArray) = glUniform3fv(loc(n), v.size / 3, v, 0)
     fun set4f(n: String, a: Float, b: Float, c: Float, d: Float) = glUniform4f(loc(n), a, b, c, d)
+    fun set4fv(n: String, v: FloatArray) = glUniform4fv(loc(n), v.size / 4, v, 0)
+    fun set2ui(n: String, a: Int, b: Int) = GLES30.glUniform2ui(loc(n), a, b)
     fun set1fv(n: String, v: FloatArray) = glUniform1fv(loc(n), v.size, v, 0)
     /** Row-major 3x3 matrix. */
     fun setMat3RowMajor(n: String, m: FloatArray) = glUniformMatrix3fv(loc(n), 1, true, m, 0)

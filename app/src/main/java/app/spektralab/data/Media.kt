@@ -10,12 +10,18 @@ import android.graphics.Matrix
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.system.Os
 import androidx.exifinterface.media.ExifInterface
 import app.spektralab.engine.AutoExposure
 import app.spektralab.engine.Look
 import app.spektralab.raw.LinearImage
 import app.spektralab.raw.RawDeveloper
+import app.spektralab.raw.RawImage
 import app.spektralab.raw.RawReader
+import java.io.File
+import java.io.RandomAccessFile
+import java.nio.ByteBuffer
+import java.nio.channels.FileChannel
 import kotlin.math.max
 import kotlin.math.pow
 
@@ -50,16 +56,50 @@ object Media {
      * sensor data to scene-linear RGB (see [RawDeveloper]); everything else, and raw files
      * we cannot parse, goes through the system decoder.
      * @param fast prefer speed (previews, thumbnails) over full-resolution demosaicing
+     * @param rawHeapBudget when set, a raw is developed into a file mapping (off the Java heap)
+     *   and binned if its development would still allocate more Java heap than this, in bytes
      */
-    fun loadSource(context: Context, uri: Uri, maxLongEdge: Int, tryRaw: Boolean, fast: Boolean = true): SourceImage {
+    fun loadSource(context: Context, uri: Uri, maxLongEdge: Int, tryRaw: Boolean, fast: Boolean = true,
+                   rawHeapBudget: Long = 0): SourceImage {
         if (tryRaw) {
             val linear = runCatching {
-                val bytes = context.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
-                RawReader.read(bytes)?.takeIf { RawDeveloper.supports(it) }?.let { RawDeveloper.develop(it, maxLongEdge, fast) }
+                readRaw(context, uri)?.let { raw ->
+                    if (rawHeapBudget <= 0) RawDeveloper.develop(raw, maxLongEdge, fast)
+                    else RawDeveloper.develop(raw, RawDeveloper.longEdgeWithin(raw, maxLongEdge, fast, rawHeapBudget, outputOnHeap = false),
+                        fast, allocate = { mappedBuffer(context, it) })
+                }
             }.getOrNull()
             if (linear != null) return SourceImage(null, linear)
         }
         return SourceImage(decodeImage(context, uri, maxLongEdge), null)
+    }
+
+    /** Parse a supported raw file; the file's bytes are garbage once this returns. */
+    private fun readRaw(context: Context, uri: Uri): RawImage? {
+        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
+        return RawReader.read(bytes)?.takeIf { RawDeveloper.supports(it) }
+    }
+
+    /**
+     * [size] bytes backed by an unlinked cache file: not Java heap, and the kernel can page it
+     * out instead of killing the app. Blocks are reserved up front, so a full disk shows here
+     * (then: a plain direct buffer, as before) rather than as a fault on a later write.
+     */
+    private fun mappedBuffer(context: Context, size: Int): ByteBuffer {
+        val f = runCatching { File.createTempFile("develop", ".bin", context.cacheDir) }.getOrNull()
+            ?: return ByteBuffer.allocateDirect(size)
+        try {
+            RandomAccessFile(f, "rw").use { raf ->
+                Os.posix_fallocate(raf.fd, 0, size.toLong())
+                return raf.channel.map(FileChannel.MapMode.READ_WRITE, 0, size.toLong())
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("SpektraMedia", "no file mapping for the raw development", e)
+            return ByteBuffer.allocateDirect(size)
+        } finally {
+            // the mapping keeps the data; nothing is left behind if the app dies
+            f.delete()
+        }
     }
 
     /** Center-weighted auto exposure of a developed raw frame. */

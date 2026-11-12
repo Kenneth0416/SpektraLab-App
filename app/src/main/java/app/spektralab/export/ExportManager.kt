@@ -12,6 +12,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -29,9 +30,12 @@ import app.spektralab.R
 import app.spektralab.SpektraApp
 import app.spektralab.data.LibraryItem
 import app.spektralab.data.Media
+import app.spektralab.data.SourceImage
+import app.spektralab.engine.LookSetup
 import app.spektralab.gl.GlUtil
 import app.spektralab.render.Framing
 import app.spektralab.render.OverlayPainter
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -272,20 +276,41 @@ class ExportManager(private val app: SpektraApp) {
                 throw e
             }
         } else {
-            // the GPU must hold the source and the output as single textures
+            if (cancelled()) throw CancellationException("cancelled")
+            // the untiled render holds the source and the output as single textures
             val maxTex = app.glWorker.run { GlUtil.maxTextureSize }
-            val cap = minOf(FULL_SIZE_CAP, maxTex)
+            val cap = minOf(UNTILED_CAP, maxTex)
             val limit = minOf(if (o.photoLongEdge == 0) cap else o.photoLongEdge, (maxTex / 1.07).toInt())
-            val src = withContext(Dispatchers.IO) {
-                // decode a bit larger than the target so the format crop keeps resolution
-                // raw: full-resolution demosaic unless the sensor has pixels to spare for binning
-                Media.loadSource(app, Uri.parse(item.uri), if (item.isRaw) limit else (limit * 1.5).toInt().coerceAtMost(cap), tryRaw = item.isRaw,
-                    fast = maxOf(item.width, item.height) > maxTex)
+            val frame = item.id.toInt() % 36 + 1
+            val full = if (o.photoLongEdge == 0 && maxOf(item.width, item.height) > limit) {
+                printFullSize(item, setup, limit, frame, cancelled, progress)
+            } else null
+            val out: Bitmap = full ?: run {
+                if (cancelled()) throw CancellationException("cancelled")
+                val src = withContext(Dispatchers.IO) {
+                    // decode a bit larger than the target so the format crop keeps resolution
+                    // raw: full-resolution demosaic unless the sensor has pixels to spare for binning
+                    Media.loadSource(app, Uri.parse(item.uri), if (item.isRaw) limit else (limit * 1.5).toInt().coerceAtMost(cap), tryRaw = item.isRaw,
+                        fast = maxOf(item.width, item.height) > maxTex, rawHeapBudget = RAW_HEAP_BUDGET)
+                }
+                try {
+                    if (cancelled()) throw CancellationException("cancelled")
+                    progress(0.3f)
+                    val framing = Framing.compute(src.width, src.height, item.look, limit)
+                    val overlay = OverlayPainter.paint(framing, item.look, frame, item.dateTaken)
+                    try {
+                        app.glWorker.run { renderPhoto(src, setup, item.autoEv, framing, overlay, item.id.toInt()) }
+                    } finally {
+                        overlay?.recycle()
+                    }
+                } finally {
+                    src.bitmap?.recycle()
+                }
             }
-            progress(0.3f)
-            val framing = Framing.compute(src.width, src.height, item.look, limit)
-            val overlay = OverlayPainter.paint(framing, item.look, item.id.toInt() % 36 + 1, item.dateTaken)
-            val out: Bitmap = app.glWorker.run { renderPhoto(src, setup, item.autoEv, framing, overlay, item.id.toInt()) }
+            if (cancelled()) {
+                out.recycle()
+                throw CancellationException("cancelled")
+            }
             progress(0.8f)
             val values = ContentValues().apply {
                 put(MediaStore.Images.Media.DISPLAY_NAME, "SPK_${stamp}_${item.id}_$film.${o.photoFormat.ext}")
@@ -296,27 +321,31 @@ class ExportManager(private val app: SpektraApp) {
                 put(MediaStore.Images.Media.IS_PENDING, 1)
             }
             val cr = app.contentResolver
-            val uri = cr.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return null
+            val uri = cr.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: run {
+                out.recycle()
+                return null
+            }
             try {
                 withContext(Dispatchers.IO) {
-                    val ok = cr.openOutputStream(uri)!!.use { os ->
-                        when (o.photoFormat) {
-                            PhotoFormat.JPEG -> out.compress(Bitmap.CompressFormat.JPEG, 95, os)
-                            PhotoFormat.PNG -> out.compress(Bitmap.CompressFormat.PNG, 100, os)
+                    val ok = try {
+                        cr.openOutputStream(uri)!!.use { os ->
+                            when (o.photoFormat) {
+                                PhotoFormat.JPEG -> out.compress(Bitmap.CompressFormat.JPEG, 95, os)
+                                PhotoFormat.PNG -> out.compress(Bitmap.CompressFormat.PNG, 100, os)
+                            }
                         }
+                    } finally {
+                        out.recycle()
                     }
                     check(ok) { "encoding failed" }
-                    if (o.photoFormat == PhotoFormat.JPEG) runCatching {
+                    // best effort: a print without metadata is still a print
+                    runCatching {
+                        val original = PrintExif.read(cr, Uri.parse(item.uri))
+                        val taken = SimpleDateFormat("yyyy:MM:dd HH:mm:ss", Locale.US).format(Date(item.dateTaken))
                         cr.openFileDescriptor(uri, "rw")?.use { pfd ->
-                            val exif = androidx.exifinterface.media.ExifInterface(pfd.fileDescriptor)
-                            val taken = SimpleDateFormat("yyyy:MM:dd HH:mm:ss", Locale.US).format(Date(item.dateTaken))
-                            exif.setAttribute(androidx.exifinterface.media.ExifInterface.TAG_DATETIME_ORIGINAL, taken)
-                            exif.setAttribute(androidx.exifinterface.media.ExifInterface.TAG_DATETIME, taken)
-                            exif.setAttribute(androidx.exifinterface.media.ExifInterface.TAG_SOFTWARE, "Silvercam")
-                            exif.setAttribute(androidx.exifinterface.media.ExifInterface.TAG_IMAGE_DESCRIPTION, app.engine.film(item.look.film).name)
-                            exif.saveAttributes()
+                            PrintExif.write(pfd.fileDescriptor, original, taken, app.engine.film(item.look.film).name)
                         }
-                    }
+                    }.onFailure { android.util.Log.w("SpektraExport", "print EXIF skipped", it) }
                     cr.update(uri, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null)
                 }
             } catch (e: Throwable) {
@@ -328,9 +357,62 @@ class ExportManager(private val app: SpektraApp) {
         }
     }
 
+    /**
+     * Full-size print of an image larger than [limit], the untiled render's long edge:
+     * rendered in tiles up to [FULL_SIZE_CAP]. Null when that fails (GPU error, out of
+     * memory); the caller then prints at [limit] as before.
+     */
+    private suspend fun printFullSize(item: LibraryItem, setup: LookSetup, limit: Int, frame: Int,
+                                      cancelled: () -> Boolean, progress: (Float) -> Unit): Bitmap? {
+        var src: SourceImage? = null
+        try {
+            if (cancelled()) throw CancellationException("cancelled")
+            src = withContext(Dispatchers.IO) {
+                Media.loadSource(app, Uri.parse(item.uri), FULL_SIZE_CAP, tryRaw = item.isRaw, fast = false, rawHeapBudget = RAW_HEAP_BUDGET)
+            }
+            if (cancelled()) throw CancellationException("cancelled")
+            progress(0.3f)
+            val framing = Framing.compute(src.width, src.height, item.look, FULL_SIZE_CAP)
+            if (maxOf(framing.imageWidth, framing.imageHeight) <= limit) {
+                // came out within the untiled size (a raw binned to fit the heap): print it as before
+                val small = Framing.compute(src.width, src.height, item.look, limit)
+                val overlay = OverlayPainter.paint(small, item.look, frame, item.dateTaken)
+                return try {
+                    app.glWorker.run { renderPhoto(src, setup, item.autoEv, small, overlay, item.id.toInt()) }
+                } finally {
+                    overlay?.recycle()
+                }
+            }
+            val out = app.glWorker.run {
+                renderPhotoTiled(src, setup, item.autoEv, framing, item.id.toInt(), cancelled = cancelled) { p -> progress(0.3f + 0.5f * p) }
+            }
+            if (cancelled()) {
+                out.recycle()
+                throw CancellationException("cancelled")
+            }
+            // on the bitmap: a full-size overlay texture would be a second full-size copy
+            if (OverlayPainter.needsOverlay(item.look)) OverlayPainter.draw(Canvas(out), framing, item.look, frame, item.dateTaken)
+            return out
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            android.util.Log.w("SpektraExport", "full-size print failed, printing at $limit px", t)
+            return null
+        } finally {
+            src?.bitmap?.recycle()
+        }
+    }
+
     companion object {
-        /** "Full size" long edge cap: keeps the half-float GPU buffers within mobile memory. */
-        const val FULL_SIZE_CAP = 4096
+        /** Long edge rendered untiled: whole-image half-float GPU buffers still fit mobile memory. */
+        const val UNTILED_CAP = 4096
+        /** "Full size" long edge cap; above [UNTILED_CAP] prints are rendered in tiles. */
+        const val FULL_SIZE_CAP = 12000
+        /**
+         * Java heap a raw development may allocate besides the sensor data (2 bytes/px for a
+         * Bayer raw): full resolution up to 33 MP within a ~270 MB peak; larger raws are binned.
+         */
+        const val RAW_HEAP_BUDGET = 200L shl 20
     }
 
     /** Open the system share sheet; call from a resumed activity. */

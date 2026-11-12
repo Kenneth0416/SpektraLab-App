@@ -113,6 +113,8 @@ fun CameraScreen(state: AppState) {
     var flash by rememberSaveable { mutableIntStateOf(ImageCapture.FLASH_MODE_OFF) }
     var zoom by rememberSaveable { mutableFloatStateOf(1f) }
     var session by remember { mutableStateOf<CameraSession?>(null) }
+    var selectedCameraId by remember { mutableStateOf<String?>(null) }
+    var separateLenses by remember { mutableStateOf<List<SeparateLens>>(emptyList()) }
     var busy by remember { mutableStateOf(false) }
     val multiFrame by state.multiFrame.collectAsState()
     val merging by state.merging.collectAsState()
@@ -154,7 +156,7 @@ fun CameraScreen(state: AppState) {
     }
 
     // bind the camera while this screen is shown
-    DisposableEffect(granted, front) {
+    DisposableEffect(granted, front, selectedCameraId) {
         var provider: ProcessCameraProvider? = null
         var disposed = false
         if (granted) {
@@ -167,6 +169,10 @@ fun CameraScreen(state: AppState) {
                 if (!runCatching { p.hasCamera(selector) }.getOrDefault(false)) {
                     selector = if (front) CameraSelector.DEFAULT_BACK_CAMERA else CameraSelector.DEFAULT_FRONT_CAMERA
                     if (!runCatching { p.hasCamera(selector) }.getOrDefault(false)) { state.say(R.string.no_camera); return@addListener }
+                }
+                separateLenses = discoverSeparateLenses(p, selector)
+                selectedCameraId?.let { id ->
+                    separateLenses.firstOrNull { it.id == id }?.let { selector = it.selector }
                 }
                 val fourThree = ResolutionSelector.Builder()
                     .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY).build()
@@ -194,8 +200,16 @@ fun CameraScreen(state: AppState) {
                 session = runCatching { bind(rawSupported) }.recoverCatching {
                     // some devices list raw but cannot stream it next to the preview
                     if (rawSupported) bind(false) else throw it
-                }.onFailure { state.say(R.string.camera_open_failed, it.message ?: context.getString(R.string.unknown_error)) }.getOrNull()
-                session?.camera?.cameraControl?.setZoomRatio(zoom)
+                }.onFailure {
+                    state.say(R.string.camera_open_failed, it.message ?: context.getString(R.string.unknown_error))
+                    // Recover the default lens when an auxiliary camera cannot host our use cases.
+                    if (selectedCameraId != null) selectedCameraId = null
+                }.getOrNull()
+                session?.camera?.let { camera ->
+                    val range = camera.cameraInfo.zoomState.value
+                    zoom = range?.let { zoom.coerceIn(it.minZoomRatio, it.maxZoomRatio) } ?: 1f
+                    camera.cameraControl.setZoomRatio(zoom)
+                }
             }, ContextCompat.getMainExecutor(context))
         }
         onDispose {
@@ -220,19 +234,20 @@ fun CameraScreen(state: AppState) {
     // zoom stops shared by the chips and the pinch haptic; real lenses when they can be read
     val zoomStops = remember(zoomRange, lens) {
         val (min, max) = zoomRange
-        val real = lens?.stops.orEmpty().filter { it in min..max }
-        val all = (real + 1f).sorted().fold(listOf<Float>()) { acc, z ->
-            if (acc.isNotEmpty() && z / acc.last() < 1.1f) acc else acc + z
-        }
-        if (real.size >= 2) all else buildList {
-            if (min < 0.95f) add(min)
-            add(1f)
-            if (max >= 2f) add(2f)
-            if (max >= 5f) add(5f)
-        }
+        val real = lens?.stops.orEmpty()
+        app.spektralab.camera.lensZoomStops(min, max, real)
     }
     // 35mm-equivalent label for a zoom ratio; null when the focal length is unknown (falls back to ×)
     val baseMm = lens?.baseMm
+    // A camera exposed as a separate CameraX device cannot be reached with setZoomRatio.
+    val lensChoices = remember(lens, separateLenses, zoomStops, zoomRange) {
+        val alternatives = if (lens == null) emptyList() else app.spektralab.camera.separateLensRatios(
+            lens.id, lens.baseMm, lens.stops, zoomRange.first, zoomRange.second,
+            separateLenses.map { it.id to it.baseMm },
+        ).map { (id, ratio) -> ratio to separateLenses.first { it.id == id } }
+        (zoomStops.filter { z -> alternatives.none { app.spektralab.camera.nearLensRatio(it.first, z) } }
+            .map { it to null } + alternatives).sortedBy { it.first }
+    }
     // only talk to the camera when the ratio really changed (pinch events often repeat a value)
     var appliedZoom by remember(session) { mutableFloatStateOf(Float.NaN) }
     fun applyZoom(z: Float) {
@@ -559,12 +574,12 @@ fun CameraScreen(state: AppState) {
                     Text(summary(look).uppercase(Locale.ROOT), fontFamily = Fonts.mono, fontSize = 9.sp, color = Pal.text,
                         modifier = Modifier.align(Alignment.TopStart).padding(10.dp).background(Color(0x99140807)).padding(horizontal = 6.dp, vertical = 2.dp))
                     // zoom steps sit on the lower edge of the finder, where thumbs expect them
-                    val stops = zoomStops
+                    val stops = lensChoices
                     Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp)
                         .background(Color(0x80140807), CircleShape).padding(3.dp)) {
-                        val nearest = stops.minByOrNull { kotlin.math.abs(it - zoom) }
-                        stops.forEach { z ->
-                            val on = z == nearest
+                        val nearest = stops.filter { it.second == null }.minByOrNull { kotlin.math.abs(it.first - zoom) }?.first
+                        stops.forEach { (z, other) ->
+                            val on = other == null && z == nearest
                             val live = on && kotlin.math.abs(zoom - z) > 0.05f
                             val label = if (baseMm != null) "${Math.round(baseMm * (if (live) zoom else z))}" + if (on) "mm" else ""
                                 else if (live) "%.1f×".format(zoom)
@@ -572,7 +587,14 @@ fun CameraScreen(state: AppState) {
                             Text(label, fontFamily = Fonts.mono, fontSize = 11.sp,
                                 color = if (on) Pal.dink else Pal.text, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
                                 modifier = Modifier.padding(horizontal = 2.dp).springClick {
-                                    animateZoom(z)
+                                    if (!busy) {
+                                        if (other == null) animateZoom(z) else {
+                                            zoomJob?.cancel()
+                                            zoom = 1f
+                                            focusLocked = false
+                                            selectedCameraId = other.id
+                                        }
+                                    }
                                 }.graphicsLayer { rotationZ = iconTurn }.clip(CircleShape).background(if (on) accent else Color.Transparent)
                                     .padding(horizontal = 9.dp, vertical = 7.dp))
                         }
@@ -613,7 +635,7 @@ fun CameraScreen(state: AppState) {
         val switchDescription = stringResource(R.string.switch_camera)
         Box(Modifier.size(52.dp).semantics { contentDescription = switchDescription }
             .springClick(0.9f) {
-                front = !front; zoomJob?.cancel(); zoom = 1f
+                front = !front; selectedCameraId = null; separateLenses = emptyList(); zoomJob?.cancel(); zoom = 1f
                 scope.launch { spin.snapTo(0f); spin.animateTo(180f, Motion.settle) }
             }.border(1.dp, Pal.off, CircleShape), contentAlignment = Alignment.Center) {
             // Keep the drawing and rotation anchored to the button's center.
@@ -746,23 +768,40 @@ private fun cameraCharacteristics(context: android.content.Context, camera: Came
 }.getOrNull()
 
 /** Base 35mm-equivalent focal length (zoom 1.0) and the zoom ratios of the phone's physical lenses. */
-private class LensInfo(val baseMm: Float, val stops: List<Float>)
+private class LensInfo(val id: String, val baseMm: Float, val stops: List<Float>)
+private class SeparateLens(val id: String, val baseMm: Float, val selector: CameraSelector)
+
+private fun equivalentFocalLengths(c: android.hardware.camera2.CameraCharacteristics): List<Float> {
+    val size = c.get(android.hardware.camera2.CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE) ?: return emptyList()
+    val diagonal = kotlin.math.hypot(size.width, size.height)
+    if (!diagonal.isFinite() || diagonal <= 0f) return emptyList()
+    val focalLengths = c.get(android.hardware.camera2.CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
+        ?: return emptyList()
+    return focalLengths.map { it * 43.27f / diagonal }.filter { it.isFinite() && it > 0f }
+}
+
+@androidx.annotation.OptIn(androidx.camera.camera2.interop.ExperimentalCamera2Interop::class)
+private fun discoverSeparateLenses(provider: ProcessCameraProvider, facing: CameraSelector): List<SeparateLens> =
+    facing.filter(provider.availableCameraInfos).mapNotNull { cameraInfo ->
+        runCatching {
+            val info = androidx.camera.camera2.interop.Camera2CameraInfo.from(cameraInfo)
+            val chars = info.getCameraCharacteristicsMap()[info.cameraId] ?: return@runCatching null
+            val base = equivalentFocalLengths(chars).firstOrNull() ?: return@runCatching null
+            SeparateLens(info.cameraId, base, cameraInfo.cameraSelector)
+        }.getOrNull()
+    }
 
 @androidx.annotation.OptIn(androidx.camera.camera2.interop.ExperimentalCamera2Interop::class)
 private fun readLens(context: android.content.Context, camera: Camera): LensInfo? = runCatching {
     val info = androidx.camera.camera2.interop.Camera2CameraInfo.from(camera.cameraInfo)
-    fun equiv(c: android.hardware.camera2.CameraCharacteristics): Float? {
-        val focal = c.get(android.hardware.camera2.CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)?.firstOrNull() ?: return null
-        val size = c.get(android.hardware.camera2.CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE) ?: return null
-        val diag = kotlin.math.hypot(size.width, size.height)
-        return if (focal > 0f && diag > 0f) focal * 43.27f / diag else null
-    }
+    val manager = context.getSystemService(android.hardware.camera2.CameraManager::class.java)
     val logical = info.getCameraCharacteristicsMap()[info.cameraId]
-        ?: (context.getSystemService(android.content.Context.CAMERA_SERVICE) as android.hardware.camera2.CameraManager).getCameraCharacteristics(info.cameraId)
-    val base = equiv(logical)?.takeIf { it > 0f } ?: return@runCatching null
-    val manager = context.getSystemService(android.content.Context.CAMERA_SERVICE) as android.hardware.camera2.CameraManager
-    val stops = runCatching {
-        logical.physicalCameraIds.mapNotNull { id -> equiv(manager.getCameraCharacteristics(id))?.let { it / base } }
-    }.getOrDefault(emptyList())
-    LensInfo(base, stops)
+        ?: manager.getCameraCharacteristics(info.cameraId)
+    val focalLengths = equivalentFocalLengths(logical)
+    val base = focalLengths.firstOrNull() ?: return@runCatching null
+    // One inaccessible physical ID must not discard the other lenses.
+    val physical = if (android.os.Build.VERSION.SDK_INT >= 28) logical.physicalCameraIds.flatMap { id ->
+        runCatching { equivalentFocalLengths(manager.getCameraCharacteristics(id)) }.getOrDefault(emptyList())
+    } else emptyList()
+    LensInfo(info.cameraId, base, (focalLengths + physical).map { it / base })
 }.getOrNull()

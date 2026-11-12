@@ -9,13 +9,19 @@ import android.graphics.ImageDecoder
 import android.graphics.Matrix
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.ParcelFileDescriptor
 import android.provider.OpenableColumns
 import androidx.exifinterface.media.ExifInterface
 import app.spektralab.engine.AutoExposure
 import app.spektralab.engine.Look
+import app.spektralab.raw.ByteArraySource
+import app.spektralab.raw.ChannelSource
+import app.spektralab.raw.DevelopedRaw
 import app.spektralab.raw.LinearImage
-import app.spektralab.raw.RawDeveloper
-import app.spektralab.raw.RawReader
+import app.spektralab.raw.RawLoader
+import java.util.concurrent.CancellationException
+import java.util.concurrent.Semaphore
+import java.util.concurrent.TimeUnit
 import kotlin.math.max
 import kotlin.math.pow
 
@@ -47,19 +53,46 @@ object Media {
 
     /**
      * Load a photo for rendering. DNGs written by Android cameras are developed from the
-     * sensor data to scene-linear RGB (see [RawDeveloper]); everything else, and raw files
+     * sensor data to scene-linear RGB (see [RawLoader]); everything else, and raw files
      * we cannot parse, goes through the system decoder.
      * @param fast prefer speed (previews, thumbnails) over full-resolution demosaicing
+     * @param cancelled polled while a raw file develops; when true the load stops with a
+     *   [CancellationException] instead of falling back to the system decoder
      */
-    fun loadSource(context: Context, uri: Uri, maxLongEdge: Int, tryRaw: Boolean, fast: Boolean = true): SourceImage {
+    fun loadSource(context: Context, uri: Uri, maxLongEdge: Int, tryRaw: Boolean, fast: Boolean = true,
+                   cancelled: (() -> Boolean)? = null): SourceImage {
         if (tryRaw) {
-            val linear = runCatching {
-                val bytes = context.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
-                RawReader.read(bytes)?.takeIf { RawDeveloper.supports(it) }?.let { RawDeveloper.develop(it, maxLongEdge, fast) }
-            }.getOrNull()
-            if (linear != null) return SourceImage(null, linear)
+            val raw = try { developRaw(context, uri, maxLongEdge, fast, cancelled) }
+                catch (e: CancellationException) { throw e }
+                catch (t: Throwable) { null }
+            if (raw != null) return SourceImage(null, raw.image)
         }
         return SourceImage(decodeImage(context, uri, maxLongEdge), null)
+    }
+
+    /** Raw developments hold large buffers: one at a time, so a preview, a zoom and thumbnails never stack up. */
+    private val rawGate = Semaphore(1, true)
+
+    /**
+     * Develops a raw file, streamed from its file descriptor (neither the file nor the
+     * whole sensor frame is read onto the heap); null when no raw reader handles it.
+     */
+    fun developRaw(context: Context, uri: Uri, maxLongEdge: Int, fast: Boolean, cancelled: (() -> Boolean)? = null): DevelopedRaw? {
+        while (!rawGate.tryAcquire(50, TimeUnit.MILLISECONDS)) {
+            if (cancelled?.invoke() == true) throw CancellationException("raw load cancelled")
+        }
+        try {
+            val pfd = context.contentResolver.openFileDescriptor(uri, "r") ?: return null
+            return ParcelFileDescriptor.AutoCloseInputStream(pfd).use { stream ->
+                val channel = stream.channel
+                val seekable = runCatching { channel.size() > 0 }.getOrDefault(false)
+                // a pipe from some document providers: read it once instead
+                val source = if (seekable) ChannelSource(channel) else ByteArraySource(stream.readBytes())
+                RawLoader.load(source, maxLongEdge, fast, cancelled = cancelled)
+            }
+        } finally {
+            rawGate.release()
+        }
     }
 
     /** Center-weighted auto exposure of a developed raw frame. */
@@ -162,8 +195,8 @@ object Media {
                 LibraryItem(id, uri.toString(), true, false, if (swap) eh else ew, if (swap) ew else eh, dur, rot,
                     date ?: System.currentTimeMillis(), frame?.let { autoExposure(it) } ?: 0f, Look.DEFAULT, name)
             } else {
-                val src = loadSource(context, uri, 512, tryRaw = isRaw)
-                if (src.linear != null) {
+                val raw = if (isRaw) runCatching { developRaw(context, uri, 512, fast = true) }.getOrNull() else null
+                if (raw != null) {
                     // developed from sensor data: size and exposure come from the raw frame
                     var date: Long? = null
                     runCatching {
@@ -172,11 +205,10 @@ object Media {
                             date = parseExifDate(exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL) ?: exif.getAttribute(ExifInterface.TAG_DATETIME))
                         }
                     }
-                    val scale = rawScale(context, uri)
-                    return LibraryItem(id, uri.toString(), false, true, scale?.first ?: src.width, scale?.second ?: src.height, 0, 0,
-                        date ?: System.currentTimeMillis(), autoExposure(src.linear), Look.DEFAULT, name)
+                    return LibraryItem(id, uri.toString(), false, true, raw.fullWidth, raw.fullHeight, 0, 0,
+                        date ?: System.currentTimeMillis(), autoExposure(raw.image), Look.DEFAULT, name)
                 }
-                val bmp = src.bitmap!!
+                val bmp = decodeImage(context, uri, 512)
                 var date: Long? = null
                 var w = bmp.width
                 var h = bmp.height
@@ -202,12 +234,6 @@ object Media {
             null
         }
     }
-
-    /** Full upright size of a DNG we can develop. */
-    private fun rawScale(context: Context, uri: Uri): Pair<Int, Int>? = runCatching {
-        val bytes = context.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
-        RawReader.read(bytes)?.takeIf { RawDeveloper.supports(it) }?.let { it.uprightWidth to it.uprightHeight }
-    }.getOrNull()
 
     private fun parseExifDate(s: String?): Long? {
         if (s.isNullOrBlank()) return null

@@ -182,9 +182,11 @@ fun EditorScreen(state: AppState, id: Long) {
         worthFull = item.isRaw || maxOf(item.width, item.height) > previewDecodeEdge(context),
         load = { full ->
             withContext(Dispatchers.IO) {
+                // a superseded photo stops developing at the next band instead of finishing
+                val job = coroutineContext[Job]
                 runCatching { Media.loadSource(context, Uri.parse(item.uri),
                     if (full) FilmPreviewView.FULL_EDGE else previewDecodeEdge(context),
-                    tryRaw = item.isRaw, fast = !full) }.getOrNull()
+                    tryRaw = item.isRaw, fast = !full, cancelled = { job?.isActive == false }) }.getOrNull()
             }
         },
         onSource = { playing = false; preview.setSource(it) },

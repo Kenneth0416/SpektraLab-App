@@ -91,6 +91,26 @@ class RafSampleTest {
         }
     }
 
+    /** The app's path: [RawLoader] on the file (read whole, X-Trans developer) gives the reader + developer result. */
+    @Test fun xt2ThroughTheLoader() {
+        val dir = System.getenv("SPEKTRA_RAW_SAMPLES")
+        Assume.assumeTrue("SPEKTRA_RAW_SAMPLES not set", !dir.isNullOrEmpty())
+        val file = File(dir, "RAF/00001_00_10s.RAF")
+        Assume.assumeTrue("missing $file", file.isFile)
+        val img = assertNotNull(RawReader.read(file.readBytes()))
+        fun bits(li: LinearImage): ShortArray {
+            val b = li.halfRgba.duplicate().order(li.halfRgba.order()); b.position(0)
+            return ShortArray(li.width * li.height * 4).also { b.asShortBuffer().get(it) }
+        }
+        for ((edge, fast) in listOf(2048 to true, 6000 to false)) {
+            val got = assertNotNull(RawFile.open(file).use { RawLoader.load(it, edge, fast) }, "load $edge $fast")
+            val ref = RawDeveloper.develop(img, edge, fast)
+            assertEquals(ref.width to ref.height, got.image.width to got.image.height)
+            assertEquals(5998 to 3998, got.fullWidth to got.fullHeight)
+            assertContentEquals(bits(ref), bits(got.image), "load $edge $fast")
+        }
+    }
+
     @Test fun xt2Dark() = check("00001_00_0.1s.RAF", 0x44d0bf4dL, 1022f, doubleArrayOf(475.0, 302.0, 2174.0))
 
     @Test fun xt2Bright() = check("00001_00_10s.RAF", 0xb44703c2L, 1023f, doubleArrayOf(495.0, 302.0, 743.0))

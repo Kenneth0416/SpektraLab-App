@@ -101,6 +101,35 @@ class RawReaderTest {
         assertEquals(expected.keys + unsupported, seen, "sample inventory")
     }
 
+    /**
+     * With SPEKTRA_RAW_SAMPLES and `-Dspektra.rawdump=DIR`: develops every real sample binned (2x2
+     * Bayer cells, 3x3 X-Trans cells; no highlight reconstruction or denoise; orientation ignored) and
+     * writes `<format>_<name>.f32` (int32 width, height, then float32 linear sRGB) and `.json` (crop,
+     * cell, levels, colour) for `tools/develop_compare.py`, which compares them with LibRaw.
+     */
+    @Test
+    fun dumpDevelopedSamplesForLibRaw() {
+        val root = samples() ?: return
+        val out = System.getProperty("spektra.rawdump")?.takeIf { it.isNotEmpty() }?.let { File(it).apply { mkdirs() } } ?: return
+        val plain = RawDeveloper.Options(reconstructHighlights = false, chromaDenoise = false)
+        for (key in expected.keys.sorted()) {
+            val f = File(root, key)
+            val img = RawReader.read(f.readBytes()) ?: continue
+            val up = RawImage(img.rawWidth, img.rawHeight, img.data, img.cfa, img.black, img.white, img.cropX, img.cropY,
+                img.cropWidth, img.cropHeight, img.wb, img.camToSrgb, 1, img.baselineExposure, img.gainMaps, img.make, img.model)
+            val cell = if (img.cfa.isBayer) 2 else 3
+            val li = RawDeveloper.develop(up, maxOf(img.cropWidth, img.cropHeight) / cell, fast = true, options = plain)
+            val buf = java.nio.ByteBuffer.allocate(8 + li.width * li.height * 12).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+            buf.putInt(li.width).putInt(li.height)
+            for (y in 0 until li.height) for (x in 0 until li.width) buf.putFloat(li.red(x, y)).putFloat(li.green(x, y)).putFloat(li.blue(x, y))
+            val name = key.replace('/', '_')
+            File(out, "$name.f32").writeBytes(buf.array())
+            File(out, "$name.json").writeText("""{"file": "${f.absolutePath}", "crop": [${img.cropX}, ${img.cropY}, ${img.cropWidth}, ${img.cropHeight}], """ +
+                """"cell": $cell, "black": [${img.black.take(4).joinToString()}], "white": ${img.white}, "wb": [${img.wb.joinToString()}], """ +
+                """"camToSrgb": [${img.camToSrgb.joinToString()}], "orientation": ${img.orientation}}""")
+        }
+    }
+
     @Test
     fun strippedSamplesNeverDecodeToAnImageOfTheWrongFormat() {
         val dir = samples()?.let { File(it, "_metadata_only") }?.takeIf { it.isDirectory } ?: return

@@ -85,6 +85,29 @@ class RawLoaderTest {
         }
     }
 
+    /** A synthetic X-T2 RAF (whole-file reader, X-Trans developer) through the loader, from bytes and from a file. */
+    @Test fun xTransRafLoadsLikeReaderPlusDeveloper() {
+        val w = 396; val h = 270
+        val rnd = java.util.Random(5)
+        val mosaic = IntArray(w * h) { i -> (1023 + (15000 - 1023) * (0.1 + 0.5 * (i % w) / w + 0.3 * (i / w) / h)).toInt() + rnd.nextInt(81) - 40 }
+        val bytes = RafBuilder(w, h, mosaic, visible = 384 to 264, inset = intArrayOf(4, 16, 240, 360)).build()
+        val img = assertNotNull(RawReader.read(bytes))
+        assertTrue(!img.cfa.isBayer && RawDeveloper.supports(img))
+        val f = File.createTempFile("xtrans", ".raf").apply { deleteOnExit(); writeBytes(bytes) }
+        try {
+            // binned preview (k = 1, 2), full-resolution demosaic, and a fast load that asks for more than a 3x3 bin gives
+            for ((edge, fast) in listOf(120 to true, 60 to true, 4096 to false, 200 to false, 4096 to true)) for (o in listOf(all, plain)) {
+                val ref = RawDeveloper.develop(img, edge, fast, o)
+                val got = assertNotNull(RawLoader.load(ByteArraySource(bytes), edge, fast, o))
+                assertSame(ref, got.image, "bytes $edge $fast")
+                assertEquals(img.uprightWidth, got.fullWidth); assertEquals(img.uprightHeight, got.fullHeight)
+                assertSame(ref, RawFile.open(f).use { assertNotNull(RawLoader.load(it, edge, fast, o)) }.image, "file $edge $fast")
+            }
+            assertEquals(img.cropWidth, RawDeveloper.develop(img, 4096, false).width)
+            assertEquals(img.cropWidth / 3, RawDeveloper.develop(img, 4096, true).width)
+        } finally { f.delete() }
+    }
+
     @Test fun loaderReadsFromAFileChannel() {
         val f = File.createTempFile("merged", ".dng").apply { deleteOnExit() }
         val bytes = merged()

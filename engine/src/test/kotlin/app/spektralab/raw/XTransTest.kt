@@ -126,6 +126,28 @@ class XTransTest {
             assertEquals(up.green(y, up.height - 1 - x), rot.green(x, y), 0f)
     }
 
+    /**
+     * The full-resolution demosaic works in bands of rows, each recomputing its context: the
+     * result must not depend on where the bands fall. Moving the crop down by one tile period
+     * moves every band boundary by 6 rows relative to the scene, so pixels away from the crop
+     * edges must come out bit-identical. Also checked: concurrent development gives the same bits.
+     */
+    @Test
+    fun fullResolutionDoesNotDependOnBanding() {
+        val w = 150; val h = 420
+        val a = RawDeveloper.develop(image(w, h, crop = intArrayOf(0, 0, w, h - 6)), 4096, options = opts)
+        val b = RawDeveloper.develop(image(w, h, crop = intArrayOf(0, 6, w, h - 6)), 4096, options = opts)
+        for (y in 12 until h - 18) for (x in 0 until w) {
+            assertEquals(a.red(x, y + 6), b.red(x, y), 0f, "($x, $y)")
+            assertEquals(a.green(x, y + 6), b.green(x, y), 0f, "($x, $y)")
+            assertEquals(a.blue(x, y + 6), b.blue(x, y), 0f, "($x, $y)")
+        }
+        val img = image(w, h)
+        val ref = RawDeveloper.develop(img, 4096, options = opts)
+        val runs = (0 until 4).map { java.util.concurrent.CompletableFuture.supplyAsync { RawDeveloper.develop(img, 4096, options = opts) } }
+        for (r in runs) { val o = r.get(); for (y in 0 until h step 3) for (x in 0 until w) assertEquals(ref.green(x, y), o.green(x, y), 0f) }
+    }
+
     @Test
     fun highlightsStayNeutralAndBounded() {
         val w = 72; val h = 72

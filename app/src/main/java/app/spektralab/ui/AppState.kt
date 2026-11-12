@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.spektralab.SpektraApp
+import app.spektralab.camera.CaptureMode
 import app.spektralab.camera.RawShooter
 import app.spektralab.data.LibraryItem
 import app.spektralab.data.Media
@@ -76,11 +77,12 @@ class AppState(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** Multi-frame capture: each shot is a short raw burst merged into one cleaner original. */
-    val multiFrame = MutableStateFlow(application.getSharedPreferences("camera", android.content.Context.MODE_PRIVATE).getBoolean("multiFrame", false))
-    fun setMultiFrame(on: Boolean) {
-        multiFrame.value = on
-        app.getSharedPreferences("camera", android.content.Context.MODE_PRIVATE).edit().putBoolean("multiFrame", on).apply()
+    /** What a shutter press saves (JPEG / single raw / raw with automatic low-light burst); kept in the "camera" preferences. */
+    val captureMode = MutableStateFlow(CaptureMode.fromKey(
+        application.getSharedPreferences("camera", android.content.Context.MODE_PRIVATE).getString("captureMode", null)))
+    fun setCaptureMode(mode: CaptureMode) {
+        captureMode.value = mode
+        app.getSharedPreferences("camera", android.content.Context.MODE_PRIVATE).edit().putString("captureMode", mode.key).apply()
     }
 
     /** Progress 0..1 of the burst being merged, null when idle. */

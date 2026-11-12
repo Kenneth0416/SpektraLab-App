@@ -44,6 +44,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -72,6 +73,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import app.spektralab.camera.CaptureMode
+import app.spektralab.camera.LowLight
 import app.spektralab.camera.RawShooter
 import app.spektralab.camera.FilmViewfinder
 import app.spektralab.engine.Catalog
@@ -92,6 +95,8 @@ import java.util.Locale
 private const val CAMERA_LOG_TAG = "SilvercamCamera"
 
 private class CameraSession(val camera: Camera, val capture: ImageCapture, val raw: Boolean,
+                            /** The device can stream raw here, whether or not the chosen mode uses it. */
+                            val rawSupported: Boolean,
                             /** For raw capture into memory; null when the camera would not tell. */
                             val chars: android.hardware.camera2.CameraCharacteristics? = null)
 
@@ -114,14 +119,19 @@ fun CameraScreen(state: AppState) {
     var zoom by rememberSaveable { mutableFloatStateOf(1f) }
     var session by remember { mutableStateOf<CameraSession?>(null) }
     var busy by remember { mutableStateOf(false) }
-    val multiFrame by state.multiFrame.collectAsState()
+    val mode by state.captureMode.collectAsState()
     val merging by state.merging.collectAsState()
-    // frames the next shot will take: follows the light (sensor gain) while multi-frame is on
-    var burstFrames by remember { mutableIntStateOf(RawShooter.MAX_FRAMES) }
-    LaunchedEffect(session, multiFrame) {
-        val chars = session?.chars ?: return@LaunchedEffect
-        while (multiFrame) { burstFrames = state.shooter.frameCount(chars); kotlinx.coroutines.delay(400) }
+    // frames the next shot will take in low-light auto mode: follows the metered exposure
+    var burstFrames by remember { mutableIntStateOf(1) }
+    LaunchedEffect(session, mode, flash) {
+        val s = session
+        if (s == null || !s.raw || s.chars == null || mode != CaptureMode.AUTO) { burstFrames = 1; return@LaunchedEffect }
+        while (true) {
+            burstFrames = state.shooter.frameCount(flashOn = flash == ImageCapture.FLASH_MODE_ON)
+            kotlinx.coroutines.delay(400)
+        }
     }
+    var modeMenu by remember { mutableStateOf(false) }
     // exposure compensation for the film exposure, set by dragging on the finder after a tap
     var evBias by rememberSaveable { mutableFloatStateOf(0f) }
     // focus / metering point: 0 searching, 1 in focus, 2 could not focus; locked = held until tapped again
@@ -154,7 +164,9 @@ fun CameraScreen(state: AppState) {
     }
 
     // bind the camera while this screen is shown
-    DisposableEffect(granted, front) {
+    // JPEG is a different capture stream, so choosing it (or leaving it) rebinds the camera
+    val jpegChosen = mode == CaptureMode.JPEG
+    DisposableEffect(granted, front, jpegChosen) {
         var provider: ProcessCameraProvider? = null
         var disposed = false
         if (granted) {
@@ -199,13 +211,14 @@ fun CameraScreen(state: AppState) {
                         .apply { if (!raw) addEffect(viewfinder.effect) }.build()
                     p.unbindAll()
                     val camera = p.bindToLifecycle(owner, selector, group)
-                    return CameraSession(camera, capture, raw, if (raw) cameraCharacteristics(context, camera) else null).also {
+                    return CameraSession(camera, capture, raw, rawSupported, if (raw) cameraCharacteristics(context, camera) else null).also {
                         Log.i(CAMERA_LOG_TAG, "Camera bound: raw=$raw rawCharacteristicsAvailable=${it.chars != null}")
                     }
                 }
-                session = runCatching { bind(rawSupported) }.recoverCatching {
+                val wantRaw = rawSupported && !jpegChosen
+                session = runCatching { bind(wantRaw) }.recoverCatching {
                     // some devices list raw but cannot stream it next to the preview
-                    if (rawSupported) {
+                    if (wantRaw) {
                         Log.e(CAMERA_LOG_TAG, "RAW binding failed; retrying JPEG", it)
                         bind(false)
                     } else throw it
@@ -393,7 +406,7 @@ fun CameraScreen(state: AppState) {
         val chars = s.chars
         if (s.raw && chars != null && !state.shooter.unsupported) {
             // raw frames into memory: one, or a burst that is merged in the background
-            val frames = if (multiFrame) state.shooter.frameCount(chars) else 1
+            val frames = if (mode == CaptureMode.AUTO) state.shooter.frameCount(flashOn = flash == ImageCapture.FLASH_MODE_ON) else 1
             s.capture.flashMode = if (frames > 1) ImageCapture.FLASH_MODE_OFF else flash
             if (frames > 1) state.say("连拍 $frames 帧，请拿稳")
             val accepted = state.shooter.shoot(s.capture, chars, frames, "SPK_$stamp", evBias) { ok, retry ->
@@ -425,16 +438,46 @@ fun CameraScreen(state: AppState) {
         Text("‹ 灯箱", color = Pal.text, fontSize = 15.sp, modifier = Modifier.springClick { state.closeCamera() }.padding(6.dp))
         // what the shutter will keep as the original
         AnimatedContent(session?.raw, label = "format", transitionSpec = { fadeIn() togetherWith fadeOut() }) { raw ->
-            // tapping the badge switches multi-frame capture (raw only)
-            Text(when (raw) { true -> if (multiFrame) "RAW×$burstFrames" else "RAW"; false -> "JPEG"; null -> "…" },
-                fontFamily = Fonts.mono, fontSize = 10.sp,
-                color = if (raw == true) accent else Pal.dim,
-                modifier = Modifier.springClick {
-                    if (raw == true) {
-                        state.setMultiFrame(!multiFrame)
-                        state.say(if (!multiFrame) "多帧合成：按光线连拍 1–${RawShooter.MAX_FRAMES} 帧 RAW，合成更干净的原片" else "单帧 RAW")
+            // what will be saved; tapping opens the three choices
+            val label = when {
+                raw == null -> "…"
+                raw == false -> "JPEG"
+                mode == CaptureMode.AUTO -> if (burstFrames > 1) "RAW×$burstFrames 自动" else "RAW 自动"
+                else -> "RAW"
+            }
+            Box {
+                Text(label, fontFamily = Fonts.mono, fontSize = 10.sp,
+                    color = if (raw == true) accent else Pal.dim,
+                    modifier = Modifier.semantics { contentDescription = "拍摄格式：$label" }
+                        .springClick { if (raw != null) modeMenu = true }
+                        .padding(6.dp).border(1.dp, if (raw == true) accent else Pal.off, RoundedCornerShape(4.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp))
+                DropdownMenu(modeMenu, { modeMenu = false }, modifier = Modifier.background(Pal.darkPanel)) {
+                    val rawOk = session?.rawSupported == true
+                    for (m in CaptureMode.entries) {
+                        val (title, hint) = when (m) {
+                            CaptureMode.JPEG -> "JPEG" to "存一张 JPEG 原片"
+                            CaptureMode.RAW -> "RAW 单帧" to if (rawOk) "存一张 RAW（DNG）· 默认" else "本机无法拍 RAW，改存 JPEG"
+                            CaptureMode.AUTO -> "RAW 低光多帧" to if (rawOk) "亮处单帧，暗处自动连拍合成" else "本机无法拍 RAW，改存 JPEG"
+                        }
+                        val on = m == mode
+                        Column(Modifier.springClick {
+                            modeMenu = false
+                            state.setCaptureMode(m)
+                            state.say(when {
+                                m == CaptureMode.JPEG -> "拍摄格式：JPEG"
+                                !rawOk -> "本机无法拍 RAW，仍存 JPEG"
+                                m == CaptureMode.RAW -> "拍摄格式：RAW 单帧"
+                                else -> "拍摄格式：RAW 低光多帧（暗处自动连拍 ${LowLight.MID_FRAMES}–${RawShooter.MAX_FRAMES} 帧合成，亮处单帧）"
+                            })
+                        }.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                            Text((if (on) "● " else "○ ") + title, color = if (on) accent else Pal.text, fontSize = 14.sp,
+                                fontWeight = if (on) FontWeight.Bold else FontWeight.Normal)
+                            Text(hint, color = Pal.dim, fontSize = 11.sp)
+                        }
                     }
-                }.padding(6.dp).border(1.dp, if (raw == true) accent else Pal.off, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp))
+                }
+            }
         }
         merging?.let { Text("合成 ${(it * 100).toInt()}%", fontFamily = Fonts.mono, fontSize = 10.sp, color = Pal.dim, modifier = Modifier.padding(2.dp)) }
         gap()

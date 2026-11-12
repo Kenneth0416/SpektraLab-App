@@ -42,8 +42,13 @@ class CaptureResults : CameraCaptureSession.CaptureCallback() {
     @Volatile var iso: Int? = null
         private set
 
+    /** Exposure time (ns) of the latest frame, null before the first one. */
+    @Volatile var exposureNs: Long? = null
+        private set
+
     override fun onCaptureCompleted(session: CameraCaptureSession, request: CaptureRequest, result: TotalCaptureResult) {
         result.get(CaptureResult.SENSOR_SENSITIVITY)?.let { iso = it }
+        result.get(CaptureResult.SENSOR_EXPOSURE_TIME)?.let { exposureNs = it }
         val ts = result.get(CaptureResult.SENSOR_TIMESTAMP) ?: return
         synchronized(lock) {
             recent[ts] = result
@@ -102,15 +107,12 @@ class RawShooter(private val context: Context) {
     }
 
     /**
-     * Frames worth taking now: in good light one raw frame is already clean; the more the
-     * sensor has to amplify, the more frames are averaged.
+     * Frames worth taking now in low-light auto mode: one in normal light, a burst only when
+     * the metered exposure says the scene is dark ([LowLight]). Reads the latest metering, so
+     * it costs the shutter nothing.
      */
-    fun frameCount(chars: CameraCharacteristics): Int {
-        val iso = results.iso ?: return MAX_FRAMES
-        val base = chars.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE)?.lower ?: 100
-        val gain = iso.toFloat() / base.coerceAtLeast(1)
-        return when { gain < 1.5f -> 1; gain < 4f -> 3; else -> MAX_FRAMES }
-    }
+    fun frameCount(flashOn: Boolean = false): Int =
+        LowLight.frames(results.iso, results.exposureNs, MAX_FRAMES, flashOn)
 
     /**
      * @param onExposed main thread, once: the camera is done with this shot ([ok]), or it could

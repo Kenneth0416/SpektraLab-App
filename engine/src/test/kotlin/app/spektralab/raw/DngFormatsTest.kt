@@ -204,13 +204,13 @@ class DngFormatsTest {
     }
 
     @Test
-    fun xTransDngIsReadButNotDeveloped() {
+    fun xTransDngIsReadAndDeveloped() {
         val cfa = CfaPattern.parse(6, 6, RawColorTest.XTRANS)
         val stored = sensor(14, cfa, intArrayOf(256), 1, 16383)
         val img = assertNotNull(DngReader.read(buildDng(stored, Layout(14, 7, tile = 48 to 32), cfa, intArrayOf(256), 1, 16383)))
         assertEquals(6, img.cfa.width); assertEquals(6, img.cfa.height)
         assertContentEquals(cfa.colors, img.cfa.colors)
-        assertEquals(false, RawDeveloper.supports(img))
+        assertEquals(true, RawDeveloper.supports(img))
     }
 
     @Test

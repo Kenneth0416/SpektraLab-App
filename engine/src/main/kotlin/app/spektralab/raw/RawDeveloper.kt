@@ -17,7 +17,7 @@ class LinearImage(val width: Int, val height: Int, val halfRgba: ByteBuffer) {
 }
 
 /**
- * Develops a Bayer raw frame to scene-linear sRGB — the input spektrafilm is designed
+ * Develops a Bayer or X-Trans (XTrans.kt) raw frame to scene-linear sRGB — the input spektrafilm is designed
  * for. Steps: black level, white balance, demosaic, highlight reconstruction, lens
  * shading (gain maps), camera colour matrix, chroma noise reduction. There is no tone
  * curve and no sharpening; luminance noise is left alone (the film's own grain sits on
@@ -29,7 +29,7 @@ class LinearImage(val width: Int, val height: Int, val halfRgba: ByteBuffer) {
  * band by band and never held whole.
  */
 object RawDeveloper {
-    fun supports(img: RawImage): Boolean = img.linear || img.cfa.isBayer
+    fun supports(img: RawImage): Boolean = img.linear || img.cfa.isBayer || XTrans.supports(img.cfa)
 
     class Options(
         /** Rebuild channels that clipped from the ones that did not (about one extra stop). */
@@ -49,7 +49,7 @@ object RawDeveloper {
      */
     fun develop(img: DngImage, maxLongEdge: Int, fast: Boolean = false, options: Options = Options(),
                 cancelled: (() -> Boolean)? = null): LinearImage {
-        require(supports(img)) { "Only Bayer and linear RGB frames can be developed" }
+        require(supports(img)) { "Only Bayer, X-Trans and linear RGB frames can be developed" }
         val long = maxOf(img.cropWidth, img.cropHeight)
         val job = Job(cancelled)
         if (img.linear) {
@@ -60,6 +60,16 @@ object RawDeveloper {
             if (options.chromaDenoise) ChromaDenoise.apply(out, img, samplesPerChannel = (k * k).toFloat(), cancelled)
             return out
         }
+        if (!img.cfa.isBayer) {
+            // X-Trans and similar: 3x3 cells instead of 2x2 Bayer cells (XTrans.kt)
+            val cell = XTrans.baseCell(img)
+            val binX = fast || long / cell >= maxLongEdge
+            val kx = if (binX) maxOf(1, long / cell / maxOf(maxLongEdge, 1)) else 0
+            val p = Prep(img, options)
+            val out = if (binX) XTrans.binned(img, kx, p, job) else XTrans.full(img, p, job)
+            if (options.chromaDenoise) ChromaDenoise.apply(out, img, samplesPerChannel = if (binX) (kx * kx * cell * cell) * 2f / 9f else 1f, cancelled)
+            return out
+        }
         val bin = fast || long / 2 >= maxLongEdge
         val k = if (bin) maxOf(1, long / 2 / maxOf(maxLongEdge, 1)) else 0
         val out = if (bin) binned(img, k, options, job) else malvar(img, options, job)
@@ -68,7 +78,7 @@ object RawDeveloper {
     }
 
     // ------------------------------------------------------------------ shared
-    private class Job(val cancelled: (() -> Boolean)?) {
+    internal class Job(val cancelled: (() -> Boolean)?) {
         fun check() { if (cancelled?.invoke() == true) throw CancellationException("development cancelled") }
     }
 
@@ -94,10 +104,10 @@ object RawDeveloper {
     }
 
     /** Source samples of crop rows: the whole frame, or one band decoded from [RawImage.rows]. */
-    private class Band(val data: ShortArray, val firstRow: Int)
+    internal class Band(val data: ShortArray, val firstRow: Int)
 
     /** Runs [body] on raw rows [y0, y1) of [img]; streamed rows go to a buffer from [pool]. */
-    private inline fun <R> withBand(img: RawImage, y0: Int, y1: Int, pool: Pool<ShortArray>, body: (Band) -> R): R {
+    internal inline fun <R> withBand(img: RawImage, y0: Int, y1: Int, pool: Pool<ShortArray>, body: (Band) -> R): R {
         val rows = img.rows ?: return body(Band(img.data, 0))
         return pool.use((y1 - y0) * img.rawWidth * (if (img.linear) 3 else 1)) { dst ->
             rows.read(y0, y1, dst)
@@ -105,9 +115,9 @@ object RawDeveloper {
         }
     }
 
-    private fun segment(img: RawImage) = img.rows?.segmentRows ?: 64
+    internal fun segment(img: RawImage) = img.rows?.segmentRows ?: 64
 
-    private class Prep(val img: DngImage, val options: Options) {
+    internal class Prep(val img: DngImage, val options: Options) {
         val cfa = IntArray(4) { img.cfa.color(img.cropY + it / 2, img.cropX + it % 2) }
         val black = FloatArray(4) { img.blackAt(img.cropY + it / 2, img.cropX + it % 2) }
         val scale = FloatArray(4) { 1f / (img.white - black[it]).coerceAtLeast(1f) }
@@ -204,7 +214,7 @@ object RawDeveloper {
     }
 
     /** Output buffer; [put] from several threads is safe for distinct pixels. */
-    private class Writer(img: RawImage, val w: Int, val h: Int) {
+    internal class Writer(img: RawImage, val w: Int, val h: Int) {
         private val o = img.orientation
         val outW = if (o >= 5) h else w
         val outH = if (o >= 5) w else h

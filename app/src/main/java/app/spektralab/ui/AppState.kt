@@ -66,7 +66,6 @@ class AppState(application: Application) : AndroidViewModel(application) {
             val item = withContext(Dispatchers.IO) { Media.importItem(app, uri, library.reserveIds(1)) }?.copy(look = look)
                 ?: return@launch say("拍到了，但读不回原片")
             library.add(listOf(item))
-            say(if (item.isRaw) "已放上灯箱 · RAW 原片保留" else "已放上灯箱 · 原片保留")
             // every shot is also printed: the film picture goes to the album next to the original
             exports.enqueue(item, exportOptions.value)
         }

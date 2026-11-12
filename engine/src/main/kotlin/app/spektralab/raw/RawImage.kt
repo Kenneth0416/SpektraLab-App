@@ -124,11 +124,13 @@ class RawImage(
     /** Black level per CFA position (size [CfaPattern.size], indexed by [CfaPattern.index]). */
     val black: FloatArray,
     /**
-     * Saturation level in the same units as [data]: the level the camera records for the end of the
-     * sensor's linear range when the file has one (Canon SpecularWhiteLevel, Panasonic / DNG
-     * linearity limits, DNG WhiteLevel), else LibRaw's `maximum` for the camera (its colour-table value,
-     * else the bit depth). Never derived from the picture's own data (no LibRaw adjust_maximum), so a
-     * camera's files all develop with the same exposure scale.
+     * Saturation level in the same units as [data], from metadata only, never from the picture's own
+     * data (no LibRaw adjust_maximum), so a camera's files all develop with the same exposure scale.
+     * DNG: WhiteLevel. Canon (CR2, CR3): the ColorData SpecularWhiteLevel, since LibRaw's `maximum`
+     * (colour table / bit depth) is above the clip point at many ISOs. Panasonic RawFormat 6 / 7: the
+     * largest linearity limit. Everything else: LibRaw's `maximum` (colour-table value, else the
+     * format's white tag or bit depth), which is where the real Nikon, Sony, Olympus and Fuji samples
+     * clip; their lower recorded linearity limits (LibRaw `linear_max`) are not used.
      */
     val white: Float,
     /**

@@ -22,7 +22,8 @@ package app.spektralab.raw
  * Levels, white balance and crop follow what LibRaw 0.22 reports for the same file:
  * black = tags 28..30 (+15 for RawFormat 4) or the camera table when the file has none,
  * white = the table's saturation value or (1 shl bits) - 1 (RawFormat 6 and 7: the largest
- * linearity limit), crop = the sensor borders, CFA anchored at raw (0, 0).
+ * linearity limit), crop = the sensor borders or, when present, the crop tags 0x2f..0x32 (the camera
+ * JPEG area, as in the other readers), CFA anchored at raw (0, 0).
  *
  * Ported from LibRaw (Copyright LibRaw LLC, LGPL 2.1 / CDDL 1.0, derived from dcraw by Dave Coffin)
  * and cross-checked against rawspeed (LGPL 2.1+) and rawloader (LGPL 2.1).
@@ -127,8 +128,14 @@ object Rw2Reader {
         }
         val colour = RawColor.fromXyzToCamera(DoubleArray(9) { xyz[it / 3][it % 3] }, asShot) ?: return null
         val orientation = (ifd.int(TiffTags.ORIENTATION) ?: 1).let { if (it in 1..8) it else 1 }
+        // crop: the sensor borders, or the CropTop / Left / Bottom / Right tags (0x2f..0x32) of bodies that
+        // record the camera JPEG area separately; LibRaw's raw_inset_crops[0] takes the same two in that order
+        var crop = intArrayOf(left, top, right - left, bottom - top)
+        val ct = ifd.int(0x2f); val cl = ifd.int(0x30); val cb = ifd.int(0x31); val cr = ifd.int(0x32)
+        if (ct != null && cl != null && cb != null && cr != null && ct >= 0 && cl >= 0 &&
+            cb - ct >= 16 && cr - cl >= 16 && cb <= height && cr <= width) crop = intArrayOf(cl, ct, cr - cl, cb - ct)
         return Meta(make, model, width, height, offset.toInt(), encoding, bpp, cfa, blackRgb, white,
-            left, top, right - left, bottom - top, colour, orientation)
+            crop[0], crop[1], crop[2], crop[3], colour, orientation)
     }
 
     // ------------------------------------------------------------------ codecs

@@ -39,6 +39,8 @@ internal object Rw2Synth {
         val borders: IntArray = intArrayOf(2, 4, 4, 6), // top, left, bottom margin, right margin
         val cfa: Int = 4, val black: IntArray = intArrayOf(0, 0, 0), val wb: IntArray? = intArrayOf(570, 263, 438), val redBlue: IntArray? = null,
         val orientation: Int = 1, val limit: Int = 0,
+        /** CropTop, CropLeft, CropBottom, CropRight (tags 0x2f..0x32), absent when null. */
+        val crop: IntArray? = null,
     )
 
     class Built(val file: ByteArray, val mosaic: ShortArray)
@@ -68,6 +70,7 @@ internal object Rw2Synth {
         s.wb?.let { ifd.short(0x24, it[0]).short(0x25, it[1]).short(0x26, it[2]) }
         s.redBlue?.let { ifd.short(0x11, it[0]).short(0x12, it[1]) }
         ifd.short(0x2d, s.encoding)
+        s.crop?.let { ifd.short(0x2f, it[0]).short(0x30, it[1]).short(0x31, it[2]).short(0x32, it[3]) }
         ifd.ascii(TiffTags.MAKE, s.make).ascii(TiffTags.MODEL, s.model).short(TiffTags.ORIENTATION, s.orientation)
         ifd.blobs(0x118, 0x117, listOf(data))
         val out = TiffBuilder(true).build(ifd)
@@ -287,6 +290,18 @@ class Rw2Test {
         // white balance: levels, else red / blue balance over 256, else the matrix's daylight white
         meta("DMC-LX3", 4, 12, 140, intArrayOf(0, 0, 0), wb = null, rb = intArrayOf(512, 384)).wb.let { assertEquals(2.0f, it.wb[0], 1e-5f); assertEquals(1.5f, it.wb[2], 1e-5f) }
         meta("DMC-LX3", 4, 12, 140, intArrayOf(0, 0, 0), wb = null).wb.let { assertEquals(2.302f / 0.9159f, it.wb[0], 0.01f); assertEquals(1.3338f / 0.9159f, it.wb[2], 0.01f) }
+    }
+
+    /** LibRaw 0.22.2 on this file: sizes.crop_left/top/width/height = 10, 6, 120, 52 (raw_inset_crops from 0x2f..0x32). */
+    @Test
+    fun cropTagsGiveTheCameraJpegArea() {
+        val file = Rw2Synth.container(Rw2Synth.Spec("crop", "DC-GH5", 5, 12, 140, 64, 1, crop = intArrayOf(6, 10, 58, 130)), ByteArray(0x8000))
+        dumpDir()?.let { File(it, "crop_tags.rw2").writeBytes(file) }
+        val m = Rw2Reader.meta(file)!!
+        assertEquals(listOf(10, 6, 120, 52), listOf(m.cropX, m.cropY, m.cropW, m.cropH))
+        // without the tags: the sensor borders (top 2, left 4, bottom margin 4, right margin 6)
+        val b = Rw2Reader.meta(Rw2Synth.container(Rw2Synth.Spec("borders", "DC-GH5", 5, 12, 140, 64, 1), ByteArray(0x8000)))!!
+        assertEquals(listOf(4, 2, 130, 58), listOf(b.cropX, b.cropY, b.cropW, b.cropH))
     }
 
     @Test

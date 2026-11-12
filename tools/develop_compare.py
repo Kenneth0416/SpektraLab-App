@@ -7,6 +7,7 @@
 
 For each <name>.json / <name>.f32 written by the test: prints the levels and crop next to LibRaw's, then
 LibRaw renders the file linear (camera WB, sRGB, no auto-bright, highlights clipped, no flip), its image is
+(adjust_maximum off: it lowers white to the picture's data maximum), its image is
 box-averaged to the engine's cells over the engine's crop, and the per-channel mean ratios (ours / LibRaw)
 over pixels where no channel is near clipping are printed. Differences come from the levels (printed), from
 the colour model (the engine adapts the as-shot white with Bradford in XYZ, see RawColor; LibRaw scales in
@@ -31,7 +32,8 @@ def main():
         with rawpy.imread(meta['file']) as r:
             s = r.sizes
             ref = r.postprocess(use_camera_wb=True, no_auto_bright=True, gamma=(1, 1), output_bps=16, user_flip=0,
-                                output_color=rawpy.ColorSpace.sRGB, highlight_mode=rawpy.HighlightMode.Clip).astype(np.float64) / 65535
+                                output_color=rawpy.ColorSpace.sRGB, highlight_mode=rawpy.HighlightMode.Clip,
+                                adjust_maximum_thr=0.0).astype(np.float64) / 65535
             lr = dict(black=list(r.black_level_per_channel), white=r.white_level,
                       wb=[round(v / r.camera_whitebalance[1], 4) for v in r.camera_whitebalance[:3]],
                       visible=[s.left_margin, s.top_margin, s.width, s.height],
@@ -43,9 +45,13 @@ def main():
         print('%s\n  ours   crop %s black %s white %g wb %s' % (name, meta['crop'], [round(b, 2) for b in meta['black']], meta['white'],
                                                               [round(v, 4) for v in meta['wb']]))
         print('  LibRaw visible %s crop %s black %s white %d wb %s' % (lr['visible'], lr['crop'], lr['black'], lr['white'], lr['wb']))
-        if ox < 0 or oy < 0 or ox + w * k > ref.shape[1] or oy + h * k > ref.shape[0]:
-            print('  crop outside LibRaw image, skipped')
+        if ox < 0 or oy < 0:
+            print('  crop starts outside LibRaw image, skipped')
             continue
+        # LibRaw's visible area can be a pixel short of the engine's crop: compare the common cells
+        w = min(w, (ref.shape[1] - ox) // k)
+        h = min(h, (ref.shape[0] - oy) // k)
+        ours = ours[:h, :w]
         b = ref[oy:oy + h * k, ox:ox + w * k].reshape(h, k, w, k, 3).mean(axis=(1, 3))
         mx = ref[oy:oy + h * k, ox:ox + w * k].reshape(h, k, w, k, 3).max(axis=(1, 3))
         ok = (mx.max(axis=2) < 0.9) & (b.min(axis=2) > 0.002) & (ours.max(axis=2) < 0.9)

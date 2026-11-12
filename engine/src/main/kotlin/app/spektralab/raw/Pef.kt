@@ -11,7 +11,8 @@ package app.spektralab.raw
  *  - packed_load_raw() / unpacked_load_raw() (src/decoders/generic.cpp): uncompressed PEF;
  *  - parsePentax() (src/metadata/pentax.cpp): black point 0x0200, as-shot white point 0x0201;
  *  - identify_finetune_pentax() (src/metadata/identify.cpp): per-model visible area and
- *    colour-filter overrides.
+ *    colour-filter overrides; the output crop is the maker-note inset crop (0x0038 / 0x0039,
+ *    LibRaw raw_inset_crops[0]) when present, else that visible area.
  */
 
 /**
@@ -118,8 +119,24 @@ object PefReader {
         val colour = RawColor.fromXyzToCamera(flat, shot) ?: return null
         val orientation = ifd0.int(TiffTags.ORIENTATION)?.takeIf { it in 1..8 } ?: 1
 
-        return RawImage(width, height, pixels, cfa, black, white, geo.left, geo.top, geo.width, geo.height,
+        val crop = insetCrop(mn.ifd, width, height) ?: intArrayOf(geo.left, geo.top, geo.width, geo.height)
+        return RawImage(width, height, pixels, cfa, black, white, crop[0], crop[1], crop[2], crop[3],
             colour.wb, colour.camToSrgb, orientation, make = make, model = model)
+    }
+
+    /**
+     * The camera JPEG area as in the other readers (LibRaw raw_inset_crops[0]): maker-note ImageAreaOffset
+     * (0x0038: left, top) and RawImageSize (0x0039: width, height), with an odd origin moved to the next
+     * even pixel as LibRaw's open_datastream does; null when absent or outside the frame.
+     */
+    internal fun insetCrop(mn: TiffIfd, rawWidth: Int, rawHeight: Int): IntArray? {
+        val o = mn.ints(0x0038)?.takeIf { it.size >= 2 } ?: return null
+        val s = mn.ints(0x0039)?.takeIf { it.size >= 2 } ?: return null
+        var left = o[0]; var top = o[1]; var w = s[0]; var h = s[1]
+        if (left < 0 || top < 0 || w < 8 || h < 8 || left + w > rawWidth || top + h > rawHeight) return null
+        if (left % 2 != 0) { left++; w-- }
+        if (top % 2 != 0) { top++; h-- }
+        return intArrayOf(left, top, w, h)
     }
 
     /** 2x2 CFA from the EXIF CFAPattern tag (colours 0 R, 1 G, 2 B). */

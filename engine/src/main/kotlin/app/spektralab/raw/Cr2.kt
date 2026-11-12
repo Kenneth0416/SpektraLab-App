@@ -24,7 +24,8 @@ package app.spektralab.raw
  * `raw_inset_crops[0]`, the area of the camera JPEG), falling back to LibRaw's visible area.
  *
  * White, as in the CR3 reader: the ColorData SpecularWhiteLevel (LibRaw's `linear_max`, the level
- * Canon records for the sensor's linear range at the shot's ISO) when the file has one, else
+ * Canon records for the sensor's linear range at the shot's ISO; also what rawspeed / darktable and
+ * rawler use as the white point) when the file has one, else
  * LibRaw's `maximum` (the colour-table value, else the full bit range; [Decoded.libRawWhite]).
  * The colour-table value is not the clipping point at every ISO, and LibRaw's render-time
  * adjust_maximum (white := data maximum when that lies within 75 % .. 100 % of it) is not used:
@@ -379,9 +380,11 @@ object Cr2Reader {
             bl.copyInto(info.channelBlack); info.averageBlack = bl.sum() / 4
         }
         // white levels (NormalWhiteLevel, SpecularWhiteLevel) follow the channel black levels, except in
-        // the colour data versions that have none (582, 653, 796, early 674-group and 5120 sub-versions)
+        // the colour data versions that have none (582, 653, 796 and the early 674-group sub-versions);
+        // the same offsets as rawspeed (Cr2Decoder getBlackAndWhiteLevelOffsetsInColorData), which also
+        // knows the 5120 sub-version 0xfffd one that LibRaw does not read
         val whiteAt = when {
-            e.count == 5120 -> if (subVer == 0xfffc) 0x0569 else 0
+            e.count == 5120 -> when (subVer) { 0xfffc -> 0x0569; 0xfffd -> 0x0295; else -> 0 }
             blackAt in intArrayOf(0, 0x00a6, 0x011e, 0x00c4, 0x00e7) -> 0
             else -> blackAt + 4
         }

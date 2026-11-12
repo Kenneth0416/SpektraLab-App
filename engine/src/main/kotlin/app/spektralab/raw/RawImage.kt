@@ -123,11 +123,23 @@ class RawImage(
     val cfa: CfaPattern,
     /** Black level per CFA position (size [CfaPattern.size], indexed by [CfaPattern.index]). */
     val black: FloatArray,
-    /** Saturation level in the same units as [data]. */
+    /**
+     * Saturation level in the same units as [data]: the level the camera records for the end of the
+     * sensor's linear range when the file has one (Canon SpecularWhiteLevel, Panasonic / DNG
+     * linearity limits, DNG WhiteLevel), else LibRaw's `maximum` for the camera (its colour-table value,
+     * else the bit depth). Never derived from the picture's own data (no LibRaw adjust_maximum), so a
+     * camera's files all develop with the same exposure scale.
+     */
     val white: Float,
-    /** Region to output (visible / default crop), raw pixel coordinates; any CFA phase. */
+    /**
+     * Region to output, raw pixel coordinates, any CFA phase: the camera JPEG area when the file
+     * records one (DNG DefaultCrop, the maker inset crops LibRaw reports as `raw_inset_crops[0]`:
+     * Canon SensorInfo, Nikon 0x45, Sony DefaultCrop, Olympus ImageProcessing crop, Pentax 0x38/0x39,
+     * Panasonic sensor borders / 0x2f..0x32, Fuji), else LibRaw's visible area. LibRaw's even-origin
+     * (Bayer) and period-of-6 (X-Trans) alignment is applied.
+     */
     val cropX: Int, val cropY: Int, val cropWidth: Int, val cropHeight: Int,
-    /** White balance gains (R, G, B) applied to black-subtracted, normalised camera RGB. */
+    /** White balance gains (R, G, B), green = 1, from the camera's as-shot multipliers, applied to black-subtracted, normalised camera RGB. */
     val wb: FloatArray,
     /** White-balanced camera RGB -> linear sRGB (D65), row-major 3x3. */
     val camToSrgb: FloatArray,

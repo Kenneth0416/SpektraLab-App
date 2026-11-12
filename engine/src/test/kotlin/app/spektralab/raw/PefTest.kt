@@ -122,6 +122,21 @@ class PefTest {
         return c.value
     }
 
+    /** Maker-note ImageAreaOffset / RawImageSize, as LibRaw's parsePentax reads them into raw_inset_crops[0]. */
+    @Test
+    fun insetCropFromTheMakerNote() {
+        fun mn(vararg tags: Pair<Int, IntArray>): TiffIfd {
+            val ifd = TiffBuilder.Ifd().short(0x0200, 64, 64, 64, 64)
+            for ((t, v) in tags) ifd.short(t, *v)
+            return Tiff.parse(TiffBuilder(true).build(ifd), 0, setOf(42))!!.ifd0
+        }
+        assertEquals(listOf(8, 4, 6000, 4000), PefReader.insetCrop(mn(0x38 to intArrayOf(8, 4), 0x39 to intArrayOf(6000, 4000)), 6080, 4032)?.toList())
+        // odd origin moved to the next even pixel (LibRaw open_datastream)
+        assertEquals(listOf(10, 4, 5999, 3999), PefReader.insetCrop(mn(0x38 to intArrayOf(9, 3), 0x39 to intArrayOf(6000, 4000)), 6080, 4032)?.toList())
+        assertNull(PefReader.insetCrop(mn(0x38 to intArrayOf(100, 4), 0x39 to intArrayOf(6000, 4000)), 6080, 4032))   // past the frame
+        assertNull(PefReader.insetCrop(mn(0x38 to intArrayOf(8, 4)), 6080, 4032))
+    }
+
     @Test
     fun dumpSyntheticFilesForLibRaw() {
         val dir = System.getenv("SPEKTRA_SYNTH_DUMP") ?: return

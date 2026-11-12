@@ -9,8 +9,8 @@ class GroundGlassTest {
     fun groundGlassKernelIsNormalizedAndCompact() {
         val kernel = FilmRenderer.linearGaussianKernel(FilmRenderer.GROUND_GLASS_SIGMA)
 
-        // Six symmetric bilinear pairs plus the centre: a 25-tap Gaussian in 13 reads per axis.
-        assertEquals(7, kernel.taps)
+        // Nine symmetric bilinear pairs plus the centre: a 37-tap Gaussian in 19 reads per axis.
+        assertEquals(10, kernel.taps)
         assertEquals(1.0, kernel.energy(), 1e-6)
         // Reconstruct the actual discrete samples represented by each bilinear pair.
         // Squaring the paired offset itself misses the interpolation's added variance.
@@ -23,8 +23,8 @@ class GroundGlassTest {
                 ((1 - fraction) * left * left + fraction * (left + 1) * (left + 1))
         }
         val measuredSigma = kotlin.math.sqrt(variance / kernel.energy())
-        // A sigma-4 Gaussian truncated at 3 sigma has a measured width of ~3.963.
-        assertEquals(3.962646, measuredSigma, 1e-5)
+        // A sigma-6 Gaussian truncated at 3 sigma has a measured width of ~5.936.
+        assertEquals(5.936381, measuredSigma, 1e-5)
         // The browser suite also measures the fully reconstructed GPU impulse width.
     }
 

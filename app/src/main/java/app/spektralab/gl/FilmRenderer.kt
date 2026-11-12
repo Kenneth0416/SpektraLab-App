@@ -421,7 +421,7 @@ class FilmRenderer {
         private val EXPOSE_UNITS = mapOf("uInput" to 0, "uTcLut" to 1)
         private val FINAL_UNITS = mapOf("uInput" to 0, "uDensity" to 1, "uLut" to 2, "uOverlayTex" to 3)
 
-        internal const val GROUND_GLASS_SIGMA = 4.0
+        internal const val GROUND_GLASS_SIGMA = 6.0
         private val GROUND_GLASS_KERNEL = linearGaussianKernel(GROUND_GLASS_SIGMA)
 
         /** Normalized Gaussian, with adjacent taps paired for hardware bilinear sampling. */

@@ -29,6 +29,14 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
@@ -90,7 +98,41 @@ class RawMemoryTest {
             catch (_: TimeoutException) { }
             shared.close()
             assertEquals(1, pending.get(5, TimeUnit.SECONDS))
-        } finally { image.close(); shared.close(); pool.shutdownNow() }
+            // The same handle is closed by both the owner and this cleanup. The second close
+            // must not drive the shared count negative or release a later lease.
+            image.close()
+            shared.close()
+            val again = RawMemoryGate.acquire()
+            val blocked = pool.submit(Callable { RawMemoryGate.acquire().use { 3 } })
+            try { blocked.get(100, TimeUnit.MILLISECONDS); fail("a repeated close released the next lease") }
+            catch (_: TimeoutException) { }
+            again.close()
+            assertEquals(3, blocked.get(5, TimeUnit.SECONDS))
+        } finally { pool.shutdownNow() }
+    }
+
+    @Test fun cancelledDecodeReleasesTheGate() {
+        val started = CompletableDeferred<Unit>()
+        val cancel = CompletableDeferred<Unit>()
+        val job = kotlinx.coroutines.CoroutineScope(Dispatchers.Default).launch {
+            withContext(Dispatchers.IO) {
+                RawMemoryGate.acquire().use {
+                    started.complete(Unit)
+                    cancel.await()
+                    throw CancellationException("source changed")
+                }
+            }
+        }
+        runBlocking {
+            started.await()
+            val pending = CompletableDeferred<Int>()
+            val waiter = launch(Dispatchers.IO) { RawMemoryGate.acquire().use { pending.complete(5) } }
+            yield()
+            assertFalse(pending.isCompleted)
+            job.cancel()
+            assertEquals(5, kotlinx.coroutines.withTimeout(5_000) { pending.await() })
+            waiter.cancel()
+        }
     }
 
     @Test fun knownSizeReadHandlesShortReadsWithoutGrowingBuffer() {

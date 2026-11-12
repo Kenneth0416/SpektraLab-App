@@ -57,9 +57,9 @@ class CaptureResults : CameraCaptureSession.CaptureCallback() {
     }
 
     /**
-     * Keep [count] results that complete from now on. A shot calls this before starting
-     * exposure: matching can then wait as long as decoding needs without the 48-entry
-     * preview cache forgetting the frame.
+     * A budget for [count] results. Creating it does not retain anything: the shot pins each
+     * sensor timestamp when that frame's image callback arrives, before waiting on the memory
+     * gate. [await] also pins a timestamp that completed before its image was delivered.
      */
     fun pinIncoming(count: Int): CapturePin {
         require(count > 0)
@@ -184,8 +184,8 @@ class RawShooter(private val context: Context) {
               onExposed: (ok: Boolean, retry: Boolean) -> Unit): Boolean {
         require(frames in 1..MAX_FRAMES)
         val lease = admission.acquire() ?: return false
-        // Pin before takePicture. The callback may wait on the memory budget long after
-        // this exposure, and preview traffic must not evict the result needed for its DNG.
+        // The pin object exists before takePicture, but a timestamp is pinned only when its
+        // image callback arrives. That is still before the memory-gate wait and DNG matching.
         val shot = Shot(frames, name, evBias, onExposed, lease, results.pinIncoming(frames))
         Log.i(TAG, "RAW shot=$name requestedFrames=$frames iso=${results.iso}")
         // At most MAX_FRAMES callbacks/tasks exist: admission stays closed through merging.

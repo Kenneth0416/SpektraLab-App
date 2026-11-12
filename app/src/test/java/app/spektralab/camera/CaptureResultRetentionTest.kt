@@ -6,6 +6,20 @@ import org.junit.Test
 
 /** The 48-entry preview cache must not forget a result a shot has already asked to keep. */
 class CaptureResultRetentionTest {
+    @Test fun creatingAPinDoesNotRetainAnythingUntilATimestampArrives() {
+        val results = CaptureResults()
+        val pin = results.pinIncoming(3)
+        val first = Any()
+        results.completed(1L, first)
+        repeat(60) { index -> results.completed(100L + index, Any()) }
+        assertNull(results.cached(1L))
+        results.completed(2L, Any())
+        pin.completed(2L)
+        repeat(60) { index -> results.completed(200L + index, Any()) }
+        org.junit.Assert.assertNotNull(results.cached(2L))
+        pin.close()
+    }
+
     @Test fun pinnedResultSurvivesMoreThanFortyEightLaterFrames() {
         val results = CaptureResults()
         val pin = results.pinIncoming(1)

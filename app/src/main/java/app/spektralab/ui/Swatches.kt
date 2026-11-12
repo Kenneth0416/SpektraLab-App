@@ -32,6 +32,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.res.stringResource
+import app.spektralab.R
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -178,18 +180,21 @@ class Swatches(private val app: SpektraApp) {
 /** One choice in a [FrameRow]. */
 class FrameChoice(val id: String, val name: String, val sub: String, val edge: String, val accent: Color, val look: Look)
 
+@Composable
 fun filmChoices(look: Look): List<FrameChoice> = Catalog.films.map { f ->
-    FrameChoice(f.stock, f.name, "ISO ${f.iso} · ${f.kind}", f.iso, Color(f.accent), Swatches.look(f.stock, look.paper))
+    FrameChoice(f.stock, f.name, stringResource(R.string.film_choice_subtitle, f.iso, filmKind(f)), f.iso, Color(f.accent), Swatches.look(f.stock, look.paper))
 }
 
+@Composable
 fun paperChoices(look: Look, accent: Color): List<FrameChoice> = Catalog.papers.map { p ->
-    val sub = when {
-        p.id == "auto" -> "原配相纸"
-        p.id == "none" -> "直接扫描"
-        p.id.startsWith("kodak_23") -> "电影拷贝片"
-        else -> "彩色相纸"
-    }
-    FrameChoice(p.id, p.label, sub, if (p.id == "none") "SCAN" else "PRINT", accent, Swatches.look(look.film, p.id))
+    val sub = stringResource(when {
+        p.id == "auto" -> R.string.paper_kind_matched
+        p.id == "none" -> R.string.direct_scan
+        p.id.startsWith("kodak_23") -> R.string.paper_kind_print_film
+        else -> R.string.paper_kind_color
+    })
+    val edge = if (p.id == "none") stringResource(R.string.paper_edge_scan) else stringResource(R.string.paper_edge_print)
+    FrameChoice(p.id, paperLabel(p), sub, edge, accent, Swatches.look(look.film, p.id))
 }
 
 /**

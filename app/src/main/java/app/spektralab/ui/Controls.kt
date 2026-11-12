@@ -16,6 +16,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
+import app.spektralab.R
 import kotlinx.coroutines.launch
 import kotlin.math.floor
 import androidx.compose.foundation.Canvas
@@ -224,7 +226,7 @@ fun ToggleRow(label: String, on: Boolean, accent: Color, onToggle: () -> Unit) {
         }
         AnimatedContent(on, label = "onoff", transitionSpec = {
             (slideInVertically { if (targetState) it else -it } + fadeIn()) togetherWith (slideOutVertically { if (targetState) -it else it } + fadeOut())
-        }) { v -> Text(if (v) "开" else "关", color = color, fontFamily = Fonts.mono, fontSize = 13.sp) }
+        }) { v -> Text(stringResource(if (v) R.string.on else R.string.off), color = color, fontFamily = Fonts.mono, fontSize = 13.sp) }
     }
 }
 fun signed(v: Double, digits: Int = 1, unit: String = ""): String {

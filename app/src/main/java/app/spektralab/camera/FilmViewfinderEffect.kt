@@ -1,5 +1,6 @@
 package app.spektralab.camera
 
+import android.content.Context
 import android.graphics.SurfaceTexture
 import android.opengl.EGLSurface
 import android.opengl.GLES11Ext
@@ -12,6 +13,7 @@ import androidx.camera.core.CameraEffect
 import androidx.camera.core.SurfaceOutput
 import androidx.camera.core.SurfaceProcessor
 import androidx.camera.core.SurfaceRequest
+import app.spektralab.R
 import app.spektralab.engine.AutoExposure
 import app.spektralab.engine.LookSetup
 import app.spektralab.gl.EglCore
@@ -31,7 +33,8 @@ import kotlin.math.roundToInt
  * pipeline as photos and videos before it reaches the screen. Only the preview stream is
  * processed; captures are saved untouched (raw sensor data when the device offers it).
  */
-class FilmViewfinder(private val onError: (String) -> Unit) : SurfaceProcessor {
+class FilmViewfinder(context: Context, private val onError: (String) -> Unit) : SurfaceProcessor {
+    private val context = context.applicationContext
     private val thread = HandlerThread("spektra-viewfinder").apply { start() }
     private val handler = Handler(thread.looper)
     val executor = Executor { r -> if (thread.isAlive) handler.post(r) }
@@ -84,7 +87,7 @@ class FilmViewfinder(private val onError: (String) -> Unit) : SurfaceProcessor {
         } catch (t: Throwable) {
             Log.e(TAG, "viewfinder GL init failed", t)
             failed = true
-            onError("这台设备的 GPU 无法实时处理取景画面")
+            onError(context.getString(R.string.gpu_viewfinder_unsupported))
             false
         }
     }
@@ -170,7 +173,7 @@ class FilmViewfinder(private val onError: (String) -> Unit) : SurfaceProcessor {
             frame++
         } catch (t: Throwable) {
             Log.e(TAG, "viewfinder frame failed", t)
-            if (!failed) { failed = true; onError("取景画面处理失败") }
+            if (!failed) { failed = true; onError(context.getString(R.string.viewfinder_render_failed)) }
         }
     }
 

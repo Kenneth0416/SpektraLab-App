@@ -11,6 +11,7 @@ node /tmp/glcheck/pipeline.js   # expose -> couplers -> develop -> print/scan LU
 node /tmp/glcheck/grain.js      # sublayer Poisson grain: mean / std vs CPU model
 node /tmp/glcheck/blur.js /tmp/glcheck   # pyramid Gaussian: sigma and energy
 node /tmp/glcheck/merge.js /tmp/glcheck  # burst merge gather vs CPU (16-bit error)
+node /tmp/glcheck/tiles.js /tmp/glcheck  # tiled (TilePlan ops) vs untiled render: max / mean difference, at seams vs elsewhere
 ```
 
 Needs Node with `playwright` and a Chromium build.

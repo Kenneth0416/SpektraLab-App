@@ -489,7 +489,7 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
     }
 
     companion object {
-        /** Long edge of the magnified view's render and of the source loaded for it (same as a full-size export). */
+        /** Long edge of the magnified view's render and of the source loaded for it (an untiled full-size export's limit). */
         const val FULL_EDGE = 4096
     }
 }

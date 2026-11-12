@@ -21,10 +21,18 @@ object OverlayPainter {
     /** Returns a premultiplied ARGB bitmap the size of the output canvas, or null. */
     fun paint(framing: Framing, look: Look, frameNumber: Int, date: Long): Bitmap? {
         if (!needsOverlay(look)) return null
+        val bmp = Bitmap.createBitmap(framing.outWidth, framing.outHeight, Bitmap.Config.ARGB_8888)
+        draw(Canvas(bmp), framing, look, frameNumber, date)
+        return bmp
+    }
+
+    /**
+     * Paint the markings onto [c], a canvas the size of the output. On a finished print this
+     * equals compositing [paint]'s bitmap over it (source-over), up to 8-bit rounding.
+     */
+    fun draw(c: Canvas, framing: Framing, look: Look, frameNumber: Int, date: Long) {
         val w = framing.outWidth
         val h = framing.outHeight
-        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        val c = Canvas(bmp)
         val r = framing.imageRect
         val left = r[0] * w
         val right = r[2] * w
@@ -75,6 +83,5 @@ object OverlayPainter {
             c.drawText(text, x, y, glow)
             c.drawText(text, x, y, core)
         }
-        return bmp
     }
 }

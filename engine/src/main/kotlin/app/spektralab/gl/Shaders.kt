@@ -96,7 +96,13 @@ precision highp float;
 in vec2 vUv;
 out vec4 fragColor;
 uniform sampler2D uSrc;
-void main() { fragColor = texture(uSrc, vUv); }
+#ifdef TILED
+uniform vec4 uSrcMap;      // tile: target uv -> source window uv (scale xy, offset zw)
+#define SRC_UV (vUv * uSrcMap.xy + uSrcMap.zw)
+#else
+#define SRC_UV vUv
+#endif
+void main() { fragColor = texture(uSrc, SRC_UV); }
 """
 
     const val BLUR = """#version 300 es
@@ -126,8 +132,12 @@ void main() {
         append(HEADER)
         append("in vec2 vUv;\nout vec4 fragColor;\nuniform sampler2D uBase;\nuniform vec3 uBaseW;\nuniform int uCount;\nuniform vec3 uW[$MAX_COMBINE];\n")
         for (i in 0 until MAX_COMBINE) append("uniform sampler2D uT$i;\n")
-        append("void main() {\n    vec3 s = uBaseW * texture(uBase, vUv).rgb;\n")
-        for (i in 0 until MAX_COMBINE) append("    if (uCount > $i) s += uW[$i] * texture(uT$i, vUv).rgb;\n")
+        // tile: target uv -> window uv of each input
+        append("#ifdef TILED\nuniform vec4 uBaseMap;\nuniform vec4 uMap[$MAX_COMBINE];\n")
+        append("#define BASE_UV (vUv * uBaseMap.xy + uBaseMap.zw)\n#define TERM_UV(i) (vUv * uMap[i].xy + uMap[i].zw)\n")
+        append("#else\n#define BASE_UV vUv\n#define TERM_UV(i) vUv\n#endif\n")
+        append("void main() {\n    vec3 s = uBaseW * texture(uBase, BASE_UV).rgb;\n")
+        for (i in 0 until MAX_COMBINE) append("    if (uCount > $i) s += uW[$i] * texture(uT$i, TERM_UV($i)).rgb;\n")
         append("    fragColor = vec4(s, 1.0);\n}\n")
     }
 
@@ -185,6 +195,23 @@ uniform vec3 uLayerN[3];
 uniform vec3 uUniformity;
 uniform vec3 uDmin;
 uniform uint uSeed;
+#ifdef TILED
+uniform vec4 uRawMap;      // tile: target uv -> window uv of uRaw / uS / uCb
+uniform vec4 uSMap;
+uniform vec4 uCbMap;
+uniform uvec2 uOrigin;     // target window origin in image pixels: grain is seeded by image position
+#define RAW_UV (vUv * uRawMap.xy + uRawMap.zw)
+#define S_UV (vUv * uSMap.xy + uSMap.zw)
+#define CB_UV (vUv * uCbMap.xy + uCbMap.zw)
+#define PIX_X (uint(gl_FragCoord.x) + uOrigin.x)
+#define PIX_Y (uint(gl_FragCoord.y) + uOrigin.y)
+#else
+#define RAW_UV vUv
+#define S_UV vUv
+#define CB_UV vUv
+#define PIX_X uint(gl_FragCoord.x)
+#define PIX_Y uint(gl_FragCoord.y)
+#endif
 
 uint pcg(uint v) {
     uint state = v * 747796405u + 2891336453u;
@@ -216,24 +243,24 @@ float poisson(float lambda, inout uint s) {
 vec3 rawAt(vec2 uv) { return texture(uRaw, uv).rgb; }
 
 void main() {
-    vec3 c = rawAt(vUv);
-    vec3 raw = uIdW * c + texture(uS, vUv).rgb;
+    vec3 c = rawAt(RAW_UV);
+    vec3 raw = uIdW * c + texture(uS, S_UV).rgb;
     if (uFineW != vec3(0.0)) {
         // Gaussian sigma 0.75 px, 3x3
-        vec3 e = rawAt(vUv + vec2(uTexel.x, 0.0)) + rawAt(vUv - vec2(uTexel.x, 0.0))
-               + rawAt(vUv + vec2(0.0, uTexel.y)) + rawAt(vUv - vec2(0.0, uTexel.y));
-        vec3 k = rawAt(vUv + uTexel) + rawAt(vUv - uTexel)
-               + rawAt(vUv + vec2(uTexel.x, -uTexel.y)) + rawAt(vUv + vec2(-uTexel.x, uTexel.y));
+        vec3 e = rawAt(RAW_UV + vec2(uTexel.x, 0.0)) + rawAt(RAW_UV - vec2(uTexel.x, 0.0))
+               + rawAt(RAW_UV + vec2(0.0, uTexel.y)) + rawAt(RAW_UV - vec2(0.0, uTexel.y));
+        vec3 k = rawAt(RAW_UV + uTexel) + rawAt(RAW_UV - uTexel)
+               + rawAt(RAW_UV + vec2(uTexel.x, -uTexel.y)) + rawAt(RAW_UV + vec2(-uTexel.x, uTexel.y));
         vec3 blur = 0.30119 * c + 0.12381 * e + 0.05090 * k;
         raw += uFineW * blur;
     }
     vec3 logRaw = log10v(raw);
     vec3 d;
-    if (uCouplers == 1) d = lookupCurves(uCurves0, logRaw - texture(uCb, vUv).rgb);
+    if (uCouplers == 1) d = lookupCurves(uCurves0, logRaw - texture(uCb, CB_UV).rgb);
     else d = lookupCurves(uCurves, logRaw);
 
     if (uGrain == 1) {
-        uint s = pcg(uint(gl_FragCoord.x) + pcg(uint(gl_FragCoord.y) + pcg(uSeed)));
+        uint s = pcg(PIX_X + pcg(PIX_Y + pcg(uSeed)));
         vec3 t = clamp(d / uTableHi, 0.0, 1.0) * 127.0 / 128.0 + 0.5 / 128.0;
         vec3 acc = vec3(0.0);
         vec3 mean = vec3(0.0);
@@ -275,11 +302,20 @@ uniform sampler2D uOverlayTex;
 uniform int uFlipY;
 uniform int uOriginal;
 uniform float uOriginalGain;
+#ifdef TILED
+uniform vec4 uOutMap;      // tile: target uv -> output canvas uv
+uniform vec4 uDensMap;     // image uv -> density window uv
+#define OUT_UV (vUv * uOutMap.xy + uOutMap.zw)
+#define DENS_UV(uv) ((uv) * uDensMap.xy + uDensMap.zw)
+#else
+#define OUT_UV vUv
+#define DENS_UV(uv) uv
+#endif
 
-vec3 dens(vec2 uv) { return texture(uDensity, uv).rgb; }
+vec3 dens(vec2 uv) { return texture(uDensity, DENS_UV(uv)).rgb; }
 
 void main() {
-    vec2 p = vUv;
+    vec2 p = OUT_UV;
     if (uFlipY == 1) p.y = 1.0 - p.y;
     vec3 col;
     if (p.x < uImageRect.x || p.x > uImageRect.z || p.y < uImageRect.y || p.y > uImageRect.w) {
@@ -313,6 +349,16 @@ void main() {
 
     val FINAL = HEADER + INPUT + FINAL_BODY
     val FINAL_EXTERNAL = EXTERNAL_HEADER + INPUT + FINAL_BODY
+
+    /**
+     * Variant of [DOWN], [COMBINE], [DEVELOP] or [FINAL] for a tile of a large image (see
+     * [TilePlan]): inputs are windows sampled through uv maps, grain uses image positions.
+     * Without TILED the macros expand to the original code, so untiled renders are unchanged.
+     */
+    fun tiled(src: String): String {
+        val eol = src.indexOf('\n')
+        return src.substring(0, eol + 1) + "#define TILED 1\n" + src.substring(eol + 1)
+    }
 
     /**
      * Instant-film development reveal: GLSL port of spektrafilm_gui

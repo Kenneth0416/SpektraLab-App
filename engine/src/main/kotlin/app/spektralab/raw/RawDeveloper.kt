@@ -33,21 +33,56 @@ object RawDeveloper {
      * @param maxLongEdge wanted long edge. When the sensor has at least twice that, 2x2
      *   Bayer cells are binned (fast, and averages noise); otherwise a full-resolution
      *   Malvar-He-Cutler demosaic runs unless [fast] is set.
+     * @param allocate buffer for the result (8 bytes per pixel), e.g. off the Java heap for large images
      */
-    fun develop(img: DngImage, maxLongEdge: Int, fast: Boolean = false, options: Options = Options()): LinearImage {
+    fun develop(img: DngImage, maxLongEdge: Int, fast: Boolean = false, options: Options = Options(),
+                allocate: (Int) -> ByteBuffer = ByteBuffer::allocateDirect): LinearImage {
         val long = maxOf(img.cropWidth, img.cropHeight)
         if (img.linear) {
             // already demosaiced (merged burst): only reduce the size when asked for less
             val k = maxOf(1, long / maxOf(maxLongEdge, 1))
-            val out = linear(img, k, options)
+            val out = linear(img, k, options, allocate)
             if (options.chromaDenoise) ChromaDenoise.apply(out, img, samplesPerChannel = (k * k).toFloat())
             return out
         }
         val bin = fast || long / 2 >= maxLongEdge
         val k = if (bin) maxOf(1, long / 2 / maxOf(maxLongEdge, 1)) else 0
-        val out = if (bin) binned(img, k, options) else malvar(img, options)
+        val out = if (bin) binned(img, k, options, allocate) else malvar(img, options, allocate)
         if (options.chromaDenoise) ChromaDenoise.apply(out, img, samplesPerChannel = if (bin) (k * k).toFloat() else 1f)
         return out
+    }
+
+    /**
+     * Java heap [develop] allocates on top of the sensor data already in [img], bytes: per
+     * output pixel 6 for the chroma denoise planes (more than Malvar's 4-byte plane, which
+     * is freed before) and, when [outputOnHeap], 8 for the result.
+     */
+    fun workingBytes(img: DngImage, maxLongEdge: Int, fast: Boolean, outputOnHeap: Boolean): Long {
+        val long = maxOf(img.cropWidth, img.cropHeight)
+        val px = if (img.linear) {
+            val k = maxOf(1, long / maxOf(maxLongEdge, 1))
+            (img.cropWidth / k).toLong() * (img.cropHeight / k)
+        } else if (fast || long / 2 >= maxLongEdge) {
+            val cell = 2 * maxOf(1, long / 2 / maxOf(maxLongEdge, 1))
+            (img.cropWidth / cell).toLong() * (img.cropHeight / cell)
+        } else img.cropWidth.toLong() * img.cropHeight
+        return px * (6 + if (outputOnHeap) 8 else 0)
+    }
+
+    /**
+     * The long edge to ask [develop] for so that [workingBytes] stays within [budget]:
+     * [maxLongEdge] if it fits, else the largest binned size that does.
+     */
+    fun longEdgeWithin(img: DngImage, maxLongEdge: Int, fast: Boolean, budget: Long, outputOnHeap: Boolean): Int {
+        if (workingBytes(img, maxLongEdge, fast, outputOnHeap) <= budget) return maxLongEdge
+        val long = maxOf(img.cropWidth, img.cropHeight)
+        // binning factors: 2k x 2k Bayer cells, or k x k on demosaiced data
+        for (k in 1..16) {
+            val edge = if (img.linear) long / (k + 1) else long / 2 / k
+            if (edge < 1) break
+            if (edge < maxLongEdge && workingBytes(img, edge, fast, outputOnHeap) <= budget) return edge
+        }
+        return 1
     }
 
     // ------------------------------------------------------------------ shared
@@ -116,11 +151,11 @@ object RawDeveloper {
         }
     }
 
-    private class Writer(img: DngImage, val w: Int, val h: Int) {
+    private class Writer(img: DngImage, val w: Int, val h: Int, allocate: (Int) -> ByteBuffer) {
         private val o = img.orientation
         val outW = if (o == 6 || o == 8) h else w
         val outH = if (o == 6 || o == 8) w else h
-        val buf: ByteBuffer = ByteBuffer.allocateDirect(outW * outH * 8).order(ByteOrder.nativeOrder())
+        val buf: ByteBuffer = allocate(outW * outH * 8).order(ByteOrder.nativeOrder())
         private val m = img.camToSrgb
         private val one = Half.fromFloat(1f)
 
@@ -143,11 +178,11 @@ object RawDeveloper {
     }
 
     // ------------------------------------------------------------------ demosaiced input
-    private fun linear(img: DngImage, k: Int, options: Options): LinearImage {
+    private fun linear(img: DngImage, k: Int, options: Options, allocate: (Int) -> ByteBuffer): LinearImage {
         val p = Prep(img, options)
         val w = img.cropWidth / k
         val h = img.cropHeight / k
-        val out = Writer(img, w, h)
+        val out = Writer(img, w, h, allocate)
         val rgb = FloatArray(3)
         val scale = 1f / (img.white - img.black[0]).coerceAtLeast(1f)
         val inv = 1f / (k * k)
@@ -166,12 +201,12 @@ object RawDeveloper {
     }
 
     // ------------------------------------------------------------------ binning
-    private fun binned(img: DngImage, k: Int, options: Options): LinearImage {
+    private fun binned(img: DngImage, k: Int, options: Options, allocate: (Int) -> ByteBuffer): LinearImage {
         val p = Prep(img, options)
         val cell = 2 * k
         val w = img.cropWidth / cell
         val h = img.cropHeight / cell
-        val out = Writer(img, w, h)
+        val out = Writer(img, w, h, allocate)
         val sum = FloatArray(3)
         val cnt = IntArray(3)
         val rgb = FloatArray(3)
@@ -194,13 +229,13 @@ object RawDeveloper {
     }
 
     // ------------------------------------------------------------------ Malvar-He-Cutler
-    private fun malvar(img: DngImage, options: Options): LinearImage {
+    private fun malvar(img: DngImage, options: Options, allocate: (Int) -> ByteBuffer): LinearImage {
         val p = Prep(img, options)
         val w = img.cropWidth
         val h = img.cropHeight
         val plane = FloatArray(w * h)
         for (y in 0 until h) for (x in 0 until w) plane[y * w + x] = p.sample(x, y)
-        val out = Writer(img, w, h)
+        val out = Writer(img, w, h, allocate)
         // reflect by whole CFA periods so the colour phase is kept at the borders
         fun rx(x: Int) = if (x < 0) -x else if (x >= w) 2 * (w - 1) - x else x
         fun ry(y: Int) = if (y < 0) -y else if (y >= h) 2 * (h - 1) - y else y

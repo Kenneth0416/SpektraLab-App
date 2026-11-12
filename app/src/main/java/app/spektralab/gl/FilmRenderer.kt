@@ -4,6 +4,8 @@ import android.opengl.GLES11Ext
 import android.opengl.GLES30.*
 import app.spektralab.engine.GaussianMixture
 import app.spektralab.engine.LookSetup
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import kotlin.math.ceil
 import kotlin.math.exp
 import kotlin.math.floor
@@ -71,6 +73,11 @@ class FilmRenderer {
     private val pFinal = Program(Shaders.VERTEX, Shaders.FINAL).bindSamplerUnits(FINAL_UNITS)
     private val pFinalExtLazy = lazy { Program(Shaders.VERTEX, Shaders.FINAL_EXTERNAL).bindSamplerUnits(FINAL_UNITS) }
     private val pFinalExt get() = pFinalExtLazy.value
+    // tiled variants: compiled on the first tiled render
+    private val pDownTLazy = lazy { Program(Shaders.VERTEX, Shaders.tiled(Shaders.DOWN)) }
+    private val pCombineTLazy = lazy { Program(Shaders.VERTEX, Shaders.tiled(Shaders.COMBINE)) }
+    private val pDevelopTLazy = lazy { Program(Shaders.VERTEX, Shaders.tiled(Shaders.DEVELOP)) }
+    private val pFinalTLazy = lazy { Program(Shaders.VERTEX, Shaders.tiled(Shaders.FINAL)).bindSamplerUnits(FINAL_UNITS) }
 
     private val texTc = GlUtil.texture2d()
     private val texCurves = GlUtil.texture2d()
@@ -136,14 +143,7 @@ class FilmRenderer {
             drawFinal(r, s, 0)
             return
         }
-        val pixelUm = s.pixelSizeUm(max(w, h))
-        val key = "%.4f/%d/%d".format(pixelUm, w, h)
-        if (key != mixKey) {
-            val maxSigma = max(w, h) / 3.0
-            expMix = s.exposureBlur(pixelUm, maxSigma)
-            corrMix = s.couplerBlur(pixelUm, maxSigma)
-            mixKey = key
-        }
+        val pixelUm = updateMixtures(s, w, h)
 
         // 1. expose
         val a = target("A", w, h)
@@ -214,10 +214,34 @@ class FilmRenderer {
         pd.texture("uRaw", 0, a.texture)
         pd.texture("uS", 1, sTex)
         pd.texture("uCb", 2, cbTex)
+        developUniforms(pd, s, pixelUm, r.seed, idW, fineW, 1f / w, 1f / h)
+        quad.draw()
+
+        // 5. print + scan + display
+        drawFinal(r, s, d.texture)
+        GlUtil.checkError("render")
+    }
+
+    /** Blur mixtures for a [w] x [h] image: the pixel size, so the blur sizes, come from the whole image. */
+    private fun updateMixtures(s: LookSetup, w: Int, h: Int): Double {
+        val pixelUm = s.pixelSizeUm(max(w, h))
+        val key = "%.4f/%d/%d".format(pixelUm, w, h)
+        if (key != mixKey) {
+            val maxSigma = max(w, h) / 3.0
+            expMix = s.exposureBlur(pixelUm, maxSigma)
+            corrMix = s.couplerBlur(pixelUm, maxSigma)
+            mixKey = key
+        }
+        return pixelUm
+    }
+
+    /** Develop pass uniforms besides its input textures; [texelX] / [texelY] is one texel of uRaw. */
+    private fun developUniforms(pd: Program, s: LookSetup, pixelUm: Double, seed: Int, idW: FloatArray, fineW: FloatArray,
+                                texelX: Float, texelY: Float) {
         bindCurves(pd, s, 3)
         pd.set3f("uIdW", idW[0], idW[1], idW[2])
         pd.set3f("uFineW", fineW[0], fineW[1], fineW[2])
-        pd.set2f("uTexel", 1f / w, 1f / h)
+        pd.set2f("uTexel", texelX, texelY)
         pd.set1i("uCouplers", if (s.couplersActive) 1 else 0)
         val g = s.grain
         pd.set1i("uGrain", if (g.active) 1 else 0)
@@ -231,13 +255,174 @@ class FilmRenderer {
             pd.set3fv("uLayerN", FloatArray(9) { (g.particlesPerUm2[it / 3][it % 3] * area).toFloat() })
             pd.set3f("uUniformity", g.uniformity[0].toFloat(), g.uniformity[1].toFloat(), g.uniformity[2].toFloat())
             pd.set3f("uDmin", g.densityMin[0].toFloat(), g.densityMin[1].toFloat(), g.densityMin[2].toFloat())
-            pd.set1ui("uSeed", r.seed)
+            pd.set1ui("uSeed", seed)
         }
-        quad.draw()
+    }
 
-        // 5. print + scan + display
-        drawFinal(r, s, d.texture)
-        GlUtil.checkError("render")
+    /**
+     * Plan a tiled render of an [imageWidth] x [imageHeight] image with the current look
+     * (see [TilePlan]); the output is [outWidth] x [outHeight] read back top row first.
+     * @param uvTransform row-major 3x3, image uv -> source uv (source rows top-down)
+     */
+    fun planTiled(imageWidth: Int, imageHeight: Int, outWidth: Int, outHeight: Int, imageRect: FloatArray,
+                  sourceWidth: Int, sourceHeight: Int, uvTransform: FloatArray, tile: Int): TilePlan {
+        val s = checkNotNull(setup) { "no look" }
+        updateMixtures(s, imageWidth, imageHeight)
+        return TilePlan.build(imageWidth, imageHeight, outWidth, outHeight, imageRect, flipY = true,
+            sourceWidth = sourceWidth, sourceHeight = sourceHeight, uvTransform = uvTransform,
+            expMix = expMix, corrMix = corrMix, couplers = s.couplersActive, tile = tile)
+    }
+
+    /**
+     * Execute [plan]. [upload] returns a new texture of source pixels (x, y, w, h; rows
+     * top-down; sRGB or half-float linear, as for [render]); [sink] receives every output
+     * tile (x, y, w, h, RGBA bytes, rows top-down). GPU memory is the tile buffers plus the
+     * global pyramid levels (1/64 of the image's pixels or less each). Throws on any GL error.
+     */
+    fun renderTiled(plan: TilePlan, autoEv: Float, seed: Int, border: FloatArray,
+                    upload: (Int, Int, Int, Int) -> Int, sink: (Int, Int, Int, Int, ByteBuffer) -> Unit,
+                    progress: (Float) -> Unit = {}) {
+        val s = checkNotNull(setup) { "no look" }
+        val pixelUm = updateMixtures(s, plan.imageWidth, plan.imageHeight)
+        glDisable(GL_BLEND)
+        glDisable(GL_DEPTH_TEST)
+        // an error left by earlier work must not be taken for ours
+        while (glGetError() != GL_NO_ERROR) { /* drain */ }
+        fun t(b: TilePlan.Buf) = target("T:${b.name}", b.w, b.h)
+        var src = 0
+        var pixels: ByteBuffer? = null
+        try {
+            for ((i, op) in plan.ops.withIndex()) when (op) {
+                is TilePlan.Op.Source -> {
+                    // submit each tile's work on its own: short GPU jobs for the driver watchdog
+                    glFlush()
+                    GlUtil.deleteTexture(src)
+                    src = 0
+                    src = upload(op.x0, op.y0, op.w, op.h)
+                    checkTiled("source upload")
+                }
+                is TilePlan.Op.Expose -> {
+                    t(op.dst).bind()
+                    pExpose.use()
+                    pExpose.texture("uInput", 0, src)
+                    pExpose.setMat3RowMajor("uUvTransform", op.uvTransform)
+                    pExpose.setMat3RowMajor("uToXyz", s.inputMatrix)
+                    pExpose.texture("uTcLut", 1, texTc)
+                    pExpose.set1f("uTcSize", s.tcLutSize.toFloat())
+                    pExpose.set1f("uExposure", s.exposureScale * 2f.pow(autoEv))
+                    quad.draw()
+                }
+                is TilePlan.Op.Down -> {
+                    val srcTex = t(op.src).texture
+                    glBindFramebuffer(GL_FRAMEBUFFER, t(op.dst).framebuffer)
+                    glViewport(op.viewport.x0 - op.dst.x0, op.viewport.y0 - op.dst.y0, op.viewport.w, op.viewport.h)
+                    val p = pDownTLazy.value
+                    p.use()
+                    p.texture("uSrc", 0, srcTex)
+                    p.set4f("uSrcMap", op.map[0], op.map[1], op.map[2], op.map[3])
+                    quad.draw()
+                }
+                is TilePlan.Op.Blur -> {
+                    val from = t(op.src)
+                    val tmp = t(op.tmp)
+                    val dst = t(op.dst)
+                    blurPass(from.texture, tmp, op.sigma, 1f / from.width, 0f)
+                    blurPass(tmp.texture, dst, op.sigma, 0f, 1f / from.height)
+                }
+                is TilePlan.Op.Combine -> {
+                    val inputs = op.terms.map { t(it.src).texture }
+                    val base = op.base?.let { t(it).texture } ?: texZero
+                    t(op.dst).bind()
+                    val p = pCombineTLazy.value
+                    p.use()
+                    p.texture("uBase", 0, base)
+                    p.set4f("uBaseMap", op.baseMap[0], op.baseMap[1], op.baseMap[2], op.baseMap[3])
+                    p.set3f("uBaseW", op.baseWeight[0], op.baseWeight[1], op.baseWeight[2])
+                    p.set1i("uCount", op.terms.size)
+                    val w = FloatArray(Shaders.MAX_COMBINE * 3)
+                    val maps = FloatArray(Shaders.MAX_COMBINE * 4)
+                    for (k in 0 until Shaders.MAX_COMBINE) {
+                        p.texture("uT$k", k + 1, inputs.getOrNull(k) ?: texZero)
+                        val term = op.terms.getOrNull(k) ?: continue
+                        for (c in 0..2) w[k * 3 + c] = term.weight[c]
+                        for (c in 0..3) maps[k * 4 + c] = term.map[c]
+                    }
+                    p.set3fv("uW", w)
+                    p.set4fv("uMap", maps)
+                    quad.draw()
+                }
+                is TilePlan.Op.Corr -> {
+                    val l1 = t(op.l1).texture
+                    val sTex = op.s?.let { t(it).texture } ?: texZero
+                    t(op.dst).bind()
+                    pCorr.use()
+                    pCorr.texture("uL1", 0, l1)
+                    pCorr.texture("uS", 1, sTex)
+                    pCorr.set3f("uIdW", op.idW[0], op.idW[1], op.idW[2])
+                    bindCurves(pCorr, s, 2)
+                    pCorr.setMat3ColumnMajor("uCoupler", s.couplerMatrix)
+                    pCorr.set3f("uDmax", s.densityMax[0], s.densityMax[1], s.densityMax[2])
+                    pCorr.set1i("uPositive", if (s.positive) 1 else 0)
+                    quad.draw()
+                }
+                is TilePlan.Op.Develop -> {
+                    val raw = t(op.raw).texture
+                    val sTex = op.s?.let { t(it).texture } ?: texZero
+                    val cbTex = op.cb?.let { t(it).texture } ?: texZero
+                    t(op.dst).bind()
+                    val p = pDevelopTLazy.value
+                    p.use()
+                    p.texture("uRaw", 0, raw)
+                    p.texture("uS", 1, sTex)
+                    p.texture("uCb", 2, cbTex)
+                    developUniforms(p, s, pixelUm, seed, plan.idW, plan.fineW, op.texel[0], op.texel[1])
+                    p.set4f("uRawMap", op.rawMap[0], op.rawMap[1], op.rawMap[2], op.rawMap[3])
+                    p.set4f("uSMap", op.sMap[0], op.sMap[1], op.sMap[2], op.sMap[3])
+                    p.set4f("uCbMap", op.cbMap[0], op.cbMap[1], op.cbMap[2], op.cbMap[3])
+                    p.set2ui("uOrigin", op.dst.x0, op.dst.y0)
+                    quad.draw()
+                }
+                is TilePlan.Op.Final -> {
+                    val density = op.density?.let { t(it).texture } ?: texZero
+                    val out = target("T:out", op.w, op.h, GL_RGBA8)
+                    out.bind()
+                    val p = pFinalTLazy.value
+                    p.use()
+                    p.texture("uDensity", 1, density)
+                    printUniforms(p, s, plan.imageWidth, plan.imageHeight)
+                    p.set1i("uOriginal", 0)
+                    p.set4f("uImageRect", plan.imageRect[0], plan.imageRect[1], plan.imageRect[2], plan.imageRect[3])
+                    p.set3f("uBorder", border[0], border[1], border[2])
+                    p.set1i("uFlipY", if (plan.flipY) 1 else 0)
+                    // date stamp and edge print are drawn on the finished bitmap
+                    p.set1i("uOverlay", 0)
+                    p.set4f("uOutMap", op.outMap[0], op.outMap[1], op.outMap[2], op.outMap[3])
+                    p.set4f("uDensMap", op.densMap[0], op.densMap[1], op.densMap[2], op.densMap[3])
+                    quad.draw()
+                    val need = op.w * op.h * 4
+                    val buf = pixels?.takeIf { it.capacity() >= need } ?: ByteBuffer.allocateDirect(need).order(ByteOrder.nativeOrder())
+                    pixels = buf
+                    buf.clear()
+                    glPixelStorei(GL_PACK_ALIGNMENT, 1)
+                    glReadPixels(0, 0, op.w, op.h, GL_RGBA, GL_UNSIGNED_BYTE, buf)
+                    checkTiled("output tile")
+                    buf.position(0)
+                    sink(op.x0, op.y0, op.w, op.h, buf)
+                    progress((i + 1f) / plan.ops.size)
+                }
+                is TilePlan.Op.Free -> for (n in op.names) targets.remove("T:$n")?.release()
+            }
+            glBindFramebuffer(GL_FRAMEBUFFER, 0)
+            checkTiled("tiled render")
+        } finally {
+            GlUtil.deleteTexture(src)
+            releaseTargets()
+        }
+    }
+
+    private fun checkTiled(where: String) {
+        val e = glGetError()
+        check(e == GL_NO_ERROR) { "GL error 0x${Integer.toHexString(e)} at $where" }
     }
 
     private fun bindCurves(p: Program, s: LookSetup, unit: Int) {
@@ -259,14 +444,7 @@ class FilmRenderer {
             p.set1f("uOriginalGain", if (r.input.sceneLinear) 2f.pow(r.autoEv) else 1f)
         } else {
             p.texture("uDensity", 1, density)
-            p.texture("uLut", 2, texLut, GL_TEXTURE_3D)
-            p.set3f("uLutLo", s.outputLut.lo[0].toFloat(), s.outputLut.lo[1].toFloat(), s.outputLut.lo[2].toFloat())
-            p.set3f("uLutHi", s.outputLut.hi[0].toFloat(), s.outputLut.hi[1].toFloat(), s.outputLut.hi[2].toFloat())
-            p.set1f("uLutSize", s.outputLut.n.toFloat())
-            p.set1f("uGlare", s.glare)
-            p.set2f("uTexel", 1f / r.imageWidth, 1f / r.imageHeight)
-            val sigma = if (s.grain.active) s.grain.blurPx else 0.0
-            p.set3fv("uGrainBlur", grainBlurWeights(sigma))
+            printUniforms(p, s, r.imageWidth, r.imageHeight)
         }
         p.set1i("uOriginal", if (r.original) 1 else 0)
         p.set4f("uImageRect", r.imageRect[0], r.imageRect[1], r.imageRect[2], r.imageRect[3])
@@ -275,6 +453,18 @@ class FilmRenderer {
         p.set1i("uOverlay", if (r.overlayTexture != 0) 1 else 0)
         if (r.overlayTexture != 0) p.texture("uOverlayTex", 3, r.overlayTexture)
         quad.draw()
+    }
+
+    /** Print pass uniforms of the film image (LUT, glare, grain blur) for a [w] x [h] image. */
+    private fun printUniforms(p: Program, s: LookSetup, w: Int, h: Int) {
+        p.texture("uLut", 2, texLut, GL_TEXTURE_3D)
+        p.set3f("uLutLo", s.outputLut.lo[0].toFloat(), s.outputLut.lo[1].toFloat(), s.outputLut.lo[2].toFloat())
+        p.set3f("uLutHi", s.outputLut.hi[0].toFloat(), s.outputLut.hi[1].toFloat(), s.outputLut.hi[2].toFloat())
+        p.set1f("uLutSize", s.outputLut.n.toFloat())
+        p.set1f("uGlare", s.glare)
+        p.set2f("uTexel", 1f / w, 1f / h)
+        val sigma = if (s.grain.active) s.grain.blurPx else 0.0
+        p.set3fv("uGrainBlur", grainBlurWeights(sigma))
     }
 
     /** Pyramid of half-resolution reductions of [src]; element 0 is half size. */
@@ -360,6 +550,7 @@ class FilmRenderer {
         listOf(pExpose, pDown, pBlur, pCombine, pCorr, pDevelop, pFinal).forEach { it.release() }
         if (pExposeExtLazy.isInitialized()) pExposeExt.release()
         if (pFinalExtLazy.isInitialized()) pFinalExt.release()
+        listOf(pDownTLazy, pCombineTLazy, pDevelopTLazy, pFinalTLazy).forEach { if (it.isInitialized()) it.value.release() }
         listOf(texTc, texCurves, texCurves0, texLayers, texZero, texLut).forEach { GlUtil.deleteTexture(it) }
         quad.release()
     }

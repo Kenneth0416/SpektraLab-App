@@ -14,6 +14,7 @@ const frames = [
 export function FilmStrip() {
   const { messages } = useLanguage();
   return (
+    <div className="filmstrip-viewport">
     <div className="filmstrip" aria-label={messages.home.filmstripLabel}>
       <div className="filmstrip-track">
         {frames.map((frame, index) => (
@@ -24,6 +25,7 @@ export function FilmStrip() {
           </figure>
         ))}
       </div>
+    </div>
     </div>
   );
 }

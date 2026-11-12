@@ -13,10 +13,11 @@
 }
 .hero::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, rgba(12,11,10,.5), transparent 25%, transparent 75%, rgba(12,11,10,.5)); }
 .hero-ambient { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(600px circle at var(--pointer-x) var(--pointer-y), rgba(183,49,29,.15), transparent 65%); }
-.hero-grid { position: relative; z-index: 2; width: min(100%, 1370px); margin: 0 auto; display: grid; grid-template-columns: minmax(0, .94fr) minmax(480px, 1.06fr); gap: clamp(40px, 5vw, 84px); align-items: center; }
+.hero-grid { position: relative; z-index: 2; width: min(100%, 1370px); margin: 0 auto; display: grid; grid-template-columns: minmax(0, .94fr) minmax(0, 1.06fr); gap: clamp(40px, 5vw, 84px); align-items: center; }
+.hero-copy, .hero-lab { min-width: 0; max-width: 100%; }
 .hero-copy { padding: 30px 0 10px; animation: hero-in .9s .05s both cubic-bezier(.22,.61,.36,1); }
 @keyframes hero-in { from { opacity: 0; transform: translateY(22px); } }
-.hero-eyebrow { display: flex; align-items: center; gap: 11px; margin-bottom: 28px; color: #a8a197; font-family: var(--mono); font-size: 9px; letter-spacing: .12em; }
+.hero-eyebrow { display: flex; flex-wrap: wrap; align-items: center; gap: 11px; margin-bottom: 28px; color: #a8a197; font-family: var(--mono); font-size: 9px; letter-spacing: .12em; max-width: 100%; }
 .hero h1 { margin-bottom: 28px; color: #f2eee5; font-size: clamp(58px, 5.6vw, 86px); font-weight: 800; line-height: 1.15; letter-spacing: -.065em; }
 .memory-word { position: relative; display: inline-block; color: #f2eee5; }
 .memory-word svg { position: absolute; width: 100%; height: 18px; left: 0; bottom: -8px; overflow: visible; }
@@ -98,13 +99,13 @@
 .scene-options img { width: 100%; height: 100%; object-fit: cover; }
 
 /* Film strip transition */
-.filmstrip { position: relative; z-index: 4; width: 102%; margin: -28px 0 -20px -1%; padding: 25px 0; overflow: hidden; background: #080706; box-shadow: 0 15px 40px rgba(0,0,0,.45); transform: rotate(-1.1deg); }
+.filmstrip { position: relative; z-index: 4; width: 100%; max-width: 100%; margin: 0; padding: 25px 0; overflow: hidden; background: #080706; box-shadow: 0 15px 40px rgba(0,0,0,.45); transform: rotate(-1.1deg); }
 .filmstrip::before, .filmstrip::after { content: ''; position: absolute; z-index: 3; left: 0; right: 0; height: 8px; background: repeating-linear-gradient(90deg, #d9d3c4 0 13px, transparent 13px 26px); opacity: .85; }
 .filmstrip::before { top: 7px; }
 .filmstrip::after { bottom: 7px; }
 .filmstrip-track { display: flex; width: max-content; gap: 6px; animation: film-drift 28s ease-in-out infinite alternate; }
 .filmstrip:hover .filmstrip-track { animation-play-state: paused; }
-@keyframes film-drift { to { transform: translateX(calc(-100% + 100vw)); } }
+@keyframes film-drift { to { transform: translateX(-35%); } }
 .film-frame { width: 250px; height: 164px; margin: 0; padding: 16px 8px 14px; flex: none; background: #14110e; }
 .film-frame img { width: 100%; height: 111px; object-fit: cover; }
 .frame-edge, .film-frame figcaption { position: absolute; display: flex; justify-content: space-between; font-family: var(--mono); font-size: 6px; color: #c99b50; }
@@ -230,7 +231,7 @@
 
 @media (max-width: 1150px) {
   .hero { padding-left: 32px; padding-right: 32px; }
-  .hero-grid { grid-template-columns: minmax(0,.85fr) minmax(470px,1.15fr); gap: 34px; }
+  .hero-grid { grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: 34px; }
   .hero h1 { font-size: 62px; }
   .recipe-note { right: -10px; bottom: 85px; width: 155px; }
   .media-grid { gap: 45px; }
@@ -238,7 +239,7 @@
 
 @media (max-width: 960px) {
   .hero { padding-top: 130px; }
-  .hero-grid { grid-template-columns: 1fr; gap: 70px; }
+  .hero-grid { grid-template-columns: minmax(0, 1fr); gap: 70px; }
   .hero-copy { max-width: 680px; }
   .hero h1 { font-size: clamp(62px,9vw,82px); }
   .hero-intro { max-width: 580px; }
@@ -270,7 +271,7 @@
   .memory-word svg { height: 12px; bottom: -5px; }
   .hero-intro { font-size: 14px; line-height: 1.85; }
   .hero-actions { gap: 9px; }
-  .hero-actions .button { flex: 1; min-width: 145px; padding: 0 13px; font-size: 13px; }
+  .hero-actions .button { flex: 1 1 140px; min-width: 0; max-width: 100%; padding: 0 13px; font-size: 13px; }
   .hero-specs { margin-top: 36px; }
   .hero-specs > div { flex-direction: column; gap: 5px; }
   .hero-specs strong { font-size: 21px; }

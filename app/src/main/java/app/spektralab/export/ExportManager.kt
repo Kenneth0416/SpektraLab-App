@@ -57,7 +57,7 @@ data class ExportState(
     val share: Boolean = false,
 )
 
-/** Background exports ("冲印"): every item is rendered in full through the pipeline. */
+/** Background exports (film development): every item is rendered in full through the pipeline. */
 class ExportManager(private val app: SpektraApp) {
     private val _state = MutableStateFlow<ExportState?>(null)
     val state: StateFlow<ExportState?> = _state

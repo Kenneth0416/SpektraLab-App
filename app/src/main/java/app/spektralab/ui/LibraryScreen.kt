@@ -45,15 +45,20 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.spektralab.R
 import app.spektralab.data.LibraryItem
 import app.spektralab.engine.Catalog
 import app.spektralab.engine.Look
 import java.util.Calendar
+import java.util.Date
 import java.util.Locale
 
 @Composable
@@ -72,7 +77,9 @@ fun LibraryScreen(state: AppState) {
     val shown = items.filter { filter == Filter.ALL || (filter == Filter.VIDEO) == it.isVideo }
     // three frames per strip on a phone, more on an unfolded inner screen / tablet
     val perStrip = when (widthClass()) { WidthClass.COMPACT -> 3; WidthClass.MEDIUM -> 4; WidthClass.EXPANDED -> 6 }
-    val strips = remember(shown, perStrip) { buildStrips(shown, perStrip) }
+    val context = LocalContext.current
+    val locale = context.resources.configuration.locales[0]
+    val strips = remember(shown, perStrip, locale) { buildStrips(shown, perStrip, context) }
 
     Box(Modifier.fillMaxSize().background(
         Brush.radialGradient(listOf(Pal.glow, Pal.paper), radius = 1800f)
@@ -85,34 +92,34 @@ fun LibraryScreen(state: AppState) {
             // header
             Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 16.dp, top = 14.dp), verticalAlignment = Alignment.Bottom) {
                 Column(Modifier.weight(1f)) {
-                    Text("SPEKTRALAB · CONTACT SHEET", fontFamily = Fonts.mono, fontSize = 9.sp, color = Pal.grey, letterSpacing = 1.5.sp)
+                    Text(stringResource(R.string.contact_sheet), fontFamily = Fonts.mono, fontSize = 9.sp, color = Pal.grey, letterSpacing = 1.5.sp)
                     // the printed title is swapped for a handwritten note when circling frames
                     AnimatedContent(selecting, label = "title", transitionSpec = {
                         (slideInVertically(Motion.glideOffset) { if (targetState) it / 2 else -it / 2 } + fadeIn(tween(180))) togetherWith
                             (slideOutVertically(Motion.glideOffset) { if (targetState) -it / 2 else it / 2 } + fadeOut(tween(120)))
                     }) { sel ->
-                        if (sel) Row(verticalAlignment = Alignment.Bottom) {
-                            Text("圈出 ", fontFamily = Fonts.hand, fontSize = 34.sp, color = Pal.red)
-                            RollingNumber(picked.size, Fonts.hand, 34.sp, Pal.red)
-                            Text(" 张", fontFamily = Fonts.hand, fontSize = 34.sp, color = Pal.red)
-                        }
+                        if (sel) Text(pluralStringResource(R.plurals.selected_frames, picked.size, picked.size),
+                            fontFamily = Fonts.hand, fontSize = 34.sp, color = Pal.red)
                         else Row(verticalAlignment = Alignment.Bottom) {
-                            Text("图库", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Pal.ink)
+                            Text(stringResource(R.string.library_title), fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Pal.ink)
                             Spacer(Modifier.width(10.dp))
-                            Row(Modifier.padding(bottom = 6.dp)) {
-                                RollingNumber(items.size, Fonts.mono, 10.sp, Pal.grey)
-                                Text(" FRAMES", fontFamily = Fonts.mono, fontSize = 10.sp, color = Pal.grey)
-                            }
+                            Text(stringResource(R.string.library_frame_count, items.size), fontFamily = Fonts.mono,
+                                fontSize = 10.sp, color = Pal.grey, modifier = Modifier.padding(bottom = 6.dp))
                         }
                     }
                 }
-                Text(if (selecting) "完成" else "选择", color = Pal.ink, fontSize = 15.sp,
+                SettingsButton(state::openSettings, Modifier.padding(end = 6.dp))
+                Text(stringResource(if (selecting) R.string.done else R.string.select), color = Pal.ink, fontSize = 15.sp,
                     modifier = Modifier.clip(RoundedCornerShape(16.dp)).border(1.dp, Pal.ink, RoundedCornerShape(16.dp))
                         .springClick { state.toggleSelecting() }.padding(horizontal = 14.dp, vertical = 6.dp))
             }
             // filters with a red crayon underline
             Row(Modifier.padding(start = 20.dp, top = 10.dp, bottom = 4.dp)) {
-                listOf(Filter.ALL to "全部", Filter.PHOTO to "照片", Filter.VIDEO to "视频").forEach { (f, label) ->
+                listOf(
+                    Filter.ALL to stringResource(R.string.all),
+                    Filter.PHOTO to stringResource(R.string.photos),
+                    Filter.VIDEO to stringResource(R.string.videos),
+                ).forEach { (f, label) ->
                     Column(Modifier.padding(end = 20.dp).clickable { state.filter.value = f }, horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(label, color = if (filter == f) Pal.ink else Pal.grey, fontSize = 15.sp,
                             fontWeight = if (filter == f) FontWeight.Bold else FontWeight.Normal)
@@ -155,13 +162,14 @@ fun LibraryScreen(state: AppState) {
             }) { sel ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                     if (!sel) {
-                        BarButton(if (importing) "导入中" + busyDots() else "＋ 导入", Pal.paper, filled = true) { if (!importing) state.sheet.value = Sheet.IMPORT }
-                        BarButton("相机", Pal.paper) { state.openCamera() }
+                        BarButton(stringResource(if (importing) R.string.importing else R.string.import_action) + if (importing) busyDots() else "",
+                            Pal.paper, filled = true) { if (!importing) state.sheet.value = Sheet.IMPORT }
+                        BarButton(stringResource(R.string.camera), Pal.paper) { state.openCamera() }
                     } else {
-                        BarButton("粘贴设置", if (clip != null) Pal.paper else Color(0xFF8F8A7E)) { state.pasteToPicked() }
-                        BarButton("配方", Pal.paper) { state.openRecipes() }
-                        BarButton("导出", Pal.paper) { state.openExport(state.picked.value) }
-                        BarButton("移除", Pal.paper) { state.removePicked() }
+                        BarButton(stringResource(R.string.paste_settings), if (clip != null) Pal.paper else Color(0xFF8F8A7E)) { state.pasteToPicked() }
+                        BarButton(stringResource(R.string.recipes), Pal.paper) { state.openRecipes() }
+                        BarButton(stringResource(R.string.export_action), Pal.paper) { state.openExport(state.picked.value) }
+                        BarButton(stringResource(R.string.remove), Pal.paper) { state.removePicked() }
                     }
                 }
             }
@@ -200,11 +208,11 @@ private fun EmptyLightbox(modifier: Modifier, filter: Filter) {
     val arrow by drawOnProgress(filter, durationMs = 700, delayMs = 500)
     Box(modifier, contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(when (filter) { Filter.VIDEO -> "还没有视频"; Filter.PHOTO -> "还没有照片"; else -> "灯箱是空的" },
+            Text(stringResource(when (filter) { Filter.VIDEO -> R.string.empty_videos; Filter.PHOTO -> R.string.empty_photos; else -> R.string.empty_lightbox }),
                 fontFamily = Fonts.hand, fontSize = 32.sp, color = Pal.grey,
                 modifier = Modifier.graphicsLayer { translationY = bob * 4.dp.toPx(); rotationZ = bob * 0.8f })
             Spacer(Modifier.height(8.dp))
-            Text("点「＋ 导入」从相册或文件放上几张底片", color = Pal.grey, fontSize = 13.sp)
+            Text(stringResource(R.string.empty_lightbox_hint), color = Pal.grey, fontSize = 13.sp)
             // a pencilled arrow that draws itself towards the import button
             Canvas(Modifier.padding(top = 14.dp).size(60.dp, 90.dp).graphicsLayer { translationY = bob * 3.dp.toPx() }) {
                 val shaft = Path().apply {
@@ -225,24 +233,27 @@ private fun EmptyLightbox(modifier: Modifier, filter: Filter) {
 
 class Strip(val key: String, val label: String, val rot: Float, val frames: List<LibraryItem>, val slots: Int)
 
-private fun dayLabel(t: Long): String {
-    val c = Calendar.getInstance().apply { timeInMillis = t }
-    val now = Calendar.getInstance()
+private fun dayLabel(context: android.content.Context, t: Long): String {
+    val locale = context.resources.configuration.locales[0]
+    val c = Calendar.getInstance(locale).apply { timeInMillis = t }
+    val now = Calendar.getInstance(locale)
     val days = ((now.timeInMillis - t) / 86_400_000L).toInt()
-    val base = "${c.get(Calendar.MONTH) + 1}月${c.get(Calendar.DAY_OF_MONTH)}日"
+    fun format(pattern: String): String = java.text.SimpleDateFormat(
+        android.text.format.DateFormat.getBestDateTimePattern(locale, pattern), locale).format(Date(t))
+    val base = format("MMMd")
     val sameDay = now.get(Calendar.YEAR) == c.get(Calendar.YEAR) && now.get(Calendar.DAY_OF_YEAR) == c.get(Calendar.DAY_OF_YEAR)
     return when {
-        sameDay -> "$base · 今天"
-        days < 7 -> base + " · " + arrayOf("周日", "周一", "周二", "周三", "周四", "周五", "周六")[c.get(Calendar.DAY_OF_WEEK) - 1]
-        now.get(Calendar.YEAR) != c.get(Calendar.YEAR) -> "${c.get(Calendar.YEAR)}年$base"
+        sameDay -> context.getString(R.string.date_today, base)
+        days < 7 -> context.getString(R.string.date_with_weekday, base, format("EEE"))
+        now.get(Calendar.YEAR) != c.get(Calendar.YEAR) -> format("yMMMd")
         else -> base
     }
 }
 
-private fun buildStrips(items: List<LibraryItem>, perStrip: Int): List<Strip> {
+private fun buildStrips(items: List<LibraryItem>, perStrip: Int, context: android.content.Context): List<Strip> {
     val rots = floatArrayOf(-0.7f, 0.5f, -0.4f, 0.8f)
     val out = ArrayList<Strip>()
-    val byDay = items.sortedByDescending { it.dateTaken }.groupBy { dayLabel(it.dateTaken) }
+    val byDay = items.sortedByDescending { it.dateTaken }.groupBy { dayLabel(context, it.dateTaken) }
     for ((label, group) in byDay) {
         group.chunked(perStrip).forEachIndexed { i, frames ->
             out += Strip("${frames.first().id}", if (i == 0) label else "", rots[out.size % 4], frames, perStrip)
@@ -292,7 +303,9 @@ private fun Frame(state: AppState, item: LibraryItem, selecting: Boolean, order:
     val thumb by produceState(state.app.thumbs.cached(item), item.id, item.look) {
         value = state.app.thumbs.get(item)
     }
-    val desc = (if (item.isVideo) "视频：" else "照片：") + item.name + if (order >= 0) "，已圈选" else ""
+    val mediaType = stringResource(if (item.isVideo) R.string.video else R.string.photo)
+    val desc = stringResource(R.string.media_description, mediaType, item.name) +
+        if (order >= 0) stringResource(R.string.media_selected) else ""
     // a circled frame sinks a little under the crayon
     val sink by animateFloatAsState(if (order >= 0) 0.94f else 1f, Motion.settle, label = "sink")
     Box(modifier.aspectRatio(1.5f).graphicsLayer { scaleX = sink; scaleY = sink }

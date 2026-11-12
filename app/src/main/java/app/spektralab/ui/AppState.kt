@@ -2,13 +2,16 @@ package app.spektralab.ui
 
 import android.app.Application
 import android.net.Uri
+import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import app.spektralab.R
 import app.spektralab.SpektraApp
 import app.spektralab.data.LibraryItem
 import app.spektralab.data.Media
 import app.spektralab.data.LookJson
 import app.spektralab.data.Recipe
+import app.spektralab.data.localizedName
 import app.spektralab.engine.Look
 import app.spektralab.export.ExportOptions
 import kotlinx.coroutines.Dispatchers
@@ -38,6 +41,25 @@ class AppState(application: Application) : AndroidViewModel(application) {
     val exportTargets = MutableStateFlow<List<Long>>(emptyList())
     val exportOptions = MutableStateFlow(ExportOptions())
     val importing = MutableStateFlow(false)
+    val settingsOpen = MutableStateFlow(false)
+
+    private val languagePreferences = LanguagePreferences(application)
+    val language = MutableStateFlow(languagePreferences.load())
+
+    fun setLanguage(value: AppLanguage) {
+        languagePreferences.save(value)
+        language.value = value
+        AppLocales.apply(value)
+    }
+
+    fun openSettings() {
+        sheet.value = Sheet.NONE
+        selecting.value = false
+        picked.value = emptyList()
+        settingsOpen.value = true
+    }
+
+    fun closeSettings() { settingsOpen.value = false }
 
     // camera: the look loaded in the camera, kept between sessions
     val cameraOpen = MutableStateFlow(false)
@@ -64,9 +86,9 @@ class AppState(application: Application) : AndroidViewModel(application) {
         val look = camLook.value
         viewModelScope.launch {
             val item = withContext(Dispatchers.IO) { Media.importItem(app, uri, library.reserveIds(1)) }?.copy(look = look)
-                ?: return@launch say("拍到了，但读不回原片")
+                ?: return@launch say(R.string.captured_unreadable)
             library.add(listOf(item))
-            say(if (item.isRaw) "已放上灯箱 · RAW 原片保留" else "已放上灯箱 · 原片保留")
+            say(if (item.isRaw) R.string.captured_raw_kept else R.string.captured_original_kept)
             // every shot is also printed: the film picture goes to the album next to the original
             exports.enqueue(item, exportOptions.value)
         }
@@ -91,6 +113,8 @@ class AppState(application: Application) : AndroidViewModel(application) {
     val redo = MutableStateFlow<List<Look>>(emptyList())
     private var lastKey: String? = null
 
+    fun say(@StringRes text: Int, vararg args: Any) = say(app.getString(text, *args))
+
     fun say(text: String) {
         _hint.value = text
         hintJob?.cancel()
@@ -111,6 +135,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
     }
 
     fun back() {
+        if (settingsOpen.value) return closeSettings()
         if (editId.value == null && cameraOpen.value) return closeCamera()
         editId.value = null
         sheet.value = Sheet.NONE
@@ -160,31 +185,31 @@ class AppState(application: Application) : AndroidViewModel(application) {
         library.setLook(item.id, target)
     }
 
-    fun copyLook() { currentItem()?.let { clip.value = it.look; say("已复制这张的设置") } }
+    fun copyLook() { currentItem()?.let { clip.value = it.look; say(R.string.settings_copied) } }
 
     fun pasteLook() {
-        val c = clip.value ?: return say("还没有复制过设置")
-        applyLook(c); say("已粘贴设置")
+        val c = clip.value ?: return say(R.string.no_copied_settings)
+        applyLook(c); say(R.string.settings_pasted)
     }
 
     fun pasteToPicked() {
-        val c = clip.value ?: return say("先打开一张，点「复制设置」")
-        if (picked.value.isEmpty()) return say("先圈出要套用的项目")
+        val c = clip.value ?: return say(R.string.copy_settings_first)
+        if (picked.value.isEmpty()) return say(R.string.select_items_to_apply)
         library.setLooks(picked.value, c)
-        say("已粘贴到 ${picked.value.size} 项")
+        say(R.string.settings_pasted_count, picked.value.size)
     }
 
     fun removePicked() {
-        if (picked.value.isEmpty()) return say("先圈出要移除的项目")
+        if (picked.value.isEmpty()) return say(R.string.select_items_to_remove)
         val n = picked.value.size
         app.thumbs.forget(picked.value)
         library.remove(picked.value)
         picked.value = emptyList(); selecting.value = false
-        say("已移除 $n 项，相册原片不受影响")
+        say(R.string.items_removed, n)
     }
 
     fun openRecipes() {
-        if (editId.value == null && !cameraOpen.value && picked.value.isEmpty()) return say("先圈出要套用的项目")
+        if (editId.value == null && !cameraOpen.value && picked.value.isEmpty()) return say(R.string.select_items_to_apply)
         sheet.value = Sheet.RECIPES
     }
 
@@ -192,15 +217,15 @@ class AppState(application: Application) : AndroidViewModel(application) {
         val full = r.look
         if (recipeTargetIsCamera) setCamLook(full) else applyLook(full)
         sheet.value = Sheet.NONE
-        say("已套用：${r.name}")
+        say(R.string.recipe_applied, r.localizedName(app))
     }
 
     fun saveRecipe() {
         val look = currentItem()?.look ?: (if (cameraOpen.value) camLook.value else return)
         val used = library.recipes.value.map { it.name }.toSet()
-        val name = generateSequence(1) { it + 1 }.map { "我的配方 $it" }.first { it !in used }
+        val name = generateSequence(1) { it + 1 }.map { app.getString(R.string.my_recipe, it) }.first { it !in used }
         library.addRecipe(Recipe(name, look))
-        say("已写成配方卡：$name")
+        say(R.string.recipe_saved, name)
     }
 
     // ----------------------------------------------------------- import
@@ -214,17 +239,17 @@ class AppState(application: Application) : AndroidViewModel(application) {
                 uris.mapIndexedNotNull { i, u -> Media.importItem(app, u, first + i) }
             }
             importing.value = false
-            if (items.isEmpty()) return@launch say("没有可以导入的照片或视频")
+            if (items.isEmpty()) return@launch say(R.string.no_importable_media)
             library.add(items)
             filter.value = Filter.ALL
-            if (items.size == 1) openEdit(items[0].id) else say("已导入 ${items.size} 项")
-            if (items.size < uris.size) say("有 ${uris.size - items.size} 项无法读取，已跳过")
+            if (items.size == 1) openEdit(items[0].id) else say(R.string.items_imported, items.size)
+            if (items.size < uris.size) say(R.string.items_import_skipped, uris.size - items.size)
         }
     }
 
     // ----------------------------------------------------------- export
     fun openExport(ids: List<Long>) {
-        if (ids.isEmpty()) return say("先圈出要导出的项目")
+        if (ids.isEmpty()) return say(R.string.select_items_to_export)
         if (exports.isRunning()) { sheet.value = Sheet.PROGRESS; return }
         exportTargets.value = ids
         sheet.value = Sheet.EXPORT
@@ -232,7 +257,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
 
     fun startExport(share: Boolean) {
         val items = exportTargets.value.mapNotNull { library.item(it) }
-        if (items.isEmpty() || exports.isRunning()) { sheet.value = Sheet.NONE; return say("没有可以导出的项目") }
+        if (items.isEmpty() || exports.isRunning()) { sheet.value = Sheet.NONE; return say(R.string.nothing_to_export) }
         exports.start(items, exportOptions.value, share)
         sheet.value = Sheet.PROGRESS
         selecting.value = false
@@ -241,10 +266,10 @@ class AppState(application: Application) : AndroidViewModel(application) {
             val st = exports.state.first { it != null && !it.running }!!
             if (sheet.value == Sheet.PROGRESS) sheet.value = Sheet.NONE
             val msg = when {
-                st.saved.isEmpty() -> "导出失败"
-                st.share -> "已交给系统分享 · ${st.saved.size} 项"
-                else -> "已存到相册 · ${st.saved.size} 项"
-            } + if (st.failed > 0 && st.saved.isNotEmpty()) "（${st.failed} 项失败）" else ""
+                st.saved.isEmpty() -> app.getString(R.string.export_failed)
+                st.share -> app.getString(R.string.export_shared_count, st.saved.size)
+                else -> app.getString(R.string.export_saved_count, st.saved.size)
+            } + if (st.failed > 0 && st.saved.isNotEmpty()) app.getString(R.string.export_failed_count, st.failed) else ""
             say(msg)
             exports.dismiss()
         }

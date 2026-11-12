@@ -10,6 +10,7 @@ import android.opengl.GLES11Ext
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
 import android.view.Surface
+import app.spektralab.R
 import app.spektralab.engine.Look
 import app.spektralab.data.SourceImage
 import app.spektralab.engine.LookSetup
@@ -162,7 +163,7 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
                 FilmRenderer()
             } catch (e: Exception) {
                 android.util.Log.e("SpektraPreview", "renderer init failed", e)
-                post { onGpuError?.invoke("这台设备的 GPU 不支持所需的半精度渲染，无法预览") }
+                post { onGpuError?.invoke(context.getString(R.string.gpu_half_float_unsupported)) }
                 null
             }
             if (renderer == null) return
@@ -197,7 +198,9 @@ class FilmPreviewView(context: Context) : GLSurfaceView(context) {
                 android.util.Log.e("SpektraPreview", "draw failed", e)
                 if (!errorReported) {
                     errorReported = true
-                    post { onGpuError?.invoke(if (video != null) "这台设备的 GPU 无法处理视频帧" else "预览渲染失败") }
+                    post {
+                        onGpuError?.invoke(context.getString(if (video != null) R.string.gpu_video_frame_failed else R.string.preview_render_failed))
+                    }
                 }
             }
         }

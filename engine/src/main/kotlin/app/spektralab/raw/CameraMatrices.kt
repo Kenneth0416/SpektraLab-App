@@ -60,6 +60,22 @@ object CameraMatrices {
         return findNormalized(n.maker, n.model)
     }
 
+    /**
+     * [find] for a Canon body: LibRaw names Canon cameras by the model id in the maker note (tag 0x0010), so
+     * regional names ("EOS Rebel T2i", "EOS Kiss X4") and any Model string find the row of the camera
+     * ("EOS 550D").  Falls back to [find] when the id is 0 or unknown.
+     */
+    fun findCanon(uniqueId: Long, make: String, model: String): CameraMatrixEntry? {
+        val n = normalizeMakeModel(make, model)
+        val byId = canonModelName(uniqueId)
+        if (byId != null && n.model != "EOS Ra") findNormalized("Canon", byId)?.let { return it }
+        return findNormalized(n.maker, n.model)
+    }
+
+    /** LibRaw GetNormalizedModel `unique[]`: the model name for a Canon maker-note model id, null if unknown. */
+    fun canonModelName(uniqueId: Long): String? =
+        if (uniqueId == 0L || uniqueId == 0x80000520L || uniqueId == 0x80000560L) null else CANON_MODEL_BY_ID[uniqueId]
+
     /** Lookup with an already normalised canonical maker name and model (no normalisation is applied). */
     fun findNormalized(maker: String?, model: String): CameraMatrixEntry? {
         if (maker == null) return null
@@ -777,6 +793,91 @@ object CameraMatrices {
         "NXF1",
         "@WB2000",
         "TL350",
+    )
+
+    /** Canon maker-note model id -> LibRaw model name (GetNormalizedModel `unique[]`, 81 entries). */
+    private val CANON_MODEL_BY_ID: Map<Long, String> = mapOf(
+        0x00000412L to "EOS M50",
+        0x00000811L to "EOS M6 Mark II",
+        0x00000812L to "EOS M200",
+        0x01140000L to "EOS D30",
+        0x01668000L to "EOS D60",
+        0x03740000L to "EOS M3",
+        0x03840000L to "EOS M10",
+        0x03940000L to "EOS M5",
+        0x03980000L to "EOS M100",
+        0x04070000L to "EOS M6",
+        0x40000218L to "EOS R5 C",
+        0x80000001L to "EOS-1D",
+        0x80000167L to "EOS-1Ds",
+        0x80000168L to "EOS 10D",
+        0x80000169L to "EOS-1D Mark III",
+        0x80000170L to "EOS 300D",
+        0x80000174L to "EOS-1D Mark II",
+        0x80000175L to "EOS 20D",
+        0x80000176L to "EOS 450D",
+        0x80000188L to "EOS-1Ds Mark II",
+        0x80000189L to "EOS 350D",
+        0x80000190L to "EOS 40D",
+        0x80000213L to "EOS 5D",
+        0x80000215L to "EOS-1Ds Mark III",
+        0x80000218L to "EOS 5D Mark II",
+        0x80000232L to "EOS-1D Mark II N",
+        0x80000234L to "EOS 30D",
+        0x80000236L to "EOS 400D",
+        0x80000250L to "EOS 7D",
+        0x80000252L to "EOS 500D",
+        0x80000254L to "EOS 1000D",
+        0x80000261L to "EOS 50D",
+        0x80000269L to "EOS-1D X",
+        0x80000270L to "EOS 550D",
+        0x80000281L to "EOS-1D Mark IV",
+        0x80000285L to "EOS 5D Mark III",
+        0x80000286L to "EOS 600D",
+        0x80000287L to "EOS 60D",
+        0x80000288L to "EOS 1100D",
+        0x80000289L to "EOS 7D Mark II",
+        0x80000301L to "EOS 650D",
+        0x80000302L to "EOS 6D",
+        0x80000324L to "EOS-1D C",
+        0x80000325L to "EOS 70D",
+        0x80000326L to "EOS 700D",
+        0x80000327L to "EOS 1200D",
+        0x80000328L to "EOS-1D X Mark II",
+        0x80000331L to "EOS M",
+        0x80000346L to "EOS 100D",
+        0x80000347L to "EOS 760D",
+        0x80000349L to "EOS 5D Mark IV",
+        0x80000350L to "EOS 80D",
+        0x80000355L to "EOS M2",
+        0x80000382L to "EOS 5DS",
+        0x80000393L to "EOS 750D",
+        0x80000401L to "EOS 5DS R",
+        0x80000404L to "EOS 1300D",
+        0x80000405L to "EOS 800D",
+        0x80000406L to "EOS 6D Mark II",
+        0x80000408L to "EOS 77D",
+        0x80000417L to "EOS 200D",
+        0x80000421L to "EOS R5",
+        0x80000422L to "EOS 3000D",
+        0x80000424L to "EOS R",
+        0x80000428L to "EOS-1D X Mark III",
+        0x80000432L to "EOS 1500D",
+        0x80000433L to "EOS RP",
+        0x80000435L to "EOS 850D",
+        0x80000436L to "EOS 250D",
+        0x80000437L to "EOS 90D",
+        0x80000450L to "EOS R3",
+        0x80000453L to "EOS R6",
+        0x80000464L to "EOS R7",
+        0x80000465L to "EOS R10",
+        0x80000468L to "EOS M50 Mark II",
+        0x80000480L to "EOS R50",
+        0x80000481L to "EOS R6 Mark II",
+        0x80000487L to "EOS R8",
+        0x80000495L to "EOS R1",
+        0x80000496L to "EOS R5 Mark II",
+        0x80000498L to "EOS R100",
     )
 
     // Table rows are packed into string constants (one row per line, tab separated:

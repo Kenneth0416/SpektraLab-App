@@ -15,7 +15,9 @@ What is extracted
                                (maker id, model prefix, black, maximum, 3x3/4x3 matrix x10000)
   * src/metadata/identify.cpp  `CorpTable` (maker id -> canonical maker name, in match order)
   * src/metadata/normalize_model.cpp
-                               the model alias tables used by GetNormalizedModel()
+                               the model alias tables used by GetNormalizedModel(), and its Canon
+                               `unique[]` table (maker-note model id -> model name), with the ids
+                               from internal/libraw_cameraids.h
 
 Entries inside `#ifdef USE_6BY9RPI` are skipped (that macro is not defined in
 the default LibRaw build).  Commented-out entries are skipped.
@@ -129,6 +131,23 @@ def parse_alias_tables(norm_src):
     return tables
 
 
+def parse_canon_ids(norm_src, ids_src):
+    """GetNormalizedModel `unique[]`: Canon model id (maker note 0x0010) -> LibRaw model name, in table order."""
+    ids = {}
+    for name, expr in re.findall(r'#define\s+(CanonID_\w+)\s+([^\n]+)', ids_src):
+        expr = re.sub(r'(0x[0-9A-Fa-f]+|\d+)ULL', r'\1', expr.split('//')[0]).strip()
+        if not re.fullmatch(r'[()0-9a-fA-Fx+ ]+', expr):
+            raise SystemExit('unexpected CanonID expression %r' % expr)
+        ids[name] = eval(expr)
+    blk = re.search(r'unique\[\]\s*=(.*?)\};', strip_comments(norm_src), re.S)
+    if not blk:
+        raise SystemExit('Canon unique[] table not found')
+    rows = re.findall(r'\{\s*(CanonID_\w+)\s*,\s*"([^"]*)"\s*\}', blk.group(1))
+    if len(rows) != len(re.findall(r'\{\s*CanonID_', blk.group(1))) or not rows:
+        raise SystemExit('could not parse the Canon unique[] table')
+    return [(ids[n], model) for n, model in rows], ids['CanonID_EOS_D2000C'], ids['CanonID_EOS_D6000C']
+
+
 def kt_str(s):
     out = []
     for ch in s:
@@ -168,7 +187,9 @@ def main():
         first_name.setdefault(enum, name)
 
     rows = parse_color_table(read(os.path.join(root, 'src', 'tables', 'colordata.cpp')))
-    aliases = parse_alias_tables(read(os.path.join(root, 'src', 'metadata', 'normalize_model.cpp')))
+    norm_src = read(os.path.join(root, 'src', 'metadata', 'normalize_model.cpp'))
+    aliases = parse_alias_tables(norm_src)
+    canon_ids, d2000c, d6000c = parse_canon_ids(norm_src, read(os.path.join(root, 'internal', 'libraw_cameraids.h')))
     wanted = ['fujialias', 'kodakalias', 'leafalias', 'KonicaMinolta_aliases', 'nikonalias', 'olyalias',
               'panalias', 'phase1alias', 'SamsungPentax_aliases', 'samsungalias']
     for w in wanted:
@@ -250,6 +271,20 @@ def main():
     w('        val n = normalizeMakeModel(make, model)\n')
     w('        return findNormalized(n.maker, n.model)\n')
     w('    }\n\n')
+    w('    /**\n')
+    w('     * [find] for a Canon body: LibRaw names Canon cameras by the model id in the maker note (tag 0x0010), so\n')
+    w('     * regional names ("EOS Rebel T2i", "EOS Kiss X4") and any Model string find the row of the camera\n')
+    w('     * ("EOS 550D").  Falls back to [find] when the id is 0 or unknown.\n')
+    w('     */\n')
+    w('    fun findCanon(uniqueId: Long, make: String, model: String): CameraMatrixEntry? {\n')
+    w('        val n = normalizeMakeModel(make, model)\n')
+    w('        val byId = canonModelName(uniqueId)\n')
+    w('        if (byId != null && n.model != "EOS Ra") findNormalized("Canon", byId)?.let { return it }\n')
+    w('        return findNormalized(n.maker, n.model)\n')
+    w('    }\n\n')
+    w('    /** LibRaw GetNormalizedModel `unique[]`: the model name for a Canon maker-note model id, null if unknown. */\n')
+    w('    fun canonModelName(uniqueId: Long): String? =\n')
+    w('        if (uniqueId == 0L || uniqueId == 0x%xL || uniqueId == 0x%xL) null else CANON_MODEL_BY_ID[uniqueId]\n\n' % (d2000c, d6000c))
     w('    /** Lookup with an already normalised canonical maker name and model (no normalisation is applied). */\n')
     w('    fun findNormalized(maker: String?, model: String): CameraMatrixEntry? {\n')
     w('        if (maker == null) return null\n')
@@ -465,6 +500,11 @@ def main():
         for it in items:
             w('        %s,\n' % kt_str(it))
         w('    )\n\n')
+    w('    /** Canon maker-note model id -> LibRaw model name (GetNormalizedModel `unique[]`, %d entries). */\n' % len(canon_ids))
+    w('    private val CANON_MODEL_BY_ID: Map<Long, String> = mapOf(\n')
+    for cid, name in canon_ids:
+        w('        0x%08xL to %s,\n' % (cid, kt_str(name)))
+    w('    )\n\n')
     w('    // Table rows are packed into string constants (one row per line, tab separated:\n')
     w('    // maker, model prefix, black, white, 12 matrix values x10000 row-major, 4th row all zero for RGB)\n')
     w('    // so that no single method or constant approaches the JVM 64 KB limits.\n')

@@ -18,7 +18,7 @@ package app.spektralab.raw
  *   colour data's ChannelBlackLevel and the maker-note SensorInfo (0x00E0) crop when its
  *   sensor size matches the frame. Odd margins move to the next even row / column.
  * - CFA from the CMP1 layout field (or the table's filters byte), orientation from CMT1,
- *   colour matrix from [CameraMatrices], as-shot WB from the colour data.
+ *   colour matrix from [CameraMatrices.findCanon] (by the maker-note model id, as LibRaw), as-shot WB from the colour data.
  *
  * Returns null for: other files; CMP1 variants LibRaw rejects; 1-plane or encoding-type-1
  * tracks; a largest raw track whose header is unusable (LibRaw would then fall back to a
@@ -88,7 +88,7 @@ object Cr3Reader {
         val table = CANON_SIZES.lastOrNull { it[0] == w && it[1] == h }
         if (table == null && notes.channelBlack == null) return null
 
-        val matrix = CameraMatrices.find(make, model)?.takeIf { it.colors == 3 && it.xyzToCamera != null } ?: return null
+        val matrix = CameraMatrices.findCanon(notes.uniqueId, make, model)?.takeIf { it.colors == 3 && it.xyzToCamera != null } ?: return null
 
         // pixels
         val data = ShortArray(w * h)
@@ -148,6 +148,17 @@ object Cr3Reader {
         val xyz = DoubleArray(9) { matrix.xyzToCamera!![it / 3][it % 3] }
         val colour = RawColor.fromXyzToCamera(xyz, asShot) ?: return null
         val orientation = notes.orientation
+
+        // output crop: the SensorInfo crop (the camera JPEG area, LibRaw's raw_inset_crops[0]) as in the CR2
+        // reader, else the visible area; LibRaw moves an odd inset origin to the next even position
+        notes.sensorInfo?.let { si ->
+            val l = si[5]; val t = si[6]; val r = si[7]; val b = si[8]
+            if (si[1] == w && si[2] == h && l >= 0 && t >= 0 && r > l + 22 && b > t + 22 && r < w && b < h) {
+                cropX = l; cropY = t; cropW = r - l + 1; cropH = b - t + 1
+                if (cropX % 2 != 0) { cropX++; cropW-- }
+                if (cropY % 2 != 0) { cropY++; cropH-- }
+            }
+        }
 
         return RawImage(w, h, data, cfa, black, white, cropX, cropY, cropW, cropH, colour.wb, colour.camToSrgb,
             orientation = orientation, make = make, model = model)
@@ -245,10 +256,13 @@ object Cr3Reader {
         var wb: IntArray? = null              // R, G1, G2, B as stored (RGGB)
         var channelBlack: IntArray? = null
         var specularWhite = 0
+        /** Maker-note model id (tag 0x0010), by which LibRaw names the camera. */
+        var uniqueId = 0L
         var sensorInfo: IntArray? = null
         var multishot = false
 
         fun apply(ifd: TiffIfd) {
+            ifd.longs(0x0010, 1)?.firstOrNull()?.takeIf { it != 0L }?.let { uniqueId = it }
             ifd.ints(0x00e0)?.takeIf { it.size >= 9 }?.let { sensorInfo = it }
             colorData(ifd)
             // tag order: 0x4021 (multi-shot) comes after the colour data and resets the WB to unity

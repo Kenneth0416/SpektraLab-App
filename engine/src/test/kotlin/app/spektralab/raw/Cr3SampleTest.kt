@@ -46,7 +46,7 @@ class Cr3SampleTest {
         assertEquals(CfaPattern.RGGB.colors.toList(), img.cfa.colors.toList())
         assertEquals(listOf(512f, 512f, 512f, 512f), img.black.toList())
         assertEquals(14008f, img.white)                     // LibRaw linear_max; LibRaw maximum is 16383
-        assertEquals(listOf(156, 108, 3407, 2271), listOf(img.cropX, img.cropY, img.cropWidth, img.cropHeight))
+        assertEquals(listOf(156, 108, 3408, 2272), listOf(img.cropX, img.cropY, img.cropWidth, img.cropHeight))
         assertEquals(1, img.orientation)
         // as-shot multipliers 1853 / 1024 / 1667 (R / G / B) -> green-normalised gains
         assertEquals(1853.0 / 1024, img.wb[0].toDouble(), 1e-5)

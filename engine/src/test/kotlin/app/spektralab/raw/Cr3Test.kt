@@ -70,8 +70,9 @@ class Cr3Test {
         assertEquals(CfaPattern.RGGB.colors.toList(), img.cfa.colors.toList())
         assertEquals(listOf(512f, 512f, 512f, 512f), img.black.toList())
         assertEquals(14000f, img.white)
-        // LibRaw: left = (5 + 1) & ~1 = 6, width = 199 - 6; top = 4, height = 120 - 4
-        assertEquals(listOf(6, 4, 193, 116), listOf(img.cropX, img.cropY, img.cropWidth, img.cropHeight))
+        // SensorInfo 5, 3 .. 199, 120 (inclusive, LibRaw raw_inset_crops) with the odd origin moved to 6, 4
+        // (LibRaw's visible area would be 6, 4, 193 x 116)
+        assertEquals(listOf(6, 4, 194, 117), listOf(img.cropX, img.cropY, img.cropWidth, img.cropHeight))
         assertEquals(6, img.orientation)
         assertEquals(2000f / 1024, img.wb[0], 1e-5f)
         assertEquals(1500f / 1024, img.wb[2], 1e-5f)

@@ -181,7 +181,7 @@ class Cr2Test {
     }
 
     @Test
-    fun twoComponentTableCameraMaskedBlackAndAdjustedMaximum() {
+    fun twoComponentTableCameraMaskedBlackAndTableMaximum() {
         val s = table2
         // visible area starts at column 48; values clip at 3900 (below the 12-bit maximum LibRaw assumes)
         val m = mosaic(s, { y, x -> borderBlack[(y and 1) * 2 + (x and 1)] }, 3600, 48, clipAt = 3900)
@@ -204,10 +204,9 @@ class Cr2Test {
         assertContentEquals(exp, img.black)
         assertContentEquals(LIBRAW_TABLE2_BLACK, img.black)
         assertEquals(4095, d.libRawWhite)                                       // no table maximum for the D30: 12 bit
-        // adjust_maximum: smallest channel black + largest black-subtracted value of the visible area
-        var dmax = 0
-        for (y in 6 until 6 + 1448) for (x in 48 until 48 + 2176) dmax = maxOf(dmax, m[y * s.rawWidth + x] - exp[(y and 1) * 2 + (x and 1)].toInt())
-        assertEquals(exp.min() + dmax, img.white)
+        // no SpecularWhiteLevel in this colour data: LibRaw's maximum, not lowered to where this picture's data
+        // happens to end (LibRaw's render-time adjust_maximum would give the content-dependent 3900 - black)
+        assertEquals(4095f, img.white)
         assertEquals(1900f / 1000f, img.wb[0], 1e-5f)
         assertEquals(1, img.orientation)
         assertEquals(LIBRAW_TABLE2_CRC, crc(img))
@@ -298,12 +297,13 @@ class Cr2Test {
 
     private val samples = listOf(
         // values from LibRaw 0.22.2: raw_image CRC-32 (uint16 LE), black_level_per_channel at the 2x2 raw positions,
-        // white_level, raw_inset_crops[0] (= SensorInfo), camera_whitebalance (R, G, B, G2), flip 0
+        // white_level, raw_inset_crops[0] (= SensorInfo), camera_whitebalance (R, G, B, G2), flip 0; white is the
+        // ColorData SpecularWhiteLevel (LibRaw linear_max, exiftool SpecularWhiteLevel 15312 / 11222)
         Expect("jeremytorres_little_endian.CR2", "Canon", "Canon EOS 5D Mark II", 5792, 3804, 1963067855L,
-            "GBRG", floatArrayOf(1023f, 1024f, 1023f, 1024f), 15600, 13604f,
+            "GBRG", floatArrayOf(1023f, 1024f, 1023f, 1024f), 15600, 15312f,
             listOf(168, 56, 5616, 3744), doubleArrayOf(2661.0, 1024.0, 1475.0, 1024.0), 1),
         Expect("rubyraw_IMG_2112.CR2", "Canon", "Canon EOS 7D", 5360, 3516, 3126108881L,
-            "GBRG", floatArrayOf(2047f, 2047f, 2047f, 2047f), 13584, 12649f,
+            "GBRG", floatArrayOf(2047f, 2047f, 2047f, 2047f), 13584, 11222f,
             listOf(168, 56, 5184, 3456), doubleArrayOf(2284.0, 1024.0, 1467.0, 1024.0), 1),
     )
 
@@ -326,7 +326,6 @@ class Cr2Test {
             assertEquals("CfaPattern(2x2, ${e.cfa})", img.cfa.toString())
             assertContentEquals(e.black, img.black)
             assertEquals(e.libRawWhite, d.libRawWhite)
-            // LibRaw's render lowers maximum to the visible data maximum (adjust_maximum, 0.75)
             assertEquals(e.white, img.white)
             assertEquals(e.crop, listOf(img.cropX, img.cropY, img.cropWidth, img.cropHeight))
             val g = (e.asShot[1] + e.asShot[3]) / 2

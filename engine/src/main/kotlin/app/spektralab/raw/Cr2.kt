@@ -20,13 +20,16 @@ package app.spektralab.raw
  * per-channel mean of the left (and right) masked border for cameras in the LibRaw margin
  * table, else the maker note ColorData ChannelBlackLevel; WB is the ColorData as-shot
  * multipliers (green = mean of G1 and G2); the colour matrix is looked up under LibRaw's
- * model-id name. The crop is the maker note SensorInfo crop (LibRaw's `raw_inset_crops[0]`,
- * the area of the camera JPEG), falling back to LibRaw's visible area.
+ * model-id name ([CameraMatrices.findCanon]). The crop is the maker note SensorInfo crop (LibRaw's
+ * `raw_inset_crops[0]`, the area of the camera JPEG), falling back to LibRaw's visible area.
  *
- * White: LibRaw's `maximum` is the colour-table value (else the full bit range), which is not
- * the clipping point at every ISO; [RawImage.white] is that value after LibRaw's render-time
- * adjust_maximum (threshold 0.75), so highlights clip where a LibRaw render clips them.
- * The unadjusted value is [Decoded.libRawWhite].
+ * White, as in the CR3 reader: the ColorData SpecularWhiteLevel (LibRaw's `linear_max`, the level
+ * Canon records for the sensor's linear range at the shot's ISO) when the file has one, else
+ * LibRaw's `maximum` (the colour-table value, else the full bit range; [Decoded.libRawWhite]).
+ * The colour-table value is not the clipping point at every ISO, and LibRaw's render-time
+ * adjust_maximum (white := data maximum when that lies within 75 % .. 100 % of it) is not used:
+ * it depends on the picture (one hot pixel sets it), so the same scene would develop brighter or
+ * darker depending on its content.
  *
  * Returns null for sRAW / mRAW (subsampled YCbCr frames), anything that is not a CR2,
  * truncated files, cameras without a colour matrix in [CameraMatrices], cameras with no
@@ -35,7 +38,7 @@ package app.spektralab.raw
 object Cr2Reader {
     fun read(bytes: ByteArray): RawImage? = decode(bytes)?.image
 
-    /** The image plus LibRaw's own `maximum` (before the render-time adjustment applied to [RawImage.white]). */
+    /** The image plus LibRaw's own `maximum` ([RawImage.white] is the SpecularWhiteLevel when the file has one). */
     internal class Decoded(val image: RawImage, val libRawWhite: Int)
 
     internal fun decode(bytes: ByteArray): Decoded? = try { parse(bytes) } catch (e: Exception) { null } catch (e: OutOfMemoryError) { null }
@@ -136,19 +139,20 @@ object Cr2Reader {
 
         // ---- black: crop_masked_pixels, else ColorData, else the colour table
         // LibRaw names Canon bodies by their maker-note model id (so "EOS Rebel T2i" / "EOS Kiss X4" are "EOS 550D")
-        val entry = (MODEL_BY_ID[mn.uniqueId]?.let { CameraMatrices.findNormalized("Canon", it) } ?: CameraMatrices.find(make, model)) ?: return null
+        val entry = CameraMatrices.findCanon(mn.uniqueId, make, model) ?: return null
         val matrix = entry.xyzToCamera?.takeIf { entry.colors == 3 } ?: return null
         maskedBlack(data, rawWidth, rawHeight, left, top, width, height, mask, ::libColour)?.let { cblack = it }
         val blackPerColour = cblack ?: if (entry.blackLevel > 0) IntArray(4) { entry.blackLevel } else return null
         val black = FloatArray(4) { i -> blackPerColour[libColour(i / 2, i % 2)].toFloat() }
 
-        // ---- white: LibRaw takes the colour table maximum, else the full bit range ...
+        // ---- white: Canon's SpecularWhiteLevel, else LibRaw's maximum (colour table, else the bit range)
         val libRawWhite = if (entry.white > 0) entry.white else (1 shl h.precision) - 1
         if (libRawWhite <= blackPerColour.max()) return null
-        // ... and its render (dcraw_process) lowers it to the data maximum of the visible
-        // area when that lies within 75 % .. 100 % of it (adjust_maximum, default threshold):
-        // the table value is not the clipping point at every ISO.
-        val white = adjustMaximum(data, rawWidth, left, top, width, height, libRawWhite, blackPerColour, ::libColour).toFloat()
+        val bitMax = (1 shl h.precision) - 1
+        // LibRaw open_datastream: maker-note levels recorded on a 14-bit scale are brought to the real bit depth
+        var specular = mn.specularWhite
+        if (h.precision < 14 && specular > bitMax) specular /= 1 shl (14 - h.precision)
+        val white = (specular.takeIf { it > blackPerColour.max() && it <= bitMax } ?: libRawWhite).toFloat()
 
         // ---- crop: SensorInfo (the camera's JPEG area), else LibRaw's visible area
         var cropX = left; var cropY = top; var cropW = width; var cropH = height
@@ -262,35 +266,6 @@ object Cr2Reader {
         return IntArray(4) { (sum[it] / maxOf(1L, count[it])).toInt() }
     }
 
-    /**
-     * LibRaw adjust_maximum (threshold 0.75) on black-subtracted data: subtract_black moves the
-     * smallest channel black into `black` and lowers `maximum` by it; data_maximum is the
-     * largest black-subtracted value of the visible area.
-     */
-    private fun adjustMaximum(
-        data: ShortArray, rawWidth: Int, left: Int, top: Int, width: Int, height: Int,
-        maximum: Int, cblack: IntArray, colour: (Int, Int) -> Int,
-    ): Int {
-        val common = cblack.min()
-        val pos = IntArray(4) { cblack[colour(top + it / 2, left + it % 2)] }
-        var dmax = 0
-        for (row in top until top + height) {
-            val base = row * rawWidth
-            val b0 = pos[(row - top and 1) * 2]; val b1 = pos[(row - top and 1) * 2 + 1]
-            var col = left
-            val end = left + width
-            while (col < end) {
-                val v = (data[base + col].toInt() and 0xffff) - (if ((col - left) and 1 == 0) b0 else b1)
-                if (v > dmax) dmax = v
-                col++
-            }
-        }
-        // data_maximum is relative to black + cblack[c]; maximum only had the common part removed
-        val realMax = dmax
-        val maxAfter = maximum - common
-        return if (realMax > 0 && realMax < maxAfter && realMax > maxAfter * 0.75f) common + realMax else maximum
-    }
-
     // ------------------------------------------------------------------ CFA helpers
 
     /** dcraw `filters` with the second green marked as colour 3 (identify(), colors == 3). */
@@ -318,6 +293,8 @@ object Cr2Reader {
         var camMul: DoubleArray? = null
         val channelBlack = IntArray(4)
         var averageBlack = 0
+        /** ColorData SpecularWhiteLevel, 0 when the colour data has no white levels. */
+        var specularWhite = 0
         var sensorWidth = 0
         var sensorHeight = 0
         /** SensorInfo DefaultCropAbsolute: left, top, right, bottom (inclusive). */
@@ -401,6 +378,14 @@ object Cr2Reader {
             val bl = rgbg(black2At)
             bl.copyInto(info.channelBlack); info.averageBlack = bl.sum() / 4
         }
+        // white levels (NormalWhiteLevel, SpecularWhiteLevel) follow the channel black levels, except in
+        // the colour data versions that have none (582, 653, 796, early 674-group and 5120 sub-versions)
+        val whiteAt = when {
+            e.count == 5120 -> if (subVer == 0xfffc) 0x0569 else 0
+            blackAt in intArrayOf(0, 0x00a6, 0x011e, 0x00c4, 0x00e7) -> 0
+            else -> blackAt + 4
+        }
+        if (whiteAt != 0 && whiteAt + 1 < e.count) info.specularWhite = at(whiteAt + 1)
     }
 
     /** processCanonCameraInfo: the camera's rotation (LibRaw flip code 0, 6 or 5), 0 when unknown. */
@@ -461,91 +446,6 @@ object Cr2Reader {
         }
         return 0
     }
-
-    /** LibRaw GetNormalizedModel `unique[]`: Canon model id (maker note 0x0010) -> model name. */
-    private val MODEL_BY_ID: Map<Long, String> = mapOf(
-        0x412L to "EOS M50",
-        0x811L to "EOS M6 Mark II",
-        0x812L to "EOS M200",
-        0x1140000L to "EOS D30",
-        0x1668000L to "EOS D60",
-        0x3740000L to "EOS M3",
-        0x3840000L to "EOS M10",
-        0x3940000L to "EOS M5",
-        0x3980000L to "EOS M100",
-        0x4070000L to "EOS M6",
-        0x40000218L to "EOS R5 C",
-        0x80000001L to "EOS-1D",
-        0x80000167L to "EOS-1Ds",
-        0x80000168L to "EOS 10D",
-        0x80000169L to "EOS-1D Mark III",
-        0x80000170L to "EOS 300D",
-        0x80000174L to "EOS-1D Mark II",
-        0x80000175L to "EOS 20D",
-        0x80000176L to "EOS 450D",
-        0x80000188L to "EOS-1Ds Mark II",
-        0x80000189L to "EOS 350D",
-        0x80000190L to "EOS 40D",
-        0x80000213L to "EOS 5D",
-        0x80000215L to "EOS-1Ds Mark III",
-        0x80000218L to "EOS 5D Mark II",
-        0x80000232L to "EOS-1D Mark II N",
-        0x80000234L to "EOS 30D",
-        0x80000236L to "EOS 400D",
-        0x80000250L to "EOS 7D",
-        0x80000252L to "EOS 500D",
-        0x80000254L to "EOS 1000D",
-        0x80000261L to "EOS 50D",
-        0x80000269L to "EOS-1D X",
-        0x80000270L to "EOS 550D",
-        0x80000281L to "EOS-1D Mark IV",
-        0x80000285L to "EOS 5D Mark III",
-        0x80000286L to "EOS 600D",
-        0x80000287L to "EOS 60D",
-        0x80000288L to "EOS 1100D",
-        0x80000289L to "EOS 7D Mark II",
-        0x80000301L to "EOS 650D",
-        0x80000302L to "EOS 6D",
-        0x80000324L to "EOS-1D C",
-        0x80000325L to "EOS 70D",
-        0x80000326L to "EOS 700D",
-        0x80000327L to "EOS 1200D",
-        0x80000328L to "EOS-1D X Mark II",
-        0x80000331L to "EOS M",
-        0x80000346L to "EOS 100D",
-        0x80000347L to "EOS 760D",
-        0x80000349L to "EOS 5D Mark IV",
-        0x80000350L to "EOS 80D",
-        0x80000355L to "EOS M2",
-        0x80000382L to "EOS 5DS",
-        0x80000393L to "EOS 750D",
-        0x80000401L to "EOS 5DS R",
-        0x80000404L to "EOS 1300D",
-        0x80000405L to "EOS 800D",
-        0x80000406L to "EOS 6D Mark II",
-        0x80000408L to "EOS 77D",
-        0x80000417L to "EOS 200D",
-        0x80000421L to "EOS R5",
-        0x80000422L to "EOS 3000D",
-        0x80000424L to "EOS R",
-        0x80000428L to "EOS-1D X Mark III",
-        0x80000432L to "EOS 1500D",
-        0x80000433L to "EOS RP",
-        0x80000435L to "EOS 850D",
-        0x80000436L to "EOS 250D",
-        0x80000437L to "EOS 90D",
-        0x80000450L to "EOS R3",
-        0x80000453L to "EOS R6",
-        0x80000464L to "EOS R7",
-        0x80000465L to "EOS R10",
-        0x80000468L to "EOS M50 Mark II",
-        0x80000480L to "EOS R50",
-        0x80000481L to "EOS R6 Mark II",
-        0x80000487L to "EOS R8",
-        0x80000495L to "EOS R1",
-        0x80000496L to "EOS R5 Mark II",
-        0x80000498L to "EOS R100",
-    )
 
     /** LibRaw flip code -> EXIF orientation (inverse of "50132467"). */
     private val FLIP_TO_EXIF = intArrayOf(1, 2, 4, 3, 5, 8, 6, 7)

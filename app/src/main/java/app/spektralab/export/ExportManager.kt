@@ -314,17 +314,14 @@ class ExportManager(private val app: SpektraApp) {
                         }
                     }
                     check(ok) { "encoding failed" }
-                    if (o.photoFormat == PhotoFormat.JPEG) runCatching {
+                    // best effort: a print without metadata is still a print
+                    runCatching {
+                        val original = PrintExif.read(cr, Uri.parse(item.uri))
+                        val taken = SimpleDateFormat("yyyy:MM:dd HH:mm:ss", Locale.US).format(Date(item.dateTaken))
                         cr.openFileDescriptor(uri, "rw")?.use { pfd ->
-                            val exif = androidx.exifinterface.media.ExifInterface(pfd.fileDescriptor)
-                            val taken = SimpleDateFormat("yyyy:MM:dd HH:mm:ss", Locale.US).format(Date(item.dateTaken))
-                            exif.setAttribute(androidx.exifinterface.media.ExifInterface.TAG_DATETIME_ORIGINAL, taken)
-                            exif.setAttribute(androidx.exifinterface.media.ExifInterface.TAG_DATETIME, taken)
-                            exif.setAttribute(androidx.exifinterface.media.ExifInterface.TAG_SOFTWARE, "SpektraLab")
-                            exif.setAttribute(androidx.exifinterface.media.ExifInterface.TAG_IMAGE_DESCRIPTION, app.engine.film(item.look.film).name)
-                            exif.saveAttributes()
+                            PrintExif.write(pfd.fileDescriptor, original, taken, app.engine.film(item.look.film).name)
                         }
-                    }
+                    }.onFailure { android.util.Log.w("SpektraExport", "print EXIF skipped", it) }
                     cr.update(uri, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null)
                 }
             } catch (e: Throwable) {

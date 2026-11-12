@@ -10,6 +10,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -50,15 +58,48 @@ import kotlin.math.sin
  * @param autoStroke changes when the motor drive should perform a stroke by itself
  */
 @Composable
-fun FilmAdvanceLever(cocked: Boolean, accent: Color, nudge: Int, autoStroke: Int, modifier: Modifier = Modifier, onAdvance: () -> Unit) {
+fun FilmAdvanceLever(cocked: Boolean, accent: Color, nudge: Int, autoStroke: Int, modifier: Modifier = Modifier,
+                     guidanceEnabled: Boolean = true, onAdvance: () -> Unit) {
     val p = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
     val advance by rememberUpdatedState(onAdvance)
     val isCocked by rememberUpdatedState(cocked)
     val leverDescription = stringResource(if (cocked) R.string.film_lever_advanced else R.string.film_lever_action)
+    var interacting by remember { mutableStateOf(false) }
+    var interaction by remember { mutableIntStateOf(0) }
+    var guideReady by remember { mutableStateOf(false) }
+    val demonstration = remember { Animatable(0f) }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var resumed by remember(lifecycle) { mutableStateOf(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) }
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, _ ->
+            resumed = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
+    val waiting = !cocked && guidanceEnabled && resumed && !interacting
+    LaunchedEffect(waiting, interaction) {
+        guideReady = false
+        if (waiting) {
+            delay(10_000)
+            guideReady = true
+        }
+    }
+    val showGuide = waiting && guideReady
+    LaunchedEffect(showGuide) {
+        demonstration.snapTo(0f)
+        if (showGuide) while (true) {
+            demonstration.animateTo(1f, tween(1400))
+            delay(600)
+            demonstration.snapTo(0f)
+        }
+    }
 
     suspend fun finishStroke() {
+        guideReady = false
+        interaction++
         p.animateTo(1f, tween(90))
         if (!isCocked) {
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -88,9 +129,22 @@ fun FilmAdvanceLever(cocked: Boolean, accent: Color, nudge: Int, autoStroke: Int
             var cur = 0f
             var lastTick = 0
             detectDragGestures(
-                onDragStart = { cur = p.value; lastTick = (cur * 8).toInt(); scope.launch { p.stop() } },
-                onDragEnd = { scope.launch { if (p.value >= 0.8f) finishStroke() else p.animateTo(0f, Motion.settle) } },
-                onDragCancel = { scope.launch { p.animateTo(0f, Motion.settle) } },
+                onDragStart = {
+                    interacting = true; guideReady = false; interaction++
+                    cur = p.value; lastTick = (cur * 8).toInt(); scope.launch { p.stop() }
+                },
+                onDragEnd = {
+                    scope.launch {
+                        try { if (p.value >= 0.8f) finishStroke() else p.animateTo(0f, Motion.settle) }
+                        finally { interacting = false }
+                    }
+                },
+                onDragCancel = {
+                    scope.launch {
+                        try { p.animateTo(0f, Motion.settle) }
+                        finally { interacting = false }
+                    }
+                },
             ) { change, drag ->
                 change.consume()
                 // the thumb pushes the lever tip to the right and slightly up
@@ -108,10 +162,20 @@ fun FilmAdvanceLever(cocked: Boolean, accent: Color, nudge: Int, autoStroke: Int
             val angle = (180f + 125f * p.value) * PI.toFloat() / 180f
             val tip = Offset(pivot.x + arm * cos(angle), pivot.y + arm * sin(angle))
             val metal = Color(0xFFB9B2A6)
-            // stroke guide
-            drawArc(Pal.off, 180f, 125f, false, Offset(pivot.x - arm, pivot.y - arm), androidx.compose.ui.geometry.Size(arm * 2, arm * 2),
-                style = Stroke(1.dp.toPx(), cap = StrokeCap.Round,
-                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 5.dp.toPx()))))
+            // Only show the direction cue after ten seconds of idle manual transport.
+            if (showGuide) {
+                drawArc(accent.copy(alpha = 0.65f), 180f, 125f, false,
+                    Offset(pivot.x - arm, pivot.y - arm), androidx.compose.ui.geometry.Size(arm * 2, arm * 2),
+                    style = Stroke(2.dp.toPx(), cap = StrokeCap.Round))
+                val endAngle = 305f * PI.toFloat() / 180f
+                val end = pivot + Offset(arm * cos(endAngle), arm * sin(endAngle))
+                val tangent = Offset(-sin(endAngle), cos(endAngle))
+                val normal = Offset(cos(endAngle), sin(endAngle))
+                for (side in listOf(-1f, 1f)) {
+                    drawLine(accent, end, end - tangent * 7.dp.toPx() + normal * (side * 4.dp.toPx()),
+                        strokeWidth = 2.dp.toPx(), cap = StrokeCap.Round)
+                }
+            }
             // hub
             drawCircle(Color(0xFF2A1A16), 15.dp.toPx(), pivot)
             drawCircle(metal, 15.dp.toPx(), pivot, style = Stroke(1.5.dp.toPx()))
@@ -121,6 +185,15 @@ fun FilmAdvanceLever(cocked: Boolean, accent: Color, nudge: Int, autoStroke: Int
             drawCircle(if (cocked) Pal.off else accent, 9.dp.toPx(), tip, style = Stroke(2.dp.toPx()))
             // hub screw: red dot shows the shutter is cocked
             drawCircle(if (cocked) Pal.safelight else Color(0xFF4A2A22), 4.dp.toPx(), pivot)
+            if (showGuide) {
+                // A translucent lever and touch ring demonstrate the full drag, without advancing film.
+                val demoAngle = (180f + 125f * demonstration.value) * PI.toFloat() / 180f
+                val finger = pivot + Offset(arm * cos(demoAngle), arm * sin(demoAngle))
+                drawLine(accent.copy(alpha = 0.35f), pivot, finger, 7.dp.toPx(), StrokeCap.Round)
+                drawCircle(accent.copy(alpha = 0.2f), 12.dp.toPx(), finger)
+                drawCircle(accent, 12.dp.toPx(), finger, style = Stroke(2.dp.toPx()))
+                drawCircle(Pal.text, 3.dp.toPx(), finger)
+            }
         }
     }
 }

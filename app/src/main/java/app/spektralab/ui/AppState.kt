@@ -92,7 +92,6 @@ class AppState(application: Application) : AndroidViewModel(application) {
                 ?.let { it.copy(look = look, autoEv = it.autoEv + evBias) }
                 ?: return@launch say(R.string.captured_unreadable)
             library.add(listOf(item))
-            say(if (item.isRaw) R.string.captured_raw_kept else R.string.captured_original_kept)
             // every shot is also printed: the film picture goes to the album next to the original
             exports.enqueue(item, exportOptions.value)
         }
@@ -128,7 +127,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
         shots[uri] = viewModelScope.async {
             val item = withContext(Dispatchers.IO) { Media.importItem(app, uri, library.reserveIds(1)) }
                 ?.let { it.copy(look = look, autoEv = it.autoEv + evBias) }
-            if (item == null) say(R.string.captured_unreadable) else { library.add(listOf(item)); say(R.string.captured_raw_kept) }
+            if (item == null) say(R.string.captured_unreadable) else library.add(listOf(item))
             item
         }
     }

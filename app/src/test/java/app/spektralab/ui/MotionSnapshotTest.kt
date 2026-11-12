@@ -17,6 +17,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -97,6 +99,41 @@ class MotionSnapshotTest {
         }
         rule.mainClock.advanceTimeBy(1500)
         shot("ruler_reset_done")
+    }
+
+    @Test fun filmAdvanceGuidanceWaitsThenDisappearsWhenReady() {
+        rule.mainClock.autoAdvance = false
+        var cocked by mutableStateOf(false)
+        var enabled by mutableStateOf(true)
+        rule.setContent {
+            Box(Modifier.testTag("stage").background(Color.Black).padding(16.dp)) {
+                FilmAdvanceLever(cocked, Color.Red, 0, 0, Modifier.testTag("lever"), guidanceEnabled = enabled) { cocked = true }
+            }
+        }
+        rule.mainClock.advanceTimeBy(100)
+        val initial = redPixels(shot("guide_initial"))
+        rule.mainClock.advanceTimeBy(9000)
+        assertTrue("no guidance before ten seconds", redPixels(shot("guide_9s")) == initial)
+        rule.mainClock.advanceTimeBy(2000)
+        assertTrue("visible gesture after ten seconds", redPixels(shot("guide_11s")) > initial + 40)
+        rule.onNodeWithTag("lever").performTouchInput {
+            down(Offset(width * 0.12f, height * 0.8f))
+            moveTo(Offset(width * 0.4f, height * 0.65f), delayMillis = 200)
+            up()
+        }
+        rule.mainClock.advanceTimeBy(1500)
+        assertTrue("partial drag hides guidance without advancing film", !cocked && redPixels(shot("guide_after_drag")) == initial)
+        rule.mainClock.advanceTimeBy(11000)
+        assertTrue("idle partial drag gets a new demonstration", redPixels(shot("guide_after_retry")) > initial + 40)
+        rule.runOnUiThread { enabled = false }
+        rule.mainClock.advanceTimeBy(100)
+        assertTrue("auto wind or overlay hides guidance", redPixels(shot("guide_disabled")) == initial)
+        rule.runOnUiThread { enabled = true }
+        rule.mainClock.advanceTimeBy(9000)
+        assertTrue("reenabling restarts the idle interval", redPixels(shot("guide_restarted")) == initial)
+        rule.runOnUiThread { cocked = true }
+        rule.mainClock.advanceTimeBy(11000)
+        assertTrue("ready film needs no guidance", redPixels(shot("guide_ready")) < initial)
     }
 
     @Test fun filmAdvanceLeverStroke() {

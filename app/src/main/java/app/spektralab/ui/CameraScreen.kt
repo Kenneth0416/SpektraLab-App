@@ -106,6 +106,7 @@ fun CameraScreen(state: AppState) {
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     val look by state.camLook.collectAsState()
+    val activeSheet by state.sheet.collectAsState()
     val accent by animateColorAsState(Color(Catalog.film(look.film).accent), tween(500), label = "accent")
     var tool by rememberSaveable { mutableStateOf("film") }
     var front by rememberSaveable { mutableStateOf(false) }
@@ -310,7 +311,7 @@ fun CameraScreen(state: AppState) {
             // shutter is locked until the film is advanced
             haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             nudge++
-            return state.say(R.string.advance_film_first)
+            return
         }
         busy = true
         cocked = false
@@ -557,13 +558,6 @@ fun CameraScreen(state: AppState) {
                     }
                     Text(summary(look).uppercase(Locale.ROOT), fontFamily = Fonts.mono, fontSize = 9.sp, color = Pal.text,
                         modifier = Modifier.align(Alignment.TopStart).padding(10.dp).background(Color(0x99140807)).padding(horizontal = 6.dp, vertical = 2.dp))
-                    // prompt while the frame is spent
-                    androidx.compose.animation.AnimatedVisibility(!cocked && !busy, Modifier.align(Alignment.Center),
-                        enter = fadeIn(tween(300, delayMillis = 250)), exit = fadeOut(tween(120))) {
-                        Text(stringResource(if (autoWind) R.string.advancing else R.string.advance_to_clear), color = Pal.text, fontSize = 13.sp,
-                            modifier = Modifier.graphicsLayer { rotationZ = iconTurn }
-                                .background(Color(0xB3140807), RoundedCornerShape(14.dp)).padding(horizontal = 14.dp, vertical = 7.dp))
-                    }
                     // zoom steps sit on the lower edge of the finder, where thumbs expect them
                     val stops = zoomStops
                     Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp)
@@ -643,7 +637,9 @@ fun CameraScreen(state: AppState) {
                     if (autoWind && !cocked && !busy) autoStroke++
                 }.padding(6.dp))
         }
-        val lever: @Composable () -> Unit = { FilmAdvanceLever(cocked, accent, nudge, autoStroke) { advanceFilm() } }
+        val lever: @Composable () -> Unit = {
+            FilmAdvanceLever(cocked, accent, nudge, autoStroke, guidanceEnabled = !busy && !autoWind && activeSheet == Sheet.NONE) { advanceFilm() }
+        }
         if (vertical) Column(horizontalAlignment = Alignment.CenterHorizontally) { counter(); lever(); motor() }
         else Row(Modifier.fillMaxWidth().padding(start = 18.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             counter(); Spacer(Modifier.width(10.dp)); motor(); Spacer(Modifier.weight(1f)); lever()

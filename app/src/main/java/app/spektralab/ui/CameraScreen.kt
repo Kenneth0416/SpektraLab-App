@@ -1,7 +1,9 @@
 package app.spektralab.ui
 
 import android.Manifest
+import android.app.Activity
 import android.content.ContentValues
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Environment
@@ -424,6 +426,18 @@ fun CameraScreen(state: AppState) {
 
     val config = LocalConfiguration.current
     val landscape = config.orientation == Configuration.ORIENTATION_LANDSCAPE
+    // the picture is landscape when the phone is held a quarter turn from the (fixed) screen
+    val pictureLandscape = landscape != (turn == 90 || turn == -90)
+    // Like other phone cameras: the screen stays as it is and the controls turn in place.
+    // Phones are locked upright; larger screens keep whatever they are in (fold / book / landscape layouts).
+    val activity = remember(context) { generateSequence(context) { (it as? android.content.ContextWrapper)?.baseContext }.filterIsInstance<Activity>().firstOrNull() }
+    DisposableEffect(activity, config.smallestScreenWidthDp) {
+        // a locked orientation has no effect in split screen, and unlocking there could fight the system
+        val lock = activity != null && !(activity.isInMultiWindowMode)
+        if (lock) activity!!.requestedOrientation = if (config.smallestScreenWidthDp < 600)
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT else ActivityInfo.SCREEN_ORIENTATION_LOCKED
+        onDispose { if (lock) activity!!.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
+    }
     val fold = LocalFold.current
     var origin by remember { mutableStateOf(Offset.Zero) }
     val hinge = fold.hinge?.translate(-origin)
@@ -435,7 +449,7 @@ fun CameraScreen(state: AppState) {
 
     // ------------------------------------------------------------------ parts
     val topItems: @Composable (@Composable () -> Unit) -> Unit = { gap ->
-        Text("‹ 灯箱", color = Pal.text, fontSize = 15.sp, modifier = Modifier.springClick { state.closeCamera() }.padding(6.dp))
+        Text("‹ 灯箱", color = Pal.text, fontSize = 15.sp, modifier = Modifier.springClick { state.closeCamera() }.graphicsLayer { rotationZ = iconTurn }.padding(6.dp))
         // what the shutter will keep as the original
         AnimatedContent(session?.raw, label = "format", transitionSpec = { fadeIn() togetherWith fadeOut() }) { raw ->
             // what will be saved; tapping opens the three choices
@@ -450,7 +464,7 @@ fun CameraScreen(state: AppState) {
                     color = if (raw == true) accent else Pal.dim,
                     modifier = Modifier.semantics { contentDescription = "拍摄格式：$label" }
                         .springClick { if (raw != null) modeMenu = true }
-                        .padding(6.dp).border(1.dp, if (raw == true) accent else Pal.off, RoundedCornerShape(4.dp))
+                        .graphicsLayer { rotationZ = iconTurn }.padding(6.dp).border(1.dp, if (raw == true) accent else Pal.off, RoundedCornerShape(4.dp))
                         .padding(horizontal = 6.dp, vertical = 2.dp))
                 DropdownMenu(modeMenu, { modeMenu = false }, modifier = Modifier.background(Pal.darkPanel)) {
                     val rawOk = session?.rawSupported == true
@@ -479,7 +493,8 @@ fun CameraScreen(state: AppState) {
                 }
             }
         }
-        merging?.let { Text("合成 ${(it * 100).toInt()}%", fontFamily = Fonts.mono, fontSize = 10.sp, color = Pal.dim, modifier = Modifier.padding(2.dp)) }
+        merging?.let { Text("合成 ${(it * 100).toInt()}%", fontFamily = Fonts.mono, fontSize = 10.sp, color = Pal.dim,
+            modifier = Modifier.graphicsLayer { rotationZ = iconTurn }.padding(2.dp)) }
         gap()
         val flashLabel = when (flash) { ImageCapture.FLASH_MODE_ON -> "闪光 开"; ImageCapture.FLASH_MODE_AUTO -> "闪光 自动"; else -> "闪光 关" }
         Text(flashLabel, color = if (flash == ImageCapture.FLASH_MODE_OFF) Pal.dim else Pal.text, fontSize = 13.sp, modifier = Modifier.springClick {
@@ -488,13 +503,13 @@ fun CameraScreen(state: AppState) {
                 ImageCapture.FLASH_MODE_AUTO -> ImageCapture.FLASH_MODE_ON
                 else -> ImageCapture.FLASH_MODE_OFF
             }
-        }.padding(8.dp))
-        Text("配方", color = Pal.text, fontSize = 13.sp, modifier = Modifier.springClick { state.openRecipes() }.padding(8.dp))
+        }.graphicsLayer { rotationZ = iconTurn }.padding(8.dp))
+        Text("配方", color = Pal.text, fontSize = 13.sp, modifier = Modifier.springClick { state.openRecipes() }.graphicsLayer { rotationZ = iconTurn }.padding(8.dp))
         // the film settings stay out of the way until asked for
         val toolsInk by animateColorAsState(if (toolsOpen) Pal.dink else Pal.text, tween(180), label = "toolsInk")
         val toolsBg by animateColorAsState(if (toolsOpen) accent else Color.Transparent, tween(180), label = "toolsBg")
         Text("调整", color = toolsInk, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 2.dp)
-            .springClick { toolsOpen = !toolsOpen }.clip(RoundedCornerShape(14.dp)).background(toolsBg)
+            .springClick { toolsOpen = !toolsOpen }.graphicsLayer { rotationZ = iconTurn }.clip(RoundedCornerShape(14.dp)).background(toolsBg)
             .border(1.dp, accent, RoundedCornerShape(14.dp)).padding(horizontal = 12.dp, vertical = 5.dp))
     }
 
@@ -567,8 +582,11 @@ fun CameraScreen(state: AppState) {
                             .clip(RoundedCornerShape(16.dp)).background(accent).padding(horizontal = 16.dp, vertical = 6.dp))
                     }
                     // the film format's frame lines: outside is masked, like a rangefinder
-                    val crop = remember(look.format, landscape) {
-                        Framing.compute(if (landscape) 4000 else 3000, if (landscape) 3000 else 4000, look, 4000).crop
+                    // (the picture follows how the phone is held, while the finder box stays put)
+                    val crop = remember(look.format, pictureLandscape, landscape) {
+                        val c = Framing.compute(if (pictureLandscape) 4000 else 3000, if (pictureLandscape) 3000 else 4000, look, 4000).crop
+                        // the crop is centered, so turning the picture a quarter into the unturned finder just swaps the axes
+                        if (pictureLandscape != landscape) floatArrayOf(c[1], c[0], c[3], c[2]) else c
                     }
                     Canvas(Modifier.fillMaxSize()) {
                         val l = crop[0] * size.width; val r = crop[2] * size.width
@@ -687,24 +705,26 @@ fun CameraScreen(state: AppState) {
             CameraFlipIcon(Modifier.size(28.dp).graphicsLayer { rotationZ = iconTurn + spin.value }, Pal.text)
         }
     }
-    val transportPart: @Composable (Boolean) -> Unit = { vertical ->
-        val counter: @Composable () -> Unit = {
+    val counter: @Composable () -> Unit = {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.graphicsLayer { rotationZ = iconTurn }) {
                 FrameCounter(frame)
                 Text("/ 36", fontFamily = Fonts.mono, fontSize = 8.sp, color = Pal.dim)
             }
-        }
-        val motor: @Composable () -> Unit = {
+    }
+    val motor: @Composable () -> Unit = {
             // motor drive for those who do not want to wind every frame
             Text(if (autoWind) "自动过片 开" else "自动过片 关", color = if (autoWind) accent else Pal.dim, fontSize = 11.sp,
                 modifier = Modifier.springClick {
                     autoWind = !autoWind
                     prefs.edit().putBoolean("autoWind", autoWind).apply()
                     if (autoWind && !cocked && !busy) autoStroke++
-                }.padding(6.dp))
-        }
+                }.graphicsLayer { rotationZ = iconTurn }.padding(6.dp))
+    }
+    // [spare]: counter and motor switch live elsewhere (a short sideways layout), only the lever stays
+    val transportPart: @Composable (Boolean, Boolean) -> Unit = { vertical, spare ->
         val lever: @Composable () -> Unit = { FilmAdvanceLever(cocked, accent, nudge, autoStroke) { advanceFilm() } }
-        if (vertical) Column(horizontalAlignment = Alignment.CenterHorizontally) { counter(); lever(); motor() }
+        if (spare) lever()
+        else if (vertical) Column(horizontalAlignment = Alignment.CenterHorizontally) { counter(); lever(); motor() }
         else Row(Modifier.fillMaxWidth().padding(start = 18.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             counter(); Spacer(Modifier.width(10.dp)); motor(); Spacer(Modifier.weight(1f)); lever()
         }
@@ -733,7 +753,7 @@ fun CameraScreen(state: AppState) {
                     toolsPart(Modifier.weight(1f).fillMaxHeight().padding(8.dp))
                     Column(Modifier.fillMaxHeight().padding(end = 12.dp), horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.SpaceEvenly) {
-                        transportPart(true); shutterPart(); Row(verticalAlignment = Alignment.CenterVertically) { thumbPart(); Spacer(Modifier.width(14.dp)); flipPart() }
+                        transportPart(true, false); shutterPart(); Row(verticalAlignment = Alignment.CenterVertically) { thumbPart(); Spacer(Modifier.width(14.dp)); flipPart() }
                     }
                 }
             }
@@ -745,15 +765,21 @@ fun CameraScreen(state: AppState) {
                 Spacer(Modifier.width(with(density) { hinge!!.width.toDp() }))
                 Column(Modifier.fillMaxSize()) {
                     toolsPart(Modifier.fillMaxWidth().weight(1f).padding(8.dp))
-                    transportPart(false)
+                    transportPart(false, false)
                     Row(Modifier.fillMaxWidth().padding(horizontal = 26.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween) { thumbPart(); shutterPart(); flipPart() }
                 }
             }
-            landscape -> Row(Modifier.fillMaxSize()) {
+            landscape -> BoxWithConstraints(Modifier.fillMaxSize()) {
+              // the right column needs about 340dp; below that the counter and motor switch move to the left column
+              val short = maxHeight < 360.dp
+              Row(Modifier.fillMaxSize()) {
                 // held sideways: settings on the left edge, shutter and lever under the right thumb
                 Column(Modifier.fillMaxHeight().padding(vertical = 6.dp, horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.SpaceBetween) { topItems { } }
+                    verticalArrangement = Arrangement.SpaceBetween) {
+                    topItems { }
+                    if (short) { counter(); motor() }
+                }
                 Box(Modifier.weight(1f).fillMaxHeight()) {
                     viewfinderPart(Modifier.fillMaxSize())
                     androidx.compose.animation.AnimatedVisibility(toolsOpen, Modifier.align(Alignment.CenterEnd),
@@ -763,8 +789,9 @@ fun CameraScreen(state: AppState) {
                 }
                 Column(Modifier.fillMaxHeight().padding(horizontal = 10.dp, vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.SpaceBetween) {
-                    flipPart(); transportPart(true); shutterPart(); thumbPart()
+                    flipPart(); transportPart(true, short); shutterPart(); thumbPart()
                 }
+              }
             }
             else -> Column(Modifier.fillMaxSize()) {
                 Row(Modifier.fillMaxWidth().dealIn(0, fromY = -40f).padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) { topItems { Spacer(Modifier.weight(1f)) } }
@@ -775,7 +802,7 @@ fun CameraScreen(state: AppState) {
                         toolsPart(Modifier.fillMaxWidth().height(300.dp).padding(6.dp))
                     }
                 }
-                transportPart(false)
+                transportPart(false, false)
                 Row(Modifier.fillMaxWidth().dealIn(1, fromY = 60f).padding(horizontal = 30.dp).padding(bottom = 14.dp, top = 2.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     thumbPart(); shutterPart(); flipPart()

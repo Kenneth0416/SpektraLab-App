@@ -83,7 +83,9 @@ fun LibraryScreen(state: AppState) {
         // tube not fully on yet: the whole table is dimmer
         if (tube < 1f) drawRect(Pal.ink.copy(alpha = 0.32f * (1f - tube)))
     }) {
-        Column(Modifier.fillMaxSize().statusBarsPadding()) {
+        // sides only: cutout and side navigation bar in landscape; the bottom bar and list padding own the bottom
+        Column(Modifier.fillMaxSize().statusBarsPadding()
+            .windowInsetsPadding(WindowInsets.displayCutout.union(WindowInsets.navigationBars).only(WindowInsetsSides.Horizontal))) {
             // header
             Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 16.dp, top = 14.dp), verticalAlignment = Alignment.Bottom) {
                 Column(Modifier.weight(1f)) {

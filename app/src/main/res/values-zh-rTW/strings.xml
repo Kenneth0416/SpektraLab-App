@@ -7,6 +7,25 @@
     <string name="about_action_description">關於與開源許可</string>
     <string name="export_channel">沖印</string>
     <string name="export_running">正在沖印…</string>
+    <string name="export_notification_progress">沖印中 %1$d / %2$d</string>
+    <string name="export_result_channel">沖印結果</string>
+    <string name="export_failed_items">%1$d 項沒沖出來</string>
+    <string name="export_failed_saved">另有 %1$d 項已存到相簿</string>
+    <string name="export_queued_count">已加入沖印佇列 · %1$d 項</string>
+    <string name="retry_source_missing">原片已不在燈箱，無法重試</string>
+    <string name="export_saved_others">其餘 %1$d 項已存好</string>
+    <string name="export_failures_label">失敗 %1$d 項</string>
+    <string name="export_reason_source">讀不到原片</string>
+    <string name="export_reason_storage">儲存空間不足</string>
+    <string name="export_reason_memory">顯存或記憶體不足</string>
+    <string name="export_reason_codec">這台裝置不支援該影片編碼</string>
+    <string name="export_reason_other">其他錯誤</string>
+    <string name="got_it">知道了</string>
+    <string name="retry">重試</string>
+    <string name="print_badge">印</string>
+    <string name="print_badge_stale">舊印</string>
+    <string name="media_printed">，已沖印</string>
+    <string name="media_print_stale">，沖印已過期</string>
 
     <string name="settings">設定</string>
     <string name="language">語言</string>

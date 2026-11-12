@@ -313,28 +313,50 @@ class AppState(application: Application) : AndroidViewModel(application) {
     // ----------------------------------------------------------- export
     fun openExport(ids: List<Long>) {
         if (ids.isEmpty()) return say(R.string.select_items_to_export)
-        if (exports.isRunning()) { sheet.value = Sheet.PROGRESS; return }
         exportTargets.value = ids
         sheet.value = Sheet.EXPORT
     }
 
+    /** Waits for the queue to drain once a manual export joined it, then reports. */
+    private var exportWatch: Job? = null
+
     fun startExport(share: Boolean) {
         val items = exportTargets.value.mapNotNull { library.item(it) }
-        if (items.isEmpty() || exports.isRunning()) { sheet.value = Sheet.NONE; return say(R.string.nothing_to_export) }
+        if (items.isEmpty()) { sheet.value = Sheet.NONE; return say(R.string.nothing_to_export) }
+        // a running batch takes the new items at its end
+        val joined = exports.isRunning()
         exports.start(items, exportOptions.value, share)
         sheet.value = Sheet.PROGRESS
         selecting.value = false
         picked.value = emptyList()
-        viewModelScope.launch {
+        if (joined) say(R.string.export_queued_count, items.size)
+        watchExport()
+    }
+
+    fun retryExports() {
+        if (exports.retry() == 0) { sheet.value = Sheet.NONE; return say(R.string.retry_source_missing) }
+        sheet.value = Sheet.PROGRESS
+        watchExport()
+    }
+
+    fun dismissExports() {
+        exports.dismiss()
+        sheet.value = Sheet.NONE
+    }
+
+    private fun watchExport() {
+        if (exportWatch?.isActive == true) return
+        exportWatch = viewModelScope.launch {
             val st = exports.state.first { it != null && !it.running }!!
-            if (sheet.value == Sheet.PROGRESS) sheet.value = Sheet.NONE
+            // failures stay on screen (sheet or pill) until retried or dismissed
+            if (sheet.value == Sheet.PROGRESS && st.failures.isEmpty()) sheet.value = Sheet.NONE
             val msg = when {
                 st.saved.isEmpty() -> app.getString(R.string.export_failed)
                 st.share -> app.getString(R.string.export_shared_count, st.saved.size)
                 else -> app.getString(R.string.export_saved_count, st.saved.size)
             } + if (st.failed > 0 && st.saved.isNotEmpty()) app.getString(R.string.export_failed_count, st.failed) else ""
             say(msg)
-            exports.dismiss()
+            if (st.failures.isEmpty()) exports.dismiss()
         }
     }
 }

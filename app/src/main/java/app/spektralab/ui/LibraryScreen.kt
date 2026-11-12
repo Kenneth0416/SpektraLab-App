@@ -57,6 +57,7 @@ import app.spektralab.R
 import app.spektralab.data.LibraryItem
 import app.spektralab.engine.Catalog
 import app.spektralab.engine.Look
+import app.spektralab.export.PrintSignature
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -311,8 +312,11 @@ private fun Frame(state: AppState, item: LibraryItem, selecting: Boolean, order:
         value = state.app.thumbs.get(item)
     }
     val mediaType = stringResource(if (item.isVideo) R.string.video else R.string.photo)
+    // a print whose look differs from the item's is out of date
+    val stale = remember(item.look, item.printSig) { item.printUri != null && PrintSignature.isStale(item) }
     val desc = stringResource(R.string.media_description, mediaType, item.name) +
-        if (order >= 0) stringResource(R.string.media_selected) else ""
+        (if (order >= 0) stringResource(R.string.media_selected) else "") +
+        (if (item.printUri == null) "" else if (stale) stringResource(R.string.media_print_stale) else stringResource(R.string.media_printed))
     // a circled frame sinks a little under the crayon
     val sink by animateFloatAsState(if (order >= 0) 0.94f else 1f, Motion.settle, label = "sink")
     Box(modifier.aspectRatio(1.5f).graphicsLayer { scaleX = sink; scaleY = sink }
@@ -332,6 +336,9 @@ private fun Frame(state: AppState, item: LibraryItem, selecting: Boolean, order:
         val tag = if (item.isVideo) mmss(item.durationMs / 1000) else if (item.isRaw) "RAW" else ""
         if (tag.isNotEmpty()) Text(tag, fontFamily = Fonts.mono, fontSize = 8.sp, color = Color.White,
             modifier = Modifier.align(Alignment.BottomEnd).padding(3.dp).background(Color(0xCC0D0B09)).padding(horizontal = 3.dp, vertical = 1.dp))
+        if (item.printUri != null) Text(if (stale) stringResource(R.string.print_badge_stale) else stringResource(R.string.print_badge),
+            fontFamily = Fonts.mono, fontSize = 8.sp, color = if (stale) Pal.red else Color.White,
+            modifier = Modifier.align(Alignment.BottomStart).padding(3.dp).background(Color(0xCC0D0B09)).padding(horizontal = 3.dp, vertical = 1.dp))
         if (item.look != Look.DEFAULT) RedTick(Modifier.align(Alignment.TopEnd).padding(3.dp).size(14.dp))
         // drawn on when picked, quickly rubbed out when unpicked
         androidx.compose.animation.AnimatedVisibility(order >= 0, enter = EnterTransition.None, exit = fadeOut(tween(160)) + scaleOut(tween(160), targetScale = 1.08f)) {

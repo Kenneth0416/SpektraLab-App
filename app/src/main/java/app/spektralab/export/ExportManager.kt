@@ -2,20 +2,29 @@ package app.spektralab.export
 
 import android.app.Notification
 import android.app.NotificationChannel
+import android.Manifest
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.os.IBinder
+import android.os.SystemClock
 import android.provider.MediaStore
+import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
+import androidx.core.content.ContextCompat
+import app.spektralab.MainActivity
+import app.spektralab.HeavyWork
 import app.spektralab.R
 import app.spektralab.SpektraApp
 import app.spektralab.data.LibraryItem
@@ -24,16 +33,18 @@ import app.spektralab.gl.GlUtil
 import app.spektralab.render.Framing
 import app.spektralab.render.OverlayPainter
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.takeWhile
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.Executors
 
 enum class PhotoFormat(val label: String, val mime: String, val ext: String) {
     JPEG("JPEG", "image/jpeg", "jpg"), PNG("PNG", "image/png", "png")
@@ -53,73 +64,188 @@ data class ExportState(
     val current: Float,
     val running: Boolean,
     val saved: List<Uri> = emptyList(),
-    val failed: Int = 0,
+    /** Jobs that did not print; kept (also across batches) until retried or dismissed. */
+    val failures: List<ExportFailure> = emptyList(),
+    /** The batch has "share" jobs. */
     val share: Boolean = false,
-)
+) {
+    val failed get() = failures.size
+}
 
-/** Background exports (film development): every item is rendered in full through the pipeline. */
+/**
+ * Background exports (film development): every item is rendered in full through the pipeline.
+ * One queue for the whole app: manual exports and camera prints append to it, and it is
+ * written to [file] on every change so a process death does not lose pending prints.
+ */
 class ExportManager(private val app: SpektraApp) {
     private val _state = MutableStateFlow<ExportState?>(null)
     val state: StateFlow<ExportState?> = _state
-    private var job: Job? = null
-    private val extra = java.util.concurrent.ConcurrentLinkedQueue<LibraryItem>()
     /** Finished share exports waiting for an activity in the foreground to open the chooser. */
     val pendingShare = MutableStateFlow<List<Uri>?>(null)
-    @Volatile private var cancel = false
 
-    fun isRunning() = _state.value?.running == true
+    // guarded by [lock]: the queue is changed from the UI, the camera callbacks and the worker
+    private val lock = Any()
+    /** Waiting jobs; the head is the one printing and stays until done, so a process death resumes it. */
+    private val pending = ArrayDeque<ExportJob>()
+    private var failures = emptyList<ExportFailure>()
+    private var active = false
+    /** Bumped by [cancel]: the job printing at that moment stops early. */
+    @Volatile private var generation = 0
+    private val resumed = java.util.concurrent.atomic.AtomicBoolean(false)
 
-    fun start(items: List<LibraryItem>, options: ExportOptions, share: Boolean) {
-        if (isRunning() || items.isEmpty()) return
-        cancel = false
-        _state.value = ExportState(items.size, 0, 0f, true, share = share)
-        runCatching {
-            androidx.core.content.ContextCompat.startForegroundService(app, Intent(app, ExportService::class.java))
-        }
-        job = app.appScope.launch {
-            val saved = ArrayList<Uri>()
-            var failed = 0
-            val queue = ArrayDeque(items)
-            var i = 0
-            var finished = false
-            while (!finished) {
-                while (!cancel) {
-                    // shots taken while printing join the batch
-                    val item = queue.removeFirstOrNull() ?: extra.poll() ?: break
-                    _state.value = _state.value?.copy(done = i, current = 0f)
-                    val uri = runCatching { exportOne(item, options) { p -> _state.value = _state.value?.copy(current = p) } }
-                        .onFailure { android.util.Log.e("SpektraExport", "export failed", it) }
-                        .getOrNull()
-                    if (uri != null) saved += uri else failed++
-                    i++
-                }
-                // finish under the same lock as enqueue(), so a late shot is never dropped
-                synchronized(this@ExportManager) {
-                    if (cancel || extra.isEmpty()) {
-                        val total = _state.value?.total ?: items.size
-                        if (share && saved.isNotEmpty()) pendingShare.value = saved
-                        // the service watches [state] and stops itself once it has gone foreground
-                        _state.value = ExportState(total, total, 1f, false, saved, failed, share)
-                        finished = true
-                    }
-                }
+    private val file = File(app.filesDir, "export_queue.json")
+    private val saver = Executors.newSingleThreadExecutor { Thread(it, "spektra-exports") }
+
+    init {
+        // restored now (the library is loaded), started by resume() once the UI is up
+        if (file.exists()) runCatching {
+            val (jobs, failed) = ExportQueue.resolve(ExportQueue.decode(file.readText())) { app.library.item(it) }
+            synchronized(lock) {
+                pending.addAll(jobs)
+                failures = failed
+                if (failed.isNotEmpty()) _state.value = ExportState(0, 0, 0f, false, failures = failed)
+                persist()
             }
         }
     }
 
-    /** Print one more item: joins the running batch, or starts one. */
-    @Synchronized fun enqueue(item: LibraryItem, options: ExportOptions) {
-        if (isRunning()) {
-            extra.add(item)
-            _state.value = _state.value?.let { it.copy(total = it.total + 1) }
-        } else start(listOf(item), options, share = false)
+    fun isRunning() = _state.value?.running == true
+
+    /**
+     * Print the jobs restored from the last run. Call from the foreground UI: the
+     * foreground service may only be started while the app is visible.
+     */
+    fun resume() {
+        if (resumed.getAndSet(true)) return
+        synchronized(lock) { if (!active && pending.isNotEmpty()) startLocked() }
     }
 
-    fun cancel() { cancel = true; extra.clear() }
+    /** Print [items]: joins the running batch, or starts one. */
+    fun start(items: List<LibraryItem>, options: ExportOptions, share: Boolean) =
+        submit(items.map { ExportJob(it, options, share) })
 
-    fun dismiss() { if (!isRunning()) _state.value = null }
+    /** Print one more item (camera shots): joins the running batch, or starts one. */
+    fun enqueue(item: LibraryItem, options: ExportOptions) = submit(listOf(ExportJob(item, options)))
 
-    private suspend fun exportOne(item: LibraryItem, o: ExportOptions, progress: (Float) -> Unit): Uri? {
+    /** Queue the failed jobs again, with their own options; returns how many could be. */
+    fun retry(): Int = synchronized(lock) {
+        // the item as it is now: its look may have changed, it may have been removed
+        val jobs = failures.mapNotNull { f -> app.library.item(f.job.item.id)?.let { f.job.copy(item = it) } }
+        failures = emptyList()
+        if (jobs.isEmpty()) {
+            if (active) _state.update { it?.copy(failures = failures) } else _state.value = null
+            persist()
+        } else submitLocked(jobs)
+        jobs.size
+    }
+
+    private fun submit(jobs: List<ExportJob>) = synchronized(lock) { submitLocked(jobs) }
+
+    private fun submitLocked(jobs: List<ExportJob>) {
+        if (jobs.isEmpty()) return
+        pending.addAll(jobs)
+        // update {}: the worker changes progress from another thread
+        if (active) _state.update { it?.copy(total = it.total + jobs.size, share = it.share || jobs.any { j -> j.share }, failures = failures) }
+        else startLocked()
+        persist()
+    }
+
+    private fun startLocked() {
+        active = true
+        _state.value = ExportState(pending.size, 0, 0f, true, failures = failures, share = pending.any { it.share })
+        runCatching {
+            androidx.core.content.ContextCompat.startForegroundService(app, Intent(app, ExportService::class.java))
+        }
+        app.appScope.launch { work() }
+    }
+
+    private suspend fun work() {
+        val saved = ArrayList<Uri>()
+        val shared = ArrayList<Uri>()
+        var done = 0
+        while (true) {
+            val job = synchronized(lock) {
+                pending.firstOrNull() ?: run {
+                    // drained: finish under the lock, so a job submitted now starts a new batch instead of being dropped
+                    if (shared.isNotEmpty()) pendingShare.update { (it ?: emptyList()) + shared }
+                    // the service watches [state] and stops itself once it has gone foreground
+                    _state.update { s -> ExportState(s?.total ?: done, s?.total ?: done, 1f, false, saved.toList(), failures, s?.share == true) }
+                    active = false
+                    return
+                }
+            }
+            val gen = generation
+            _state.update { it?.copy(done = done, current = 0f) }
+            // never at the same time as a burst merge (memory)
+            val sig = PrintSignature.of(job.item, job.options)
+            val result = runCatching {
+                existingPrint(job.item.id, sig)
+                    ?: HeavyWork.run { exportOne(job.item, job.options, { generation != gen }) { p -> _state.update { it?.copy(current = p) } } }
+                        ?.also { recordPrint(job.item.id, it, sig) }
+            }
+            result.exceptionOrNull()?.let { android.util.Log.e("SpektraExport", "export failed", it) }
+            val uri = result.getOrNull()
+            synchronized(lock) {
+                if (pending.firstOrNull() === job) pending.removeFirst()
+                when {
+                    uri != null -> { saved += uri; if (job.share) shared += uri }
+                    // stopped by the user: not a failure to retry
+                    generation != gen -> {}
+                    else -> failures = failures + ExportFailure(job, ExportQueue.reason(result.exceptionOrNull()))
+                }
+                done++
+                _state.update { it?.copy(done = done, saved = saved.toList(), failures = failures) }
+                persist()
+            }
+        }
+    }
+
+    /** The recorded print of the item if it was made from exactly [sig] and is still in the album. */
+    private suspend fun existingPrint(id: Long, sig: String): Uri? {
+        val item = app.library.item(id) ?: return null
+        if (item.printSig != sig) return null
+        val uri = Uri.parse(item.printUri ?: return null)
+        val exists = withContext(Dispatchers.IO) {
+            runCatching { app.contentResolver.query(uri, arrayOf(MediaStore.MediaColumns._ID), null, null, null)?.use { it.moveToFirst() } == true }
+                .getOrDefault(false)
+        }
+        return uri.takeIf { exists }
+    }
+
+    /** Record the new print on the item as it is now, then drop the one it replaces (the new one is already saved). */
+    private suspend fun recordPrint(id: Long, uri: Uri, sig: String) {
+        val old = app.library.setPrint(id, uri.toString(), sig) ?: return
+        // failures are fine: on Android 11+ only files this app created can be deleted, which is all we recorded
+        withContext(Dispatchers.IO) { runCatching { app.contentResolver.delete(Uri.parse(old), null, null) } }
+    }
+
+    /** Stop after the current item and drop the rest of the queue. */
+    fun cancel() = synchronized(lock) {
+        generation++
+        pending.clear()
+        persist()
+    }
+
+    /** Forget the finished batch and its failures. */
+    fun dismiss() = synchronized(lock) {
+        failures = emptyList()
+        if (active) _state.update { it?.copy(failures = failures) } else _state.value = null
+        persist()
+    }
+
+    /** Call under [lock]; the write itself is off the caller's thread, in order. */
+    private fun persist() {
+        val text = ExportQueue.encode(pending.toList(), failures)
+        saver.execute {
+            runCatching {
+                val tmp = File(file.parentFile, file.name + ".tmp")
+                tmp.writeText(text)
+                tmp.renameTo(file)
+            }.onFailure { android.util.Log.w("SpektraExport", "queue not saved", it) }
+        }
+    }
+
+    private suspend fun exportOne(item: LibraryItem, o: ExportOptions, cancelled: () -> Boolean, progress: (Float) -> Unit): Uri? {
         val setup = withContext(Dispatchers.Default) { app.looks.get(item.look, lutSize = 48) }
         val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
         val film = app.engine.film(item.look.film).name.replace(' ', '_')
@@ -128,6 +254,7 @@ class ExportManager(private val app: SpektraApp) {
                 put(MediaStore.Video.Media.DISPLAY_NAME, "SPK_${stamp}_${item.id}_$film.mp4")
                 put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
                 put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/Silvercam")
+                put(MediaStore.Video.Media.DATE_TAKEN, item.dateTaken)
                 put(MediaStore.Video.Media.IS_PENDING, 1)
             }
             val cr = app.contentResolver
@@ -135,7 +262,7 @@ class ExportManager(private val app: SpektraApp) {
             try {
                 cr.openFileDescriptor(uri, "rw")!!.use { pfd ->
                     app.glWorker.run {
-                        VideoExporter(app, this, item, setup, o.videoLongEdge, pfd.fileDescriptor, progress) { cancel }.run()
+                        VideoExporter(app, this, item, setup, o.videoLongEdge, pfd.fileDescriptor, progress, cancelled).run()
                     }
                 }
                 cr.update(uri, ContentValues().apply { put(MediaStore.Video.Media.IS_PENDING, 0) }, null, null)
@@ -216,34 +343,103 @@ class ExportManager(private val app: SpektraApp) {
     }
 }
 
-/** Keeps the process alive while exports run in the background. */
+/** Keeps the process alive while exports run in the background, and shows their progress and result. */
 class ExportService : Service() {
     private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.Main)
     private var watching = false
+    private var foregrounded = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val exports = (application as SpektraApp).exports
+        if (intent?.action == ACTION_CANCEL) {
+            exports.cancel()
+            // a stale action can start a service that never went foreground (plain startService)
+            if (!foregrounded) stopSelf()
+            return START_NOT_STICKY
+        }
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.createNotificationChannel(NotificationChannel(CHANNEL, getString(R.string.export_channel), NotificationManager.IMPORTANCE_LOW))
-        val n: Notification = NotificationCompat.Builder(this, CHANNEL)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(getString(R.string.export_running))
-            .setOngoing(true)
-            .setProgress(0, 0, true)
-            .build()
         // always go foreground first: stopping a service started with startForegroundService
         // before this call crashes the app
-        ServiceCompat.startForeground(this, 7, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        ServiceCompat.startForeground(this, ID_RUNNING, progressNotification(exports.state.value), ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        foregrounded = true
         if (!watching) {
             watching = true
             scope.launch {
-                (application as SpektraApp).exports.state.first { it == null || !it.running }
+                var shownAt = 0L
+                var shownItem = -1 to -1
+                exports.state.takeWhile { it != null && it.running }.collect { s ->
+                    if (s == null) return@collect
+                    val now = SystemClock.elapsedRealtime()
+                    val item = s.done to s.total
+                    // the system drops updates that come too fast; a new item is always shown
+                    if (item != shownItem || now - shownAt >= THROTTLE_MS) {
+                        shownItem = item
+                        shownAt = now
+                        nm.notify(ID_RUNNING, progressNotification(s))
+                    }
+                }
                 ServiceCompat.stopForeground(this@ExportService, ServiceCompat.STOP_FOREGROUND_REMOVE)
+                postResult(exports.state.value)
                 stopSelf()
             }
         }
         return START_NOT_STICKY
+    }
+
+    private fun openApp(): PendingIntent {
+        // same as the launcher: brings the running task to front instead of starting a second activity
+        val open = Intent(this, MainActivity::class.java)
+            .setAction(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+        return PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+    }
+
+    private fun progressNotification(s: ExportState?): Notification {
+        val total = maxOf(s?.total ?: 0, 1)
+        val shown = ((s?.done ?: 0) + 1).coerceAtMost(total)
+        val fraction = (((s?.done ?: 0) + (s?.current ?: 0f)) / total).coerceIn(0f, 1f)
+        val cancel = PendingIntent.getService(
+            this, 1, Intent(this, ExportService::class.java).setAction(ACTION_CANCEL),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        return NotificationCompat.Builder(this, CHANNEL)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(if (s == null) getString(R.string.export_running) else getString(R.string.export_notification_progress, shown, total))
+            .setContentIntent(openApp())
+            .addAction(0, getString(R.string.cancel), cancel)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+            .setProgress(1000, (fraction * 1000).toInt(), s == null)
+            .build()
+    }
+
+    /** A dismissible summary that outlives the service; the in-app UI covers the foreground case. */
+    private fun postResult(s: ExportState?) {
+        s ?: return
+        val saved = s.saved.size
+        val failed = s.failures.size
+        // a cancelled queue with nothing saved has nothing to report
+        if (saved == 0 && failed == 0) return
+        if ((application as SpektraApp).inForeground) return
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
+        val nm = NotificationManagerCompat.from(this)
+        if (!nm.areNotificationsEnabled()) return
+        nm.createNotificationChannel(
+            NotificationChannelCompat.Builder(CHANNEL_RESULT, NotificationManagerCompat.IMPORTANCE_DEFAULT)
+                .setName(getString(R.string.export_result_channel)).build()
+        )
+        val b = NotificationCompat.Builder(this, CHANNEL_RESULT)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentIntent(openApp())
+            .setAutoCancel(true)
+        if (failed == 0) b.setContentTitle(getString(R.string.export_saved_count, saved))
+        else b.setContentTitle(getString(R.string.export_failed_items, failed)).setContentText(getString(R.string.export_failed_saved, saved))
+        nm.notify(ID_RESULT, b.build())
     }
 
     override fun onDestroy() {
@@ -251,5 +447,12 @@ class ExportService : Service() {
         super.onDestroy()
     }
 
-    companion object { const val CHANNEL = "export" }
+    companion object {
+        const val CHANNEL = "export"
+        const val CHANNEL_RESULT = "export_result"
+        private const val ID_RUNNING = 7
+        private const val ID_RESULT = 8
+        private const val ACTION_CANCEL = "app.spektralab.export.CANCEL"
+        private const val THROTTLE_MS = 500L
+    }
 }

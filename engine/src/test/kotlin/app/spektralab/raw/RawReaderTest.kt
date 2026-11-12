@@ -55,7 +55,6 @@ class RawReaderTest {
         "DNG/RAW_RICOH_GR3X.DNG" to Expected("DNG", "RICOH IMAGING COMPANY, LTD.", "RICOH GR IIIx", 6112, 4064),
         "DNG/hdrplus_0006_20160722_115157_431_payload_N000.dng" to Expected("DNG", "google", "sailfish", 4048, 3036),
         "DNG/rawnerf_bikes_IMG_3384.dng" to Expected("DNG", "Apple", "iPhone X", 4032, 3024),
-        "DNG/photoprism_canon_eos_6d_lossy_linear.dng" to Expected("DNG", "Canon", "Canon EOS 6D", 1224, 816),
         "NEF/RAW_NIKON_ZFC.NEF" to Expected("NEF", "NIKON CORPORATION", "NIKON Z fc", 5600, 3728),
         "NEF/blauwaldt_goexif_nikon_d7500_DSC_0404.NEF" to Expected("NEF", "NIKON CORPORATION", "NIKON D7500", 5600, 3728),
         "NEF/imagut_001.nef" to Expected("NEF", "NIKON CORPORATION", "NIKON D70s", 3040, 2014),
@@ -65,8 +64,13 @@ class RawReaderTest {
         "RAF/00001_00_10s.RAF" to Expected("RAF", "FUJIFILM", "X-T2", 6160, 4032),
     )
 
-    /** Samples no reader decodes: the Coolpix E5700 (4-colour CMYG CFA) falls back to the system decoder. */
-    private val unsupported = setOf("NEF/jeremytorres_little_endian_no_jpeg.NEF")
+    /**
+     * Samples no reader decodes; the app falls back to the system decoder for them:
+     * - the Coolpix E5700 NEF has a 4-colour CMYG CFA, which the developer does not handle;
+     * - the Canon 6D lossy linear DNG stores LinearRaw as lossy (baseline) JPEG tiles, Compression 34892,
+     *   and the DNG reader has no baseline JPEG decoder (it reads uncompressed, lossless JPEG and deflate only).
+     */
+    private val unsupported = setOf("NEF/jeremytorres_little_endian_no_jpeg.NEF", "DNG/photoprism_canon_eos_6d_lossy_linear.dng")
 
     private fun samples(): File? = System.getenv("SPEKTRA_RAW_SAMPLES")?.let(::File)?.takeIf { it.isDirectory }
 

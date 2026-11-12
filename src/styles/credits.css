@@ -137,12 +137,14 @@
 /* Provenance grid */
 .provenance-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
   gap: 20px;
   margin: 20px 0;
 }
 
 .provenance-box {
+  min-width: 0;
+  max-width: 100%;
   padding: 22px 24px;
   border: 1px solid var(--line-dark);
   background: rgba(20, 18, 15, 0.6);
@@ -162,6 +164,8 @@
 }
 
 .provenance-link {
+  max-width: 100%;
+  overflow-wrap: anywhere;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -333,8 +337,11 @@
   .provenance-grid {
     grid-template-columns: 1fr;
   }
+  .credits-card, .credits-inner { min-width: 0; max-width: 100%; }
   .third-party-table {
     display: block;
+    max-width: 100%;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }

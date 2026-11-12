@@ -18,15 +18,32 @@ internal fun PhotoSourceEffects(
     onPreview: (SourceImage, Pair<Long, String>) -> Unit,
     onFull: (SourceImage, Pair<Long, String>) -> Unit,
     onError: () -> Unit,
+    /** A small rendition that is ready much sooner than the preview (null: none). */
+    quick: (suspend () -> SourceImage?)? = null,
+    /** The preview replacing a quick rendition that is already on screen. */
+    onRefine: (SourceImage, Pair<Long, String>) -> Unit = onPreview,
 ) {
     val currentSource by rememberUpdatedState(source)
     val currentZoomed by rememberUpdatedState(zoomed)
     LaunchedEffect(source) {
         onSource(source)
         launch {
+            // both start at once; the quick rendition is only shown if it beats the preview
+            var settled = false
+            var quickShown = false
+            val first = quick?.let { q ->
+                launch {
+                    val image = q()
+                    if (image != null && !settled && currentSource == source) { quickShown = true; onPreview(image, source) }
+                }
+            }
             val image = load(false)
-            if (currentSource == source) {
-                if (image != null) onPreview(image, source) else onError()
+            settled = true
+            first?.cancel()
+            if (currentSource == source) when {
+                image == null -> if (!quickShown) onError()
+                quickShown -> onRefine(image, source)
+                else -> onPreview(image, source)
             }
         }
         if (worthFull) launch {

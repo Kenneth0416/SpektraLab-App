@@ -70,4 +70,30 @@ class PhotoSourceEffectsTest {
         rule.runOnIdle { assertEquals(1, installedFull); zoomed.value = true }
         rule.runOnIdle { assertEquals(1, fullLoads) }
     }
+
+    @Test fun quickRenditionShowsFirstThenIsRefinedAndIsSkippedWhenLate() {
+        val small = SourceImage(Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888), null)
+        val big = SourceImage(Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888), null)
+        val shown = mutableStateOf(1L to "content://photos/a")
+        val quick = mapOf(1L to CompletableDeferred<SourceImage?>(), 2L to CompletableDeferred())
+        val preview = mapOf(1L to CompletableDeferred<SourceImage?>(), 2L to CompletableDeferred())
+        val events = mutableListOf<String>()
+        rule.setContent {
+            val key = shown.value
+            PhotoSourceEffects(key, zoomed = false, worthFull = false,
+                load = { preview.getValue(key.first).await() },
+                onSource = {}, onPreview = { src, k -> events += "${k.first} preview ${src.width}" },
+                onFull = { _, _ -> }, onError = { events += "error" },
+                quick = { quick.getValue(key.first).await() },
+                onRefine = { src, k -> events += "${k.first} refine ${src.width}" })
+        }
+        // quick first: shown at once, then swapped for the preview without a second "preview"
+        rule.runOnIdle { quick.getValue(1L).complete(small) }
+        rule.runOnIdle { assertEquals(listOf("1 preview 2"), events); preview.getValue(1L).complete(big) }
+        rule.runOnIdle { assertEquals(listOf("1 preview 2", "1 refine 4"), events); events.clear(); shown.value = 2L to "content://photos/b" }
+        // preview first: the late quick rendition never replaces it
+        rule.runOnIdle { preview.getValue(2L).complete(big) }
+        rule.runOnIdle { quick.getValue(2L).complete(small) }
+        rule.runOnIdle { assertEquals(listOf("2 preview 4"), events) }
+    }
 }

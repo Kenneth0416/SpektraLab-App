@@ -200,8 +200,13 @@ fun EditorScreen(state: AppState, id: Long) {
                 runCatching { Media.loadSource(context, Uri.parse(item.uri),
                     if (full) FilmPreviewView.FULL_EDGE else previewDecodeEdge(context),
                     tryRaw = item.isRaw, fast = !full) }.getOrNull()
+            }?.also { src ->
+                // a raw has just been read and developed: keep a small proxy so the next open is immediate
+                if (!full && item.isRaw) state.app.appScope.launch(Dispatchers.IO) { state.app.quick.keep(item, src) }
             }
         },
+        quick = if (state.app.quick.worth(item)) ({ withContext(Dispatchers.IO) { state.app.quick.load(item) } }) else null,
+        onRefine = { src, key -> preview.refinePhoto(src, key) },
         onSource = { playing = false; preview.setSource(it) },
         onPreview = { src, key -> preview.setPhoto(src, item.autoEv, item.id.toInt(), key) },
         onFull = { src, key -> preview.setFullPhoto(src, key) },

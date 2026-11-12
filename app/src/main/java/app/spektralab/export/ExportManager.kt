@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -62,7 +63,7 @@ class ExportManager(private val app: SpektraApp) {
     private val _state = MutableStateFlow<ExportState?>(null)
     val state: StateFlow<ExportState?> = _state
     private var job: Job? = null
-    private val extra = java.util.concurrent.ConcurrentLinkedQueue<LibraryItem>()
+    private val extra = java.util.concurrent.ConcurrentLinkedQueue<Pair<LibraryItem, ExportOptions>>()
     /** Finished share exports waiting for an activity in the foreground to open the chooser. */
     val pendingShare = MutableStateFlow<List<Uri>?>(null)
     @Volatile private var cancel = false
@@ -85,9 +86,11 @@ class ExportManager(private val app: SpektraApp) {
             while (!finished) {
                 while (!cancel) {
                     // shots taken while printing join the batch
-                    val item = queue.removeFirstOrNull() ?: extra.poll() ?: break
-                    _state.value = _state.value?.copy(done = i, current = 0f)
-                    val uri = runCatching { exportOne(item, options) { p -> _state.value = _state.value?.copy(current = p) } }
+                    // each with the options it was queued with, not the batch's
+                    val (item, o) = queue.removeFirstOrNull()?.let { it to options } ?: extra.poll() ?: break
+                    // update {}: enqueue() changes the total from another thread
+                    _state.update { it?.copy(done = i, current = 0f) }
+                    val uri = runCatching { exportOne(item, o) { p -> _state.update { it?.copy(current = p) } } }
                         .onFailure { android.util.Log.e("SpektraExport", "export failed", it) }
                         .getOrNull()
                     if (uri != null) saved += uri else failed++
@@ -110,8 +113,8 @@ class ExportManager(private val app: SpektraApp) {
     /** Print one more item: joins the running batch, or starts one. */
     @Synchronized fun enqueue(item: LibraryItem, options: ExportOptions) {
         if (isRunning()) {
-            extra.add(item)
-            _state.value = _state.value?.let { it.copy(total = it.total + 1) }
+            extra.add(item to options)
+            _state.update { it?.copy(total = it.total + 1) }
         } else start(listOf(item), options, share = false)
     }
 
@@ -128,6 +131,7 @@ class ExportManager(private val app: SpektraApp) {
                 put(MediaStore.Video.Media.DISPLAY_NAME, "SPK_${stamp}_${item.id}_$film.mp4")
                 put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
                 put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/SpektraLab")
+                put(MediaStore.Video.Media.DATE_TAKEN, item.dateTaken)
                 put(MediaStore.Video.Media.IS_PENDING, 1)
             }
             val cr = app.contentResolver

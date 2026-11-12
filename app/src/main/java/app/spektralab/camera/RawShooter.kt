@@ -20,6 +20,7 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.core.content.ContextCompat
 import androidx.exifinterface.media.ExifInterface
+import app.spektralab.data.RawMemoryGate
 import app.spektralab.gl.BurstGl
 import app.spektralab.raw.BurstMerge
 import app.spektralab.raw.DngReader
@@ -126,7 +127,7 @@ class RawShooter(private val context: Context) {
         repeat(frames) { index ->
             try {
                 capture.takePicture(io, object : ImageCapture.OnImageCapturedCallback() {
-                    override fun onCaptureSuccess(image: ImageProxy) = shot.frame(toDng(image, chars, shot.dead), null)
+                    override fun onCaptureSuccess(image: ImageProxy) = shot.capture(image, chars)
                     override fun onError(exception: ImageCaptureException) = shot.frame(null, exception)
                 })
             } catch (e: Exception) {
@@ -172,6 +173,27 @@ class RawShooter(private val context: Context) {
         private var first: Uri? = null
         // touched on the work thread only
         private var planner: BurstMerge.Planner? = null
+        private var memory: java.io.Closeable? = null
+
+        fun capture(image: ImageProxy, chars: CameraCharacteristics) {
+            // Runs on io. Keep this permit through all retained frames and the merge;
+            // thumbnail/import/export decodes wait instead of competing with the burst.
+            try {
+                if (!dead && memory == null) memory = RawMemoryGate.acquire()
+            } catch (e: InterruptedException) {
+                image.close()
+                Thread.currentThread().interrupt()
+                frame(null, ImageCaptureException(ImageCapture.ERROR_UNKNOWN, "RAW memory wait interrupted", e))
+                return
+            }
+            frame(toDng(image, chars, dead), null)
+        }
+
+        private fun processingDone() {
+            memory?.close()
+            memory = null
+            lease.processingDone()
+        }
 
         fun frame(dng: ByteArray?, error: ImageCaptureException?) {
             arrived++
@@ -186,13 +208,13 @@ class RawShooter(private val context: Context) {
                     if (arrived == 1 && error == null) unsupported = true
                     if (arrived == 1 || arrived == frames) {
                         dead = true
-                        lease.processingDone()
+                        processingDone()
                         main.execute { onExposed(false, error == null) }
                     }
                     return
                 }
                 val uri = save("$name.dng") { it.write(dng) }
-                if (uri == null) { dead = true; lease.processingDone(); main.execute { onExposed(false, false) }; return }
+                if (uri == null) { dead = true; processingDone(); main.execute { onExposed(false, false) }; return }
                 first = uri
                 main.execute { onSaved(uri, evBias) }
                 if (frames > 1) {
@@ -215,7 +237,7 @@ class RawShooter(private val context: Context) {
                 main.execute { onExposed(true, false) }
                 val uri = first!!
                 if (frames > 1) work.execute { finish(uri) } else {
-                    lease.processingDone()
+                    processingDone()
                     main.execute { onFinished(uri, null, 1f) }
                 }
             }
@@ -244,7 +266,7 @@ class RawShooter(private val context: Context) {
             } finally {
                 planner = null
                 if (merging.decrementAndGet() == 0) onProgress(null)
-                lease.processingDone()
+                processingDone()
             }
             main.execute { onFinished(first, merged, used) }
         }

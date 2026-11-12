@@ -1,6 +1,8 @@
 package app.spektralab.export
 
 import app.spektralab.data.LibraryItem
+import app.spektralab.data.LookJson
+import app.spektralab.engine.Look
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.FileNotFoundException
@@ -10,6 +12,27 @@ data class ExportJob(val item: LibraryItem, val options: ExportOptions, val shar
 
 /** A job that did not print, with a short reason for the user. */
 data class ExportFailure(val job: ExportJob, val reason: String)
+
+/**
+ * What a print was made from: "<look>.<rest>", both short hashes. The look part alone tells
+ * the library whether the print is out of date; the whole string decides if a re-export can be skipped.
+ */
+object PrintSignature {
+    private fun hash(text: String): String =
+        java.security.MessageDigest.getInstance("SHA-256").digest(text.toByteArray()).take(6)
+            .joinToString("") { "%02x".format(it) }
+
+    fun lookPart(look: Look) = hash(LookJson.toJson(look).toString())
+
+    /** The source, the look and the options that change the output file (size, format, EXIF date). */
+    fun of(item: LibraryItem, o: ExportOptions): String {
+        val opts = if (item.isVideo) "v${o.videoLongEdge}" else "p${o.photoFormat.name}${o.photoLongEdge}"
+        return lookPart(item.look) + "." + hash("${item.uri}|${item.autoEv}|${item.dateTaken}|$opts")
+    }
+
+    /** Printed, but with a look that is no longer the item's. */
+    fun isStale(item: LibraryItem) = item.printSig?.substringBefore('.') != lookPart(item.look)
+}
 
 /** Pure parts of the export queue: the file it survives process death in, and failure reasons. */
 object ExportQueue {

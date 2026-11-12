@@ -24,6 +24,10 @@ data class LibraryItem(
     val autoEv: Float,
     val look: Look,
     val name: String,
+    /** The album file this item was last printed to (only ever a file this app made), null if never. */
+    val printUri: String? = null,
+    /** What that print was made from, see PrintSignature. */
+    val printSig: String? = null,
 )
 
 data class Recipe(val name: String, val look: Look, val builtin: Boolean = false)
@@ -52,6 +56,31 @@ object LookJson {
             // older libraries stored the film edge as a boolean
             border = o.optString("border", if (o.optBoolean("edge", false)) "edge" else d.border),
             dateStamp = o.optBoolean("date", d.dateStamp),
+        )
+    }
+}
+
+/** One library item as JSON; fields added later are optional so old files still load. */
+object ItemJson {
+    fun toJson(it2: LibraryItem) = JSONObject().apply {
+        put("id", it2.id); put("uri", it2.uri); put("video", it2.isVideo); put("raw", it2.isRaw)
+        put("w", it2.width); put("h", it2.height); put("dur", it2.durationMs); put("rot", it2.rotation)
+        put("date", it2.dateTaken); put("autoEv", it2.autoEv.toDouble()); put("name", it2.name)
+        put("look", LookJson.toJson(it2.look))
+        if (it2.printUri != null && it2.printSig != null) { put("print", it2.printUri); put("printSig", it2.printSig) }
+    }
+
+    fun fromJson(o: JSONObject): LibraryItem {
+        val print = o.optString("print").ifEmpty { null }
+        val sig = o.optString("printSig").ifEmpty { null }
+        return LibraryItem(
+            id = o.getLong("id"), uri = o.getString("uri"), isVideo = o.optBoolean("video"),
+            isRaw = o.optBoolean("raw"), width = o.optInt("w"), height = o.optInt("h"),
+            durationMs = o.optLong("dur"), rotation = o.optInt("rot"), dateTaken = o.optLong("date"),
+            autoEv = o.optDouble("autoEv", 0.0).toFloat(), look = LookJson.fromJson(o.optJSONObject("look")),
+            name = o.optString("name"),
+            // a print without its signature can't be compared, so it is not trusted
+            printUri = if (sig != null) print else null, printSig = if (print != null) sig else null,
         )
     }
 }
@@ -99,6 +128,17 @@ class Library(context: Context) {
         save()
     }
 
+    /**
+     * Record the print of an item. Returns the previously recorded print so the caller can delete it,
+     * or null if there was none or the item is gone (nothing is recorded then).
+     */
+    @Synchronized fun setPrint(id: Long, uri: String, signature: String): String? {
+        val old = _items.value.firstOrNull { it.id == id } ?: return null
+        _items.value = _items.value.map { if (it.id == id) it.copy(printUri = uri, printSig = signature) else it }
+        save()
+        return old.printUri?.takeIf { it != uri }
+    }
+
     @Synchronized fun addRecipe(r: Recipe) {
         _recipes.value = listOf(r) + _recipes.value
         save()
@@ -125,14 +165,7 @@ class Library(context: Context) {
             val arr = root.optJSONArray("items") ?: JSONArray()
             idCounter = root.optLong("nextId", 0L)
             _items.value = (0 until arr.length()).map { i ->
-                val o = arr.getJSONObject(i)
-                LibraryItem(
-                    id = o.getLong("id"), uri = o.getString("uri"), isVideo = o.optBoolean("video"),
-                    isRaw = o.optBoolean("raw"), width = o.optInt("w"), height = o.optInt("h"),
-                    durationMs = o.optLong("dur"), rotation = o.optInt("rot"), dateTaken = o.optLong("date"),
-                    autoEv = o.optDouble("autoEv", 0.0).toFloat(), look = LookJson.fromJson(o.optJSONObject("look")),
-                    name = o.optString("name"),
-                )
+                ItemJson.fromJson(arr.getJSONObject(i))
             }
             val rs = root.optJSONArray("recipes") ?: JSONArray()
             _recipes.value = (0 until rs.length()).map { i ->
@@ -156,12 +189,7 @@ class Library(context: Context) {
         root.put("nextId", idCounter)
         root.put("items", JSONArray().apply {
             _items.value.forEach { it2 ->
-                put(JSONObject().apply {
-                    put("id", it2.id); put("uri", it2.uri); put("video", it2.isVideo); put("raw", it2.isRaw)
-                    put("w", it2.width); put("h", it2.height); put("dur", it2.durationMs); put("rot", it2.rotation)
-                    put("date", it2.dateTaken); put("autoEv", it2.autoEv.toDouble()); put("name", it2.name)
-                    put("look", LookJson.toJson(it2.look))
-                })
+                put(ItemJson.toJson(it2))
             }
         })
         root.put("recipes", JSONArray().apply {

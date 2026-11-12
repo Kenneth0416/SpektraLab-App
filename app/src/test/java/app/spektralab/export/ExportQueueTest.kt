@@ -28,6 +28,26 @@ class ExportQueueTest {
         assertEquals(listOf(ExportQueue.Stored(3, f.job.options, false, ExportQueue.STORAGE)), saved.failed)
     }
 
+    @Test fun printSurvivesJsonAndOldFilesStillLoad() {
+        val plain = item(1)
+        val printed = plain.copy(printUri = "content://media/external/images/media/9", printSig = PrintSignature.of(plain, ExportOptions()))
+        val back = app.spektralab.data.ItemJson.fromJson(org.json.JSONObject(app.spektralab.data.ItemJson.toJson(printed).toString()))
+        assertEquals(printed, back)
+        val old = app.spektralab.data.ItemJson.toJson(plain)
+        assertFalse(old.has("print"))
+        assertEquals(null, app.spektralab.data.ItemJson.fromJson(old).printUri)
+    }
+
+    @Test fun signatureTracksLookAndOptions() {
+        val a = item(1)
+        val sig = PrintSignature.of(a, ExportOptions())
+        assertEquals(sig, PrintSignature.of(a, ExportOptions(videoLongEdge = 3840)))
+        assertFalse(sig == PrintSignature.of(a, ExportOptions(photoFormat = PhotoFormat.PNG)))
+        val edited = a.copy(look = a.look.copy(grain = 2.0), printSig = sig)
+        assertTrue(PrintSignature.isStale(edited))
+        assertFalse(PrintSignature.isStale(a.copy(printSig = sig)))
+    }
+
     @Test fun restoreDropsItemsNoLongerInTheLibrary() {
         val text = ExportQueue.encode(listOf(ExportJob(item(1), ExportOptions()), ExportJob(item(2), ExportOptions())),
             listOf(ExportFailure(ExportJob(item(3), ExportOptions()), ExportQueue.SOURCE), ExportFailure(ExportJob(item(4), ExportOptions()), ExportQueue.MEMORY)))

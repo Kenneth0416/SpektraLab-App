@@ -177,8 +177,11 @@ class ExportManager(private val app: SpektraApp) {
             val gen = generation
             _state.update { it?.copy(done = done, current = 0f) }
             // never at the same time as a burst merge (memory)
+            val sig = PrintSignature.of(job.item, job.options)
             val result = runCatching {
-                HeavyWork.run { exportOne(job.item, job.options, { generation != gen }) { p -> _state.update { it?.copy(current = p) } } }
+                existingPrint(job.item.id, sig)
+                    ?: HeavyWork.run { exportOne(job.item, job.options, { generation != gen }) { p -> _state.update { it?.copy(current = p) } } }
+                        ?.also { recordPrint(job.item.id, it, sig) }
             }
             result.exceptionOrNull()?.let { android.util.Log.e("SpektraExport", "export failed", it) }
             val uri = result.getOrNull()
@@ -195,6 +198,25 @@ class ExportManager(private val app: SpektraApp) {
                 persist()
             }
         }
+    }
+
+    /** The recorded print of the item if it was made from exactly [sig] and is still in the album. */
+    private suspend fun existingPrint(id: Long, sig: String): Uri? {
+        val item = app.library.item(id) ?: return null
+        if (item.printSig != sig) return null
+        val uri = Uri.parse(item.printUri ?: return null)
+        val exists = withContext(Dispatchers.IO) {
+            runCatching { app.contentResolver.query(uri, arrayOf(MediaStore.MediaColumns._ID), null, null, null)?.use { it.moveToFirst() } == true }
+                .getOrDefault(false)
+        }
+        return uri.takeIf { exists }
+    }
+
+    /** Record the new print on the item as it is now, then drop the one it replaces (the new one is already saved). */
+    private suspend fun recordPrint(id: Long, uri: Uri, sig: String) {
+        val old = app.library.setPrint(id, uri.toString(), sig) ?: return
+        // failures are fine: on Android 11+ only files this app created can be deleted, which is all we recorded
+        withContext(Dispatchers.IO) { runCatching { app.contentResolver.delete(Uri.parse(old), null, null) } }
     }
 
     /** Stop after the current item and drop the rest of the queue. */

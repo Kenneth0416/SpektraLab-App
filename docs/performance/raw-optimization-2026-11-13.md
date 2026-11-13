@@ -100,3 +100,18 @@ JAVA_HOME=/opt/homebrew/opt/openjdk@17 python3 tools/raw-performance/run.py raw 
 ```
 
 接著核對每個 pass/edge 的 checksum、尺寸和 stage timing，更新此表格及收益。冷／暖啟動、P50/P95、實際相機並行負載、峰值記憶體與完整 UI／MediaStore 時間，仍需要正常 App 路徑的實機測試；目前沒有用單元測試耗時代替這些數據。
+
+## 後續：串流 DNG 與有界平行沖洗
+
+另以獨立 commit 移植 `d14bf75`／`c5db71d` 的串流及 band 演算法，保留本分支的 allocator、gain-table 預算、hardened format readers 與 main 的相機格式策略，沒有整份覆蓋舊版 Media／RawDeveloper。
+
+- Seekable Bayer／linear DNG strips 從 descriptor 分段讀取，保留 AssetFileDescriptor 的 offset／length。非 seekable provider、tiles、lossless JPEG、X-Trans 及其他 maker formats 保留受檔案大小／heap headroom 限制的 whole-file fallback。
+- 開啟 metadata 時仍檢查 sensor sample 數、segment 數與 strip 範圍。串流 deflate strip 的壓縮資料及解壓 scratch 各限制在 4 MiB；超過時只能走既有有上限的 fallback。裁切只用到 strip 的前幾列時，也驗證完整 bounded strip 的 trailer。
+- Bayer／linear 沖洗與 chroma passes 使用固定兩個 worker，source band 約 64 列，Malvar 另取兩列 halo。保留原浮點運算及加總順序；既有 gain-table preparation 不重複實作。X-Trans 沿用既有 band 演算法並加入取消檢查。
+- `workingBytes(RawImage, ...)` 計入 gain tables、每個 worker 的解碼 scratch、sample bands 與 Malvar halos。`longEdgeWithin` 使用 image-aware 候選估算，無法容納非空結果時明確失敗。輸出仍可由 caller 的 mapped-buffer allocator 提供；不改 tiled export 的配置路徑。
+- 取消發生時不再退回 system decoder；平行工作先全部結束才關閉 descriptor 或釋放 HeavyWork。等待 HeavyWork 的 editor load 也能取消，不另設平行 RAW admission gate。
+- 保留現行 linear `fast` 的解析度語意，沒有移植舊分支強制至少 2×2 binning 的策略。小 heap 測試明確要求 2032 edge；不把較小輸出混充同尺寸加速。
+
+驗證包含 legacy／whole／streamed 的逐 bit 比較、各 strip layout、late metadata、毀損／超大 strips、mapped allocator、provider slices、worker drain、取消與有限 heap subprocess。12 MP synthetic merged DNG 的 2032-edge preview 使用 48 MiB Java heap／32 MiB direct cap；完整輸出使用 96 MiB Java heap／104 MiB direct cap。這些是桌面 JVM 的分開上限，並非 Android 裝置整體記憶體或速度保證。私人影像、產生的 DNG／APK 與測試紀錄不納入提交。
+
+串流整合後的完整驗證：`:engine:test :engine:jar :app:testDebugUnitTest :app:assembleDebug` 通過，Engine 201 通過／23 略過，App 105 通過，零失敗。既有 benchmark Java API 編譯及 Python 語法檢查也通過。相機正常運作路徑的真機 timing／記憶體仍待量測，不宣稱量測到裝置加速。

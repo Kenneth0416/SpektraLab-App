@@ -71,7 +71,8 @@ internal object XTrans {
     }
 
     // ------------------------------------------------------------------ binning
-    fun binned(img: RawImage, k: Int, p: RawDeveloper.Prep, allocate: (Int) -> java.nio.ByteBuffer): LinearImage {
+    fun binned(img: RawImage, k: Int, p: RawDeveloper.Prep, allocate: (Int) -> java.nio.ByteBuffer,
+               cancelled: (() -> Boolean)? = null): LinearImage {
         val n = Norm(img)
         val cell = baseCell(img) * k
         val w = img.cropWidth / cell
@@ -80,6 +81,7 @@ internal object XTrans {
         val ph = img.cfa.height
         val sum = FloatArray(3); val cnt = IntArray(3); val rgb = FloatArray(3)
         for (v in 0 until h) for (u in 0 until w) {
+            if (u == 0 && cancelled?.invoke() == true) throw java.util.concurrent.CancellationException("development cancelled")
             sum.fill(0f); cnt.fill(0)
             for (dy in 0 until cell) {
                 val cy = v * cell + dy
@@ -118,7 +120,8 @@ internal object XTrans {
         val rgb = FloatArray(3)
     }
 
-    fun full(img: RawImage, p: RawDeveloper.Prep, allocate: (Int) -> java.nio.ByteBuffer): LinearImage {
+    fun full(img: RawImage, p: RawDeveloper.Prep, allocate: (Int) -> java.nio.ByteBuffer,
+             cancelled: (() -> Boolean)? = null): LinearImage {
         val n = Norm(img)
         val w = img.cropWidth
         val h = img.cropHeight
@@ -126,6 +129,7 @@ internal object XTrans {
         val buf = Buffers(w)
         var y0 = 0
         while (y0 < h) {
+            if (cancelled?.invoke() == true) throw java.util.concurrent.CancellationException("development cancelled")
             val y1 = min(y0 + BAND, h)
             band(img, p, n, out, buf, y0, y1)
             y0 = y1

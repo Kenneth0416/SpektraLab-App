@@ -113,7 +113,7 @@ class GainMap(
  * map, demosaic, then `srgb = camToSrgb * (r, g, b)`. Build [wb] and [camToSrgb] with
  * [RawColor]; a neutral surface whose green raw value reaches [white] then develops to 1.0.
  */
-class RawImage(
+class RawImage @JvmOverloads constructor(
     /** Full stored raw frame size, including any masked / optical-black borders. */
     val rawWidth: Int,
     val rawHeight: Int,
@@ -143,9 +143,15 @@ class RawImage(
     /** Interleaved camera RGB, three samples per pixel; CFA unused. */
     val linear: Boolean = false,
     val tags: Map<Int, DngTag> = emptyMap(),
+    /**
+     * Streamed pixels: when set, [data] is empty and the samples are decoded on demand
+     * through these rows ([DngReader.open], for [RawDeveloper] only). Format readers
+     * registered with [RawReader] leave it null and fill [data].
+     */
+    val rows: RawRows? = null,
 ) {
     init {
-        require(rawWidth > 0 && rawHeight > 0 && data.size.toLong() >= rawWidth.toLong() * rawHeight * (if (linear) 3 else 1)) { "raw size ${rawWidth}x$rawHeight vs ${data.size} samples" }
+        require(rawWidth > 0 && rawHeight > 0 && (rows != null || data.size.toLong() >= rawWidth.toLong() * rawHeight * (if (linear) 3 else 1))) { "raw size ${rawWidth}x$rawHeight vs ${data.size} samples" }
         require(black.size == cfa.size) { "black has ${black.size} values for a ${cfa.size}-position CFA" }
         require(cropX >= 0 && cropY >= 0 && cropWidth > 0 && cropHeight > 0 &&
             cropX + cropWidth <= rawWidth && cropY + cropHeight <= rawHeight) { "crop $cropX,$cropY ${cropWidth}x$cropHeight outside ${rawWidth}x$rawHeight" }

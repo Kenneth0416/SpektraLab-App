@@ -29,8 +29,16 @@ object HeavyWork {
      * developed image handed back to the caller. The mutex is not reentrant: a thread
      * that already holds it must not lock again. Never call on the main thread.
      */
-    internal fun lockBlocking() {
-        kotlinx.coroutines.runBlocking { mutex.lock() }
+    internal fun lockBlocking(cancelled: (() -> Boolean)? = null) {
+        if (cancelled == null) {
+            kotlinx.coroutines.runBlocking { mutex.lock() }
+            return
+        }
+        while (true) {
+            if (cancelled()) throw java.util.concurrent.CancellationException("RAW admission cancelled")
+            if (mutex.tryLock()) return
+            Thread.sleep(25)
+        }
     }
 
     internal fun unlock() {

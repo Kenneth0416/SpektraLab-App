@@ -20,6 +20,10 @@ import app.spektralab.raw.RawDeveloper
 import app.spektralab.raw.RawImage
 import app.spektralab.raw.RawLoader
 import app.spektralab.raw.RawReader
+import app.spektralab.raw.ByteArraySource
+import app.spektralab.raw.ChannelSource
+import app.spektralab.raw.DevelopedRaw
+import java.util.concurrent.CancellationException
 import java.io.File
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
@@ -149,50 +153,59 @@ object Media {
      *   and binned if its development would still allocate more Java heap than this, in bytes
      */
     fun loadSource(context: Context, uri: Uri, maxLongEdge: Int, tryRaw: Boolean, fast: Boolean = true,
-                   rawHeapBudget: Long = 0, heavyWorkHeld: Boolean = false): SourceImage {
+                   rawHeapBudget: Long = 0, heavyWorkHeld: Boolean = false,
+                   cancelled: (() -> Boolean)? = null): SourceImage {
+        if (cancelled?.invoke() == true) throw CancellationException("RAW load cancelled")
         if (tryRaw) {
             // Parsing expands the full sensor even for a small rendition. The permit covers
             // that work only: the returned image does not keep it, so a preview can stay open
             // while an export or a sharper decode waits its turn. Cancellation still runs finally.
-            RawMemoryGate.acquire(alreadyHeld = heavyWorkHeld).use {
-                val source = runCatching {
-                    readRaw(context, uri)?.let { raw ->
-                        val linear = if (rawHeapBudget <= 0) RawDeveloper.develop(raw, maxLongEdge, fast)
-                            else RawDeveloper.develop(raw, RawDeveloper.longEdgeWithin(raw, maxLongEdge, fast, rawHeapBudget, outputOnHeap = false),
-                                fast, allocate = { mappedBuffer(context, it) })
-                        SourceImage(null, linear, raw.uprightWidth, raw.uprightHeight)
+            RawMemoryGate.acquire(alreadyHeld = heavyWorkHeld, cancelled = cancelled).use {
+                val source = try {
+                    developRaw(context, uri, maxLongEdge, fast, rawHeapBudget, cancelled)?.let { raw ->
+                        SourceImage(null, raw.image, raw.fullWidth, raw.fullHeight)
                     }
-                }.getOrNull()
+                } catch (e: CancellationException) { throw e }
+                  catch (e: Exception) { null }
+                  catch (e: OutOfMemoryError) { null }
                 if (source != null) return source
             }
         }
+        if (cancelled?.invoke() == true) throw CancellationException("RAW load cancelled")
         return SourceImage(decodeImage(context, uri, maxLongEdge), null)
     }
 
-    /**
-     * Parse a supported raw file. [AssetFileDescriptor] preserves a provider slice;
-     * openFileDescriptor would instead report the whole file. Bytes are dropped once parsing returns.
-     */
-    private fun readRaw(context: Context, uri: Uri): RawImage? {
+    /** Develop within a provider's declared slice; keep its descriptor open until all bands drain. */
+    private fun developRaw(context: Context, uri: Uri, edge: Int, fast: Boolean, budget: Long,
+                           cancelled: (() -> Boolean)?): DevelopedRaw? {
         val descriptor = context.contentResolver.openAssetFileDescriptor(uri, "r") ?: return null
-        val bytes = descriptor.use {
-            val cap = RawLoader.acceptableFileBytes()
-            val length = it.declaredLength
-            if (length > cap) return null
-            if (length < 0) readAtMost(it.createInputStream(), cap) ?: return null
-            else readDeclaredBytes(it.createInputStream(), it.startOffset, length)
+        return descriptor.use { afd ->
+            val length = afd.declaredLength
+            if (length > RawLoader.MAX_WHOLE_FILE) return null
+            afd.createInputStream().use { input ->
+                val channel = input.channel
+                val seekableSize = runCatching { channel.size() }.getOrNull()?.takeIf { it > 0 }
+                val source = if (seekableSize != null) {
+                    ChannelSource(channel, afd.startOffset, if (length >= 0) length else seekableSize - afd.startOffset)
+                } else {
+                    val cap = RawLoader.acceptableFileBytes()
+                    if (length > cap) return null
+                    ByteArraySource(readAtMost(input, cap, cancelled) ?: return null)
+                }
+                RawLoader.load(source, edge, fast, cancelled = cancelled, rawHeapBudget = budget,
+                    allocate = { if (budget > 0) mappedBuffer(context, it) else ByteBuffer.allocateDirect(it) })
+            }
         }
-        if (bytes.size.toLong() > RawLoader.acceptableFileBytes()) return null
-        return RawReader.read(bytes)?.takeIf { RawDeveloper.supports(it) }
     }
 
     /** The whole stream, or null when it is longer than [limit] bytes. Does not grow past the cap. */
-    private fun readAtMost(input: java.io.InputStream, limit: Long): ByteArray? {
+    private fun readAtMost(input: java.io.InputStream, limit: Long, cancelled: (() -> Boolean)? = null): ByteArray? {
         if (limit < 0) return null
         val out = java.io.ByteArrayOutputStream()
         val buf = ByteArray(1 shl 16)
         var total = 0L
         while (true) {
+            if (cancelled?.invoke() == true) throw CancellationException("RAW read cancelled")
             val n = input.read(buf)
             if (n < 0) break
             if (n == 0) continue

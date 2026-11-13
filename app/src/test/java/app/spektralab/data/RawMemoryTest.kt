@@ -201,6 +201,70 @@ class RawMemoryTest {
         backing.delete()
     }
 
+    @Test fun cancelledAdmissionDoesNotWaitForOrReleaseTheBurstPermit() {
+        val burst = RawMemoryGate.acquire()
+        val pool = Executors.newSingleThreadExecutor()
+        val checked = CountDownLatch(1)
+        val stop = java.util.concurrent.atomic.AtomicBoolean()
+        try {
+            val pending = pool.submit(Callable {
+                Media.loadSource(RuntimeEnvironment.getApplication(), Uri.parse("content://never-open/frame"),
+                    512, true, cancelled = { checked.countDown(); stop.get() })
+            })
+            assertTrue(checked.await(2, TimeUnit.SECONDS))
+            stop.set(true)
+            try { pending.get(2, TimeUnit.SECONDS); fail("cancelled admission completed") }
+            catch (e: java.util.concurrent.ExecutionException) { assertTrue(e.cause is CancellationException) }
+            val next = pool.submit(Callable { HeavyWork.blocking { 7 } })
+            try { next.get(100, TimeUnit.MILLISECONDS); fail("cancellation released someone else's permit") }
+            catch (_: TimeoutException) { }
+            burst.close()
+            assertEquals(7, next.get(2, TimeUnit.SECONDS))
+        } finally { burst.close(); pool.shutdownNow() }
+    }
+
+    @Test fun mediaDevelopsOnlyTheDeclaredProviderSliceWithMappedOutput() {
+        val context = RuntimeEnvironment.getApplication()
+        val cfa = app.spektralab.raw.CfaPattern(2, 2, intArrayOf(0, 1, 1, 2))
+        val matrix = floatArrayOf(1f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 1f)
+        val reference = app.spektralab.raw.RawImage(8, 6, ShortArray(48), cfa, FloatArray(4), 65535f,
+            0, 0, 8, 6, floatArrayOf(1f, 1f, 1f), matrix, orientation = 6,
+            tags = mapOf(50721 to app.spektralab.raw.DngTag(10, DoubleArray(9) { matrix[it].toDouble() }),
+                50728 to app.spektralab.raw.DngTag(5, doubleArrayOf(1.0, 1.0, 1.0))))
+        val out = java.io.ByteArrayOutputStream()
+        app.spektralab.raw.DngWriter.writeLinear(out, 8, 6, ShortArray(8 * 6 * 3) { 16384 }, reference, emptyList(), null)
+        val payload = out.toByteArray()
+        val backing = File.createTempFile("streamed-slice", ".bin", context.cacheDir)
+        backing.writeBytes(ByteArray(123) { 55 } + payload + ByteArray(87) { 66 })
+        val opens = AtomicInteger()
+        val provider = object : ContentProvider() {
+            override fun onCreate() = true
+            override fun getType(uri: Uri) = "image/x-adobe-dng"
+            override fun query(uri: Uri, projection: Array<out String>?, selection: String?, selectionArgs: Array<out String>?, sortOrder: String?): Cursor? = null
+            override fun insert(uri: Uri, values: ContentValues?) = null
+            override fun update(uri: Uri, values: ContentValues?, selection: String?, selectionArgs: Array<out String>?) = 0
+            override fun delete(uri: Uri, selection: String?, selectionArgs: Array<out String>?) = 0
+            override fun openAssetFile(uri: Uri, mode: String): android.content.res.AssetFileDescriptor {
+                opens.incrementAndGet()
+                return android.content.res.AssetFileDescriptor(
+                    ParcelFileDescriptor.open(backing, ParcelFileDescriptor.MODE_READ_ONLY), 123, payload.size.toLong())
+            }
+            override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor = error("must preserve asset slice")
+        }
+        provider.attachInfo(context, android.content.pm.ProviderInfo().apply { authority = "streamed-slice"; exported = true })
+        ShadowContentResolver.registerProviderInternal("streamed-slice", provider)
+        try {
+            val expected = app.spektralab.raw.RawDeveloper.develop(app.spektralab.raw.DngReader.read(payload)!!, 512, true)
+            Media.loadSource(context, Uri.parse("content://streamed-slice/frame"), 512, true,
+                rawHeapBudget = 1L shl 20).use { actual ->
+                assertEquals(6, actual.originalWidth); assertEquals(8, actual.originalHeight)
+                assertTrue(actual.linear != null)
+                assertEquals(expected.red(0, 0), actual.linear!!.red(0, 0), 0f)
+            }
+            assertEquals(1, opens.get())
+        } finally { backing.delete() }
+    }
+
     @Test fun heavyWorkAndRawGateNeverOverlap() {
         val inside = AtomicInteger()
         val overlapped = java.util.concurrent.atomic.AtomicBoolean(false)

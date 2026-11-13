@@ -15,9 +15,10 @@ import java.util.concurrent.atomic.AtomicBoolean
  * holds [HeavyWork] passes [alreadyHeld], or locking again deadlocks.
  */
 internal object RawMemoryGate {
-    fun acquire(alreadyHeld: Boolean = false): Closeable {
+    fun acquire(alreadyHeld: Boolean = false, cancelled: (() -> Boolean)? = null): Closeable {
+        if (cancelled?.invoke() == true) throw java.util.concurrent.CancellationException("RAW admission cancelled")
         if (alreadyHeld) return Closeable { }
-        HeavyWork.lockBlocking()
+        HeavyWork.lockBlocking(cancelled)
         val closed = AtomicBoolean()
         return Closeable { if (closed.compareAndSet(false, true)) HeavyWork.unlock() }
     }

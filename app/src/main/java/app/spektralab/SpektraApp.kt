@@ -12,6 +12,7 @@ import app.spektralab.data.Library
 import app.spektralab.data.LibraryItem
 import app.spektralab.data.LookJson
 import app.spektralab.data.Media
+import app.spektralab.data.QuickSources
 import app.spektralab.data.SourceImage
 import app.spektralab.engine.EngineData
 import app.spektralab.engine.Look
@@ -108,7 +109,7 @@ class Thumbnails(private val app: SpektraApp) {
     private val mutex = Mutex()
 
     private fun key(item: LibraryItem) =
-        "${item.id}_${Integer.toHexString(item.uri.hashCode())}_${Integer.toHexString(LookJson.toJson(item.look).toString().hashCode())}"
+        "${QuickSources.sourceKey(item)}_${Integer.toHexString(LookJson.toJson(item.look).toString().hashCode())}"
 
     /** Drop memory and disk thumbnails of removed items. */
     fun forget(ids: Collection<Long>) {
@@ -139,7 +140,8 @@ class Thumbnails(private val app: SpektraApp) {
             val uri = Uri.parse(item.uri)
             runCatching {
                 if (item.isVideo) Media.videoFrame(app, uri, minOf(item.durationMs * 500, 1_000_000L), 640)?.let { SourceImage(it, null) }
-                else Media.loadSource(app, uri, 640, tryRaw = item.isRaw)
+                else (if (item.isRaw) app.quick.load(item) else null)
+                    ?: Media.loadSource(app, uri, 640, tryRaw = item.isRaw).also { if (item.isRaw) app.quick.keep(item, it) }
             }.getOrNull()
         } ?: return null
         src.use { loaded ->

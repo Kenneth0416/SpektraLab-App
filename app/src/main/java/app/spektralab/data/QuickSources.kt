@@ -16,8 +16,8 @@ import java.nio.channels.FileChannel
  * preview-resolution original is still decoding.
  *
  *  - ordinary photos: a subsampled decode, which is many times quicker than the preview decode;
- *  - raw: a developed proxy kept on disk. Opening a raw means reading and unpacking the
- *    whole file, so the first open cannot be shortened, but every later one can.
+ *  - raw: a developed proxy saved during capture/import, or on the first editor open.
+ *    A proxy never needs to wait for the full-sensor RAW memory permit.
  *
  * The last few are also kept in memory, for going back and forth between frames.
  */
@@ -27,7 +27,7 @@ class QuickSources(private val context: Context) {
     }
     private val dir = File(context.cacheDir, "quick").apply { mkdirs() }
 
-    private fun key(item: LibraryItem) = "${item.id}_${Integer.toHexString(item.uri.hashCode())}"
+    private fun key(item: LibraryItem) = sourceKey(item)
     private fun proxy(item: LibraryItem) = File(dir, "${key(item)}.lin")
 
     /** Is a quick rendition worth showing first, or is the preview decode already quick? */
@@ -36,12 +36,18 @@ class QuickSources(private val context: Context) {
     /** Blocking; call off the main thread. Null when there is none (a raw not opened before). */
     @Synchronized fun load(item: LibraryItem): SourceImage? {
         val k = key(item)
-        mem.get(k)?.let { return it }
+        mem.get(k)?.let { return view(it, item) }
         val src = runCatching {
             if (item.isRaw) readProxy(proxy(item)) else SourceImage(Media.decodeImage(context, Uri.parse(item.uri), EDGE), null)
         }.getOrNull() ?: return null
         mem.put(k, src)
-        return src
+        return view(src, item)
+    }
+
+    /** Shared immutable pixels, independent NIO cursor for every GL/upload consumer. */
+    private fun view(src: SourceImage, item: LibraryItem): SourceImage {
+        val linear = src.linear?.let { LinearImage(it.width, it.height, it.halfRgba.duplicate().order(it.halfRgba.order()).apply { clear() }) }
+        return SourceImage(src.bitmap, linear, item.width, item.height)
     }
 
     /**
@@ -60,16 +66,16 @@ class QuickSources(private val context: Context) {
             val tmp = File(dir, f.name + ".tmp")
             RandomAccessFile(tmp, "rw").use { out ->
                 out.writeInt(MAGIC); out.writeInt(small.width); out.writeInt(small.height)
-                small.halfRgba.position(0)
-                out.channel.write(small.halfRgba)
-                small.halfRgba.position(0)
+                val pixels = small.halfRgba.duplicate().order(small.halfRgba.order())
+                pixels.clear()
+                while (pixels.hasRemaining()) out.channel.write(pixels)
             }
             if (!tmp.renameTo(f)) tmp.delete()
         }
     }
 
     /** Drop the renditions of removed items. */
-    fun forget(ids: Collection<Long>) {
+    @Synchronized fun forget(ids: Collection<Long>) {
         val prefixes = ids.map { "${it}_" }
         mem.snapshot().keys.filter { k -> prefixes.any { k.startsWith(it) } }.forEach { mem.remove(it) }
         dir.listFiles()?.filter { f -> prefixes.any { f.name.startsWith(it) } }?.forEach { it.delete() }
@@ -93,6 +99,18 @@ class QuickSources(private val context: Context) {
     companion object {
         /** Long edge of a quick rendition, px: enough to judge the picture for a moment. */
         const val EDGE = 800
+
+        // Keys are also requested during UI composition; hash each URI only once
+        // while it is among the recent sources, without an unbounded global map.
+        private val uriHashes = LruCache<String, String>(256)
+
+        /** Distinct immutable URIs must not collide (String.hashCode is only 32 bits). */
+        internal fun sourceKey(item: LibraryItem): String {
+            val hash = uriHashes.get(item.uri) ?: java.security.MessageDigest.getInstance("SHA-256")
+                .digest(item.uri.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+                .also { uriHashes.put(item.uri, it) }
+            return "${item.id}_$hash"
+        }
         private const val MAGIC = 0x53504B51 // "SPKQ"
         private const val HEADER = 12L
 

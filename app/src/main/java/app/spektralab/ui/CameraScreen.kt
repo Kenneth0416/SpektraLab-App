@@ -680,7 +680,7 @@ fun CameraScreen(state: AppState) {
             .semantics { contentDescription = previousDescription }
             .springClick(0.9f) { last?.let { state.openEdit(it.id) } ?: state.say(R.string.no_photos_taken) }) {
             if (last != null) {
-                val thumb by produceState(state.app.thumbs.cached(last), last.id, last.look) { value = state.app.thumbs.get(last) }
+                val thumb by produceState(state.app.thumbs.cached(last), last.id, last.uri, last.look) { value = state.app.thumbs.get(last) }
                 Crossfade(thumb, label = "last") { t ->
                     if (t != null) Image(t.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 }

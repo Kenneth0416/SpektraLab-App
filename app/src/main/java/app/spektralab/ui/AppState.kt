@@ -10,6 +10,7 @@ import app.spektralab.SpektraApp
 import app.spektralab.camera.RawShooter
 import app.spektralab.data.LibraryItem
 import app.spektralab.data.Media
+import app.spektralab.data.RawPreview
 import app.spektralab.data.LookJson
 import app.spektralab.data.Recipe
 import app.spektralab.data.localizedName
@@ -99,7 +100,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
     fun onCaptured(uri: Uri, evBias: Float = 0f) {
         val look = camLook.value
         viewModelScope.launch {
-            val item = withContext(Dispatchers.IO) { Media.importItem(app, uri, library.reserveIds(1)) }
+            val item = withContext(Dispatchers.IO) { Media.importItem(app, uri, library.reserveIds(1), quick = app.quick) }
                 // the exposure compensation dialled in at the viewfinder is part of the metered exposure
                 ?.let { it.copy(look = look, autoEv = it.autoEv + evBias) }
                 ?: return@launch say(R.string.captured_unreadable)
@@ -122,8 +123,8 @@ class AppState(application: Application) : AndroidViewModel(application) {
     /** Raw capture into memory (single frames and bursts); lives as long as the app's UI state. */
     val shooter = RawShooter(application).also { sh ->
         sh.onProgress = { merging.value = it }
-        sh.onSaved = { uri, evBias -> onShotSaved(uri, evBias) }
-        sh.onFinished = { first, merged, used -> onShotFinished(first, merged, used) }
+        sh.onSaved = { uri, evBias, preview -> onShotSaved(uri, evBias, preview) }
+        sh.onFinished = { first, merged, used, preview -> onShotFinished(first, merged, used, preview) }
     }
     override fun onCleared() {
         shooter.close()
@@ -134,10 +135,12 @@ class AppState(application: Application) : AndroidViewModel(application) {
     private val shots = HashMap<Uri, kotlinx.coroutines.Deferred<LibraryItem?>>()
 
     /** The first frame of a shot is in the album: it goes on the lightbox right away. */
-    private fun onShotSaved(uri: Uri, evBias: Float) {
+    private fun onShotSaved(uri: Uri, evBias: Float, preview: RawPreview?) {
         val look = camLook.value
         shots[uri] = viewModelScope.async {
-            val item = withContext(Dispatchers.IO) { Media.importItem(app, uri, library.reserveIds(1)) }
+            val item = withContext(Dispatchers.IO) {
+                Media.importItem(app, uri, library.reserveIds(1), quick = app.quick, captured = preview)
+            }
                 ?.let { it.copy(look = look, autoEv = it.autoEv + evBias) }
             if (item == null) say(R.string.captured_unreadable) else library.add(listOf(item))
             item
@@ -145,7 +148,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
     }
 
     /** The shot is complete: swap in the merged original if there is one, then print it. */
-    private fun onShotFinished(first: Uri, merged: Uri?, framesUsed: Float) {
+    private fun onShotFinished(first: Uri, merged: Uri?, framesUsed: Float, preview: RawPreview?) {
         val pending = shots.remove(first)
         viewModelScope.launch {
             val id = pending?.await()?.id
@@ -153,7 +156,15 @@ class AppState(application: Application) : AndroidViewModel(application) {
                 // The lightbox uses the merged source. Keep the first frame in MediaStore:
                 // queued exports and in-flight decodes may still own its immutable URI.
                 if (id != null && library.item(id) != null) {
-                    library.setSource(id, merged.toString(), withContext(Dispatchers.IO) { Media.name(app, merged) })
+                    val item = library.item(id)!!
+                    val name = withContext(Dispatchers.IO) {
+                        val name = Media.name(app, merged)
+                        // Populate the NEW URI before publishing it to observers; never
+                        // relabel the first-frame proxy as the merged source.
+                        preview?.source()?.use { app.quick.keep(item.copy(uri = merged.toString(), name = name), it) }
+                        name
+                    }
+                    library.setSource(id, merged.toString(), name)
                     say(R.string.burst_merged, framesUsed)
                 }
             }
@@ -311,7 +322,7 @@ class AppState(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val items = withContext(Dispatchers.IO) {
                 val first = library.reserveIds(uris.size)
-                uris.mapIndexedNotNull { i, u -> Media.importItem(app, u, first + i) }
+                uris.mapIndexedNotNull { i, u -> Media.importItem(app, u, first + i, quick = app.quick) }
             }
             importing.value = false
             if (items.isEmpty()) return@launch say(R.string.no_importable_media)

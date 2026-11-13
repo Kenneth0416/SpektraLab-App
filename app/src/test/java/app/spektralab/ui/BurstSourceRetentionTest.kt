@@ -53,7 +53,7 @@ class BurstSourceRetentionTest {
         val store = ViewModelStore().apply { put("state", state) }
         try {
             // A queued export owns `first` even if its lightbox entry has since disappeared.
-            rule.runOnIdle { state.shooter.onFinished(first, merged, 3f) }
+            rule.runOnIdle { state.shooter.onFinished(first, merged, 3f, null) }
             rule.waitUntil { state.viewModelScope.coroutineContext[Job]!!.children.none { it.isActive } }
             assertTrue(original.exists())
             assertEquals("original raw bytes", app.contentResolver.openInputStream(first)!!.bufferedReader().use { it.readText() })

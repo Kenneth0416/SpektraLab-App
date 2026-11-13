@@ -319,14 +319,15 @@ object Media {
         }.getOrNull() ?: (uri.lastPathSegment ?: "")
 
     /** Inspect a picked uri and build a library item (blocking; call off the main thread). */
-    fun importItem(context: Context, uri: Uri, id: Long): LibraryItem? {
+    fun importItem(context: Context, uri: Uri, id: Long, quick: QuickSources? = null,
+                   captured: RawPreview? = null): LibraryItem? {
         val cr = context.contentResolver
         runCatching { cr.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
         val type = cr.getType(uri) ?: ""
         val name = displayName(cr, uri)
         val ext = name.substringAfterLast('.', "").lowercase()
         val isVideo = type.startsWith("video/")
-        val isRaw = ext in RAW_EXT || isRawMime(type) || (isOpaqueMime(type) && sniffRaw(cr, uri))
+        val isRaw = captured != null || ext in RAW_EXT || isRawMime(type) || (isOpaqueMime(type) && sniffRaw(cr, uri))
         return try {
             if (isVideo) {
                 val r = MediaMetadataRetriever()
@@ -343,7 +344,9 @@ object Media {
                 LibraryItem(id, uri.toString(), true, false, if (swap) eh else ew, if (swap) ew else eh, dur, rot,
                     date ?: System.currentTimeMillis(), frame?.let { autoExposure(it) } ?: 0f, Look.DEFAULT, name)
             } else {
-                val src = loadSource(context, uri, 512, tryRaw = isRaw)
+                // A captured preview owns no RAW arrays/permit. Do not reacquire the
+                // memory gate here: the rest of its burst may still be holding it.
+                val src = captured?.source() ?: loadSource(context, uri, 512, tryRaw = isRaw)
                 src.use { loaded ->
                 if (loaded.linear != null) {
                     // developed from sensor data: size and exposure come from the raw frame
@@ -355,7 +358,8 @@ object Media {
                         }
                     }
                     return LibraryItem(id, uri.toString(), false, true, loaded.originalWidth, loaded.originalHeight, 0, 0,
-                        date ?: System.currentTimeMillis(), autoExposure(loaded.linear), Look.DEFAULT, name)
+                        date ?: System.currentTimeMillis(), captured?.autoEv ?: autoExposure(loaded.linear), Look.DEFAULT, name)
+                        .also { quick?.keep(it, loaded) }
                 }
                 val bmp = loaded.bitmap!!
                 var date: Long? = null

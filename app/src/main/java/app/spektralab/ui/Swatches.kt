@@ -63,6 +63,7 @@ import app.spektralab.SpektraApp
 import app.spektralab.data.LibraryItem
 import app.spektralab.data.Media
 import app.spektralab.data.SourceImage
+import app.spektralab.data.QuickSources
 import app.spektralab.engine.Catalog
 import app.spektralab.engine.Look
 import app.spektralab.engine.LookSetup
@@ -84,7 +85,7 @@ class Swatches(private val app: SpektraApp) {
     private var source: SourceImage? = null
     private var sourceEv = 0f
 
-    private fun sourceKey(item: LibraryItem?) = item?.let { "${it.id}_${Integer.toHexString(it.uri.hashCode())}" } ?: "scene"
+    private fun sourceKey(item: LibraryItem?) = item?.let { QuickSources.sourceKey(it) } ?: "scene"
     private fun key(item: LibraryItem?, look: Look) = "${sourceKey(item)}|${look.film}|${look.paper}"
 
     fun cached(item: LibraryItem?, look: Look): Bitmap? = mem.get(key(item, look))
@@ -112,7 +113,8 @@ class Swatches(private val app: SpektraApp) {
             else runCatching {
                 val uri = Uri.parse(item.uri)
                 if (item.isVideo) Media.videoFrame(app, uri, minOf(item.durationMs * 500, 1_000_000L), 2 * EDGE)?.let { SourceImage(it, null) }
-                else Media.loadSource(app, uri, 2 * EDGE, tryRaw = item.isRaw)
+                else (if (item.isRaw) app.quick.load(item) else null)
+                    ?: Media.loadSource(app, uri, 2 * EDGE, tryRaw = item.isRaw)
             }.getOrNull()
         } ?: return null
         sourceEv = item?.autoEv ?: withContext(Dispatchers.Default) { Media.autoExposure(src.bitmap!!) }

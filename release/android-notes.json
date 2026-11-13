@@ -1,5 +1,5 @@
 {
-  "en": "Added automatic update checks and a manual Check for updates button in Settings. Update reminders can be postponed while you keep using the app.",
-  "zh-Hans": "新增自动检查更新，以及设置中的手动检查入口。发现新版后可前往下载，也可稍后提醒，继续使用应用。",
-  "zh-Hant": "新增自動檢查更新，以及設定中的手動檢查入口。發現新版後可前往下載，也可稍後提醒，繼續使用應用程式。"
+  "en": "Added automatic update checks and a manual check in Settings. The website download and update feed now share one verified APK. RAW capture reuses bounded previews; supported DNG files develop in cancellable row bands with bounded memory. Includes memory-budget fixes while preserving JPEG, single RAW, RAW burst, ultrawide switching and the folding viewfinder.",
+  "zh-Hans": "新增自动检查更新及设置中的手动检查入口，网站下载与更新通知同步使用同一份已验证 APK。RAW 拍摄复用小尺寸预览，支持的 DNG 按行分段解码，可取消并限制内存占用。修复内存预算，同时保留 JPEG、单张 RAW、RAW 连拍、超广角切换和折叠屏取景器。",
+  "zh-Hant": "新增自動檢查更新及設定中的手動檢查入口，網站下載與更新通知同步使用同一份已驗證 APK。RAW 拍攝重用小尺寸預覽，支援的 DNG 按行分段解碼，可取消並限制記憶體用量。修正記憶體預算，同時保留 JPEG、單張 RAW、RAW 連拍、超廣角切換和摺疊螢幕取景器。"
 }

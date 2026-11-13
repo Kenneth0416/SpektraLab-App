@@ -41,7 +41,7 @@
 
 先合并全部应用修改，再执行最终构建。每次应用更新都必须同时更新网站 APK：
 
-1. 在 `release/android.properties` 中将 `versionCode` 提高到所有已分发原生版本之上，并更新 `versionName`。当前草案为 `2 / 0.1.1`；整合完成后的发布建议使用 `3 / 0.1.2`，避免与已生成的 version 2 实验包冲突。之后继续单调递增。
+1. 在 `release/android.properties` 中将 `versionCode` 提高到所有已分发原生版本之上，并更新 `versionName`。此次整合版本为 `3 / 0.1.2`，高于先前的 version 2 实验包；之后继续单调递增。
 2. 更新 `release/android-notes.json` 的 `en`、`zh-Hans`、`zh-Hant` 三份说明，包含这次整合的全部用户可见变化。
 3. 使用原来的签名密钥，在最终合并的源码上运行：
 

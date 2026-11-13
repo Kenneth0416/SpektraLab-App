@@ -106,7 +106,7 @@ export function DownloadPage() {
             <p>{m.ticketDescription}</p>
             <div className="ticket-stats">
               <div><span>{m.stats[0]}</span><strong>{apk?.size ?? '—'}</strong></div>
-              <div><span>{m.stats[1]}</span><strong>Android {apk?.minAndroid ?? '8.0+'}</strong></div>
+              <div><span>{m.stats[1]}</span><strong>Android {apk?.minAndroid ?? '10+'}</strong></div>
               <div><span>{m.stats[2]}</span><strong>.APK</strong></div>
             </div>
             {choice.href ? (

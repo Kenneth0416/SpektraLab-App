@@ -3,6 +3,11 @@ package app.spektralab.raw
 import app.spektralab.engine.Half
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.concurrent.CancellationException
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
@@ -38,15 +43,24 @@ object RawDeveloper {
      * @param allocate buffer for the result (8 bytes per pixel), e.g. off the Java heap for large images
      * @throws IllegalArgumentException when [supports] is false for [img].
      */
+    @JvmOverloads
     fun develop(img: DngImage, maxLongEdge: Int, fast: Boolean = false, options: Options = Options(),
-                allocate: (Int) -> ByteBuffer = ByteBuffer::allocateDirect): LinearImage {
+                allocate: (Int) -> ByteBuffer = ByteBuffer::allocateDirect): LinearImage =
+        developCancellable(img, maxLongEdge, fast, options, allocate, null)
+
+    /** Cancellation-aware entry used by RawLoader; keep develop's trailing allocator API intact. */
+    internal fun developCancellable(img: DngImage, maxLongEdge: Int, fast: Boolean, options: Options,
+                                   allocate: (Int) -> ByteBuffer, cancelled: (() -> Boolean)?): LinearImage {
         require(supports(img)) { "Only Bayer, X-Trans and linear RGB frames can be developed" }
+        val job = Job(cancelled)
+        job.check()
         val long = maxOf(img.cropWidth, img.cropHeight)
         if (img.linear) {
             // already demosaiced (merged burst): only reduce the size when asked for less
             val k = maxOf(1, long / maxOf(maxLongEdge, 1))
-            val out = linear(img, k, options, allocate)
-            if (options.chromaDenoise) ChromaDenoise.apply(out, img, samplesPerChannel = (k * k).toFloat())
+            val out = linear(img, k, options, job, allocate)
+            if (options.chromaDenoise) ChromaDenoise.apply(out, img, samplesPerChannel = (k * k).toFloat(), cancelled = cancelled)
+            job.check()
             return out
         }
         if (!img.cfa.isBayer) {
@@ -54,14 +68,16 @@ object RawDeveloper {
             val binX = fast || long / cell >= maxLongEdge
             val kx = if (binX) maxOf(1, long / cell / maxOf(maxLongEdge, 1)) else 0
             val p = Prep(img, options)
-            val out = if (binX) XTrans.binned(img, kx, p, allocate) else XTrans.full(img, p, allocate)
-            if (options.chromaDenoise) ChromaDenoise.apply(out, img, samplesPerChannel = if (binX) (kx * kx * cell * cell) * 2f / 9f else 1f)
+            val out = if (binX) XTrans.binned(img, kx, p, allocate, cancelled) else XTrans.full(img, p, allocate, cancelled)
+            if (options.chromaDenoise) ChromaDenoise.apply(out, img, samplesPerChannel = if (binX) (kx * kx * cell * cell) * 2f / 9f else 1f, cancelled = cancelled)
+            job.check()
             return out
         }
         val bin = fast || long / 2 >= maxLongEdge
         val k = if (bin) maxOf(1, long / 2 / maxOf(maxLongEdge, 1)) else 0
-        val out = if (bin) binned(img, k, options, allocate) else malvar(img, options, allocate)
-        if (options.chromaDenoise) ChromaDenoise.apply(out, img, samplesPerChannel = if (bin) (k * k).toFloat() else 1f)
+        val out = if (bin) binned(img, k, options, job, allocate) else malvar(img, options, job, allocate)
+        if (options.chromaDenoise) ChromaDenoise.apply(out, img, samplesPerChannel = if (bin) (k * k).toFloat() else 1f, cancelled = cancelled)
+        job.check()
         return out
     }
 
@@ -84,7 +100,22 @@ object RawDeveloper {
             val band = if (binned) 0L else (64 + 12).toLong() * img.cropWidth * 16
             return px * (6 + if (outputOnHeap) 8 else 0) + band + preparedGainBytes(img)
         }
-        return workingBytes(img.cropWidth, img.cropHeight, img.linear, maxLongEdge, fast, outputOnHeap) + preparedGainBytes(img)
+        return workingBytes(img.cropWidth, img.cropHeight, img.linear, maxLongEdge, fast, outputOnHeap) +
+            preparedGainBytes(img) + bandWorkingBytes(img, maxLongEdge, fast)
+    }
+
+    /** Includes retained per-worker decoder buffers and Malvar halos, independent of output storage. */
+    internal fun bandWorkingBytes(img: RawImage, edge: Int, fast: Boolean): Long {
+        val long = maxOf(img.cropWidth, img.cropHeight)
+        val malvar = !img.linear && img.cfa.isBayer && !fast && long / 2 < edge
+        val cell = if (img.linear) maxOf(1, long / maxOf(edge, 1))
+            else if (malvar) 1 else 2 * maxOf(1, long / 2 / maxOf(edge, 1))
+        val rows = minOf(img.rawHeight, maxOf(BAND_ROWS, cell) + if (malvar) 4 else 0)
+        val decode = img.rows?.let {
+            rows.toLong() * img.rawWidth * (if (img.linear) 6 else 2) + it.scratchBytes(rows) + 256L
+        } ?: 0L
+        val plane = if (malvar) rows.toLong() * img.cropWidth * 4 + 64L else 0L
+        return WORKERS * (decode + plane)
     }
 
     fun workingBytes(cropWidth: Int, cropHeight: Int, linear: Boolean, maxLongEdge: Int, fast: Boolean, outputOnHeap: Boolean): Long {
@@ -104,22 +135,17 @@ object RawDeveloper {
      * [maxLongEdge] if it fits, else the largest binned size that does.
      */
     fun longEdgeWithin(img: RawImage, maxLongEdge: Int, fast: Boolean, budget: Long, outputOnHeap: Boolean): Int {
-        require(workingBytes(img, 1, fast, outputOnHeap) <= budget) {
-            "RAW development budget is too small even for the minimum rendition"
-        }
-        if (img.linear || img.cfa.isBayer) {
-            return longEdgeWithin(img.cropWidth, img.cropHeight, img.linear, maxLongEdge, fast,
-                budget - preparedGainBytes(img), outputOnHeap)
-        }
         if (workingBytes(img, maxLongEdge, fast, outputOnHeap) <= budget) return maxLongEdge
         val long = maxOf(img.cropWidth, img.cropHeight)
-        val base = XTrans.baseCell(img).coerceAtLeast(1)
-        for (k in 1..16) {
-            val edge = long / base / k
-            if (edge < 1) break
+        val base = if (img.linear) 1 else if (img.cfa.isBayer) 2 else XTrans.baseCell(img).coerceAtLeast(1)
+        // Streamed scratch grows again when one output row spans many sensor rows.
+        // Test actual candidates instead of subtracting a constant from a pixel-only budget.
+        for (k in 1..(minOf(img.cropWidth, img.cropHeight) / base)) {
+            val cell = base * k
+            val edge = (long + cell - 1) / cell
             if (edge < maxLongEdge && workingBytes(img, edge, fast, outputOnHeap) <= budget) return edge
         }
-        return 1
+        throw IllegalArgumentException("RAW development budget cannot hold a nonempty rendition")
     }
 
     fun longEdgeWithin(cropWidth: Int, cropHeight: Int, linear: Boolean, maxLongEdge: Int, fast: Boolean, budget: Long, outputOnHeap: Boolean): Int {
@@ -154,6 +180,66 @@ object RawDeveloper {
         return minOf(count, GAIN_TABLE_BUDGET / perMap) * perMap
     }
 
+    internal const val WORKERS = 2
+    private const val BAND_ROWS = 64
+    private val workers = Executors.newFixedThreadPool(WORKERS) { r ->
+        Thread(r, "raw-development").apply { isDaemon = true }
+    }
+
+    private class Job(val cancelled: (() -> Boolean)?) {
+        fun check() { if (cancelled?.invoke() == true) throw CancellationException("development cancelled") }
+    }
+
+    /** Bounded worker count and source rows; always drain workers before returning/closing the source. */
+    internal fun bands(count: Int, rowsPerOut: Int, segment: Int, cancelled: (() -> Boolean)?, body: (Int, Int) -> Unit) {
+        if (count <= 0) return
+        // A large compressed strip must not expand the band's decoded sample buffer.
+        val target = if (segment in 2..BAND_ROWS && segment % rowsPerOut == 0)
+            segment * (BAND_ROWS / segment) else BAND_ROWS
+        val per = maxOf(1, target / rowsPerOut)
+        val n = (count + per - 1) / per
+        val job = Job(cancelled)
+        job.check()
+        if (n == 1) { body(0, count); job.check(); return }
+        val next = AtomicInteger()
+        val failure = AtomicReference<Throwable?>()
+        val done = CountDownLatch(WORKERS)
+        repeat(WORKERS) {
+            workers.execute {
+                try {
+                    while (failure.get() == null) {
+                        job.check()
+                        val b = next.getAndIncrement()
+                        if (b >= n) break
+                        body(b * per, minOf(count, (b + 1) * per))
+                    }
+                } catch (t: Throwable) { failure.compareAndSet(null, t) }
+                finally { done.countDown() }
+            }
+        }
+        var interrupted = false
+        while (true) {
+            try { done.await(); break }
+            catch (e: InterruptedException) {
+                interrupted = true
+                failure.compareAndSet(null, CancellationException("development interrupted"))
+            }
+        }
+        if (interrupted) Thread.currentThread().interrupt()
+        failure.get()?.let { throw it }
+        job.check()
+    }
+
+    internal class Band(val data: ShortArray, val firstRow: Int)
+    private inline fun <R> withBand(img: RawImage, y0: Int, y1: Int, pool: Pool<ShortArray>, body: (Band) -> R): R {
+        val rows = img.rows ?: return body(Band(img.data, 0))
+        return pool.use((y1 - y0) * img.rawWidth * (if (img.linear) 3 else 1)) { dst ->
+            rows.read(y0, y1, dst)
+            body(Band(dst, y0))
+        }
+    }
+    private fun segment(img: RawImage) = img.rows?.segmentRows ?: BAND_ROWS
+
     // ------------------------------------------------------------------ shared
     internal class Prep(val img: DngImage, val options: Options) {
         val cfa = IntArray(4) { img.cfa.color(img.cropY + it / 2, img.cropX + it % 2) }
@@ -179,10 +265,13 @@ object RawDeveloper {
         val hasGain = maps.any { it.isNotEmpty() }
 
         /** Normalised, white-balanced sample at crop coordinates; saturates at wb[colour]. */
-        fun sample(cx: Int, cy: Int): Float {
+        private val fullBand = Band(img.data, 0)
+        fun sample(cx: Int, cy: Int): Float = sample(fullBand, cx, cy)
+
+        fun sample(b: Band, cx: Int, cy: Int): Float {
             val x = img.cropX + cx; val y = img.cropY + cy
             val pos = (cy and 1) * 2 + (cx and 1)
-            val raw = (img.data[y * img.rawWidth + x].toInt() and 0xffff).toFloat()
+            val raw = (b.data[(y - b.firstRow) * img.rawWidth + x].toInt() and 0xffff).toFloat()
             return ((raw - black[pos]) * scale[pos]).coerceIn(0f, 1f) * wb[cfa[pos]]
         }
 
@@ -267,93 +356,106 @@ object RawDeveloper {
     }
 
     // ------------------------------------------------------------------ demosaiced input
-    private fun linear(img: DngImage, k: Int, options: Options, allocate: (Int) -> ByteBuffer): LinearImage {
+    private fun linear(img: DngImage, k: Int, options: Options, job: Job, allocate: (Int) -> ByteBuffer): LinearImage {
         val p = Prep(img, options)
         val w = img.cropWidth / k
         val h = img.cropHeight / k
         val out = Writer(img, w, h, allocate)
-        val rgb = FloatArray(3)
         val scale = 1f / (img.white - img.black[0]).coerceAtLeast(1f)
         val inv = 1f / (k * k)
-        for (v in 0 until h) for (u in 0 until w) {
-            rgb.fill(0f)
-            for (dy in 0 until k) for (dx in 0 until k) {
-                val i = ((img.cropY + v * k + dy) * img.rawWidth + img.cropX + u * k + dx) * 3
-                for (c in 0..2) rgb[c] += ((img.data[i + c].toInt() and 0xffff) - img.black[0]) * scale
+        val pool = Pool.shorts()
+        bands(h, k, segment(img), job.cancelled) { v0, v1 -> withBand(img, img.cropY + v0 * k, img.cropY + v1 * k, pool) { b ->
+            val rgb = FloatArray(3)
+            for (v in v0 until v1) for (u in 0 until w) {
+                rgb.fill(0f)
+                for (dy in 0 until k) for (dx in 0 until k) {
+                    val i = ((img.cropY + v * k + dy - b.firstRow) * img.rawWidth + img.cropX + u * k + dx) * 3
+                    for (c in 0..2) rgb[c] += ((b.data[i + c].toInt() and 0xffff) - img.black[0]) * scale
+                }
+                for (c in 0..2) rgb[c] = (rgb[c] * inv).coerceIn(0f, 1f) * img.wb[c]
+                p.reconstruct(rgb)
+                if (p.hasGain) for (c in 0..2) rgb[c] *= p.gain(c, u * k + k / 2, v * k + k / 2)
+                out.put(u, v, rgb[0], rgb[1], rgb[2])
             }
-            for (c in 0..2) rgb[c] = (rgb[c] * inv).coerceIn(0f, 1f) * img.wb[c]
-            p.reconstruct(rgb)
-            if (p.hasGain) for (c in 0..2) rgb[c] *= p.gain(c, u * k + k / 2, v * k + k / 2)
-            out.put(u, v, rgb[0], rgb[1], rgb[2])
-        }
+        } }
         return out.image()
     }
 
     // ------------------------------------------------------------------ binning
-    private fun binned(img: DngImage, k: Int, options: Options, allocate: (Int) -> ByteBuffer): LinearImage {
+    private fun binned(img: DngImage, k: Int, options: Options, job: Job, allocate: (Int) -> ByteBuffer): LinearImage {
         val p = Prep(img, options)
         val cell = 2 * k
         val w = img.cropWidth / cell
         val h = img.cropHeight / cell
         val out = Writer(img, w, h, allocate)
-        val sum = FloatArray(3)
-        val cnt = IntArray(3)
-        val rgb = FloatArray(3)
-        for (v in 0 until h) for (u in 0 until w) {
-            sum.fill(0f); cnt.fill(0)
-            for (dy in 0 until cell) for (dx in 0 until cell) {
-                val cx = u * cell + dx; val cy = v * cell + dy
-                val c = p.cfa[(cy and 1) * 2 + (cx and 1)]
-                sum[c] += p.sample(cx, cy); cnt[c]++
+        val pool = Pool.shorts()
+        bands(h, cell, segment(img), job.cancelled) { v0, v1 -> withBand(img, img.cropY + v0 * cell, img.cropY + v1 * cell, pool) { b ->
+            val sum = FloatArray(3); val cnt = IntArray(3); val rgb = FloatArray(3)
+            for (v in v0 until v1) for (u in 0 until w) {
+                sum.fill(0f); cnt.fill(0)
+                for (dy in 0 until cell) for (dx in 0 until cell) {
+                    val cx = u * cell + dx; val cy = v * cell + dy
+                    val c = p.cfa[(cy and 1) * 2 + (cx and 1)]
+                    sum[c] += p.sample(b, cx, cy); cnt[c]++
+                }
+                for (c in 0..2) rgb[c] = sum[c] / maxOf(cnt[c], 1)
+                p.reconstruct(rgb)
+                if (p.hasGain) {
+                    val cx = u * cell + k; val cy = v * cell + k
+                    for (c in 0..2) rgb[c] *= p.gain(c, cx, cy)
+                }
+                out.put(u, v, rgb[0], rgb[1], rgb[2])
             }
-            for (c in 0..2) rgb[c] = sum[c] / maxOf(cnt[c], 1)
-            p.reconstruct(rgb)
-            if (p.hasGain) {
-                val cx = u * cell + k; val cy = v * cell + k
-                for (c in 0..2) rgb[c] *= p.gain(c, cx, cy)
-            }
-            out.put(u, v, rgb[0], rgb[1], rgb[2])
-        }
+        } }
         return out.image()
     }
 
     // ------------------------------------------------------------------ Malvar-He-Cutler
-    private fun malvar(img: DngImage, options: Options, allocate: (Int) -> ByteBuffer): LinearImage {
+    private fun malvar(img: DngImage, options: Options, job: Job, allocate: (Int) -> ByteBuffer): LinearImage {
         val p = Prep(img, options)
         val w = img.cropWidth
         val h = img.cropHeight
-        val plane = FloatArray(w * h)
-        for (y in 0 until h) for (x in 0 until w) plane[y * w + x] = p.sample(x, y)
         val out = Writer(img, w, h, allocate)
         // reflect by whole CFA periods so the colour phase is kept at the borders
         fun rx(x: Int) = if (x < 0) -x else if (x >= w) 2 * (w - 1) - x else x
         fun ry(y: Int) = if (y < 0) -y else if (y >= h) 2 * (h - 1) - y else y
-        fun at(x: Int, y: Int) = plane[ry(y) * w + rx(x)]
-        val rgb = FloatArray(3)
-        for (y in 0 until h) for (x in 0 until w) {
-            val c = at(x, y)
-            val n = at(x, y - 1); val s = at(x, y + 1); val e = at(x + 1, y); val wv = at(x - 1, y)
-            val nn = at(x, y - 2); val ss = at(x, y + 2); val ee = at(x + 2, y); val ww = at(x - 2, y)
-            val diag = at(x - 1, y - 1) + at(x + 1, y - 1) + at(x - 1, y + 1) + at(x + 1, y + 1)
-            val color = p.cfa[(y and 1) * 2 + (x and 1)]
-            val r: Float; val g: Float; val b: Float
-            if (color == 1) {
-                // green site: which colour sits left/right of it?
-                val horiz = p.cfa[(y and 1) * 2 + ((x + 1) and 1)]
-                val h1 = (5 * c + 4 * (e + wv) - diag - (ee + ww) + 0.5f * (nn + ss)) / 8f
-                val v1 = (5 * c + 4 * (n + s) - diag - (nn + ss) + 0.5f * (ee + ww)) / 8f
-                g = c
-                if (horiz == 0) { r = h1; b = v1 } else { r = v1; b = h1 }
-            } else {
-                g = (4 * c + 2 * (n + s + e + wv) - (nn + ss + ee + ww)) / 8f
-                val other = (6 * c + 2 * diag - 1.5f * (nn + ss + ee + ww)) / 8f
-                if (color == 0) { r = c; b = other } else { b = c; r = other }
+        val pool = Pool.shorts()
+        val planes = Pool.floats()
+        bands(h, 1, segment(img), job.cancelled) { y0, y1 ->
+            // the band's normalised samples with the 2-row neighbourhood the filters reach
+            val p0 = maxOf(0, y0 - 2); val p1 = minOf(h, y1 + 2)
+            val plane = planes.take((p1 - p0) * w)
+            withBand(img, img.cropY + p0, img.cropY + p1, pool) { b ->
+                for (y in p0 until p1) for (x in 0 until w) plane[(y - p0) * w + x] = p.sample(b, x, y)
             }
-            // the gradient-corrected filters can overshoot past a channel's clip level
-            rgb[0] = r.coerceIn(0f, img.wb[0]); rgb[1] = g.coerceIn(0f, img.wb[1]); rgb[2] = b.coerceIn(0f, img.wb[2])
-            p.reconstruct(rgb)
-            if (p.hasGain) for (ch in 0..2) rgb[ch] *= p.gain(ch, x, y)
-            out.put(x, y, rgb[0], rgb[1], rgb[2])
+            fun at(x: Int, y: Int) = plane[(ry(y) - p0) * w + rx(x)]
+            val rgb = FloatArray(3)
+            for (y in y0 until y1) for (x in 0 until w) {
+                val c = at(x, y)
+                val n = at(x, y - 1); val s = at(x, y + 1); val e = at(x + 1, y); val wv = at(x - 1, y)
+                val nn = at(x, y - 2); val ss = at(x, y + 2); val ee = at(x + 2, y); val ww = at(x - 2, y)
+                val diag = at(x - 1, y - 1) + at(x + 1, y - 1) + at(x - 1, y + 1) + at(x + 1, y + 1)
+                val color = p.cfa[(y and 1) * 2 + (x and 1)]
+                val r: Float; val g: Float; val bl: Float
+                if (color == 1) {
+                    // green site: which colour sits left/right of it?
+                    val horiz = p.cfa[(y and 1) * 2 + ((x + 1) and 1)]
+                    val h1 = (5 * c + 4 * (e + wv) - diag - (ee + ww) + 0.5f * (nn + ss)) / 8f
+                    val v1 = (5 * c + 4 * (n + s) - diag - (nn + ss) + 0.5f * (ee + ww)) / 8f
+                    g = c
+                    if (horiz == 0) { r = h1; bl = v1 } else { r = v1; bl = h1 }
+                } else {
+                    g = (4 * c + 2 * (n + s + e + wv) - (nn + ss + ee + ww)) / 8f
+                    val other = (6 * c + 2 * diag - 1.5f * (nn + ss + ee + ww)) / 8f
+                    if (color == 0) { r = c; bl = other } else { bl = c; r = other }
+                }
+                // the gradient-corrected filters can overshoot past a channel's clip level
+                rgb[0] = r.coerceIn(0f, img.wb[0]); rgb[1] = g.coerceIn(0f, img.wb[1]); rgb[2] = bl.coerceIn(0f, img.wb[2])
+                p.reconstruct(rgb)
+                if (p.hasGain) for (ch in 0..2) rgb[ch] *= p.gain(ch, x, y)
+                out.put(x, y, rgb[0], rgb[1], rgb[2])
+            }
+            planes.give(plane)
         }
         return out.image()
     }
@@ -368,7 +470,8 @@ object RawDeveloper {
  * real colour edges and fine coloured detail stay. Luminance is not touched.
  */
 object ChromaDenoise {
-    fun apply(img: LinearImage, dng: DngImage, samplesPerChannel: Float) {
+    @JvmOverloads
+    fun apply(img: LinearImage, dng: DngImage, samplesPerChannel: Float, cancelled: (() -> Boolean)? = null) {
         val scale = dng.noiseScale ?: return
         val w = img.width; val h = img.height
         if (w < 32 || h < 32) return
@@ -379,59 +482,76 @@ object ChromaDenoise {
         amp /= 3f
         val varScale = amp * scale / samplesPerChannel
         val varOffset = amp * dng.noiseOffset / samplesPerChannel
+        fun rows(n: Int, body: (Int) -> Unit) = RawDeveloper.bands(n, 1, 1, cancelled) { a, b -> for (r in a until b) body(r) }
 
         // half-resolution planes: luminance and two chroma differences
         val qw = (w + 1) / 2; val qh = (h + 1) / 2
         val y2 = FloatArray(qw * qh); val cr2 = FloatArray(qw * qh); val cb2 = FloatArray(qw * qh)
-        val cnt = IntArray(qw * qh)
         val b = img.halfRgba
-        for (py in 0 until h) for (px in 0 until w) {
-            val i = (py * w + px) * 8
-            val r = Half.toFloat(b.getShort(i)); val g = Half.toFloat(b.getShort(i + 2)); val bl = Half.toFloat(b.getShort(i + 4))
-            val lum = 0.2126f * r + 0.7152f * g + 0.0722f * bl
-            val q = (py / 2) * qw + px / 2
-            y2[q] += lum; cr2[q] += r - lum; cb2[q] += bl - lum; cnt[q]++
+        rows(qh) { qy ->
+            for (py in 2 * qy until minOf(h, 2 * qy + 2)) for (px in 0 until w) {
+                val i = (py * w + px) * 8
+                val r = Half.toFloat(b.getShort(i)); val g = Half.toFloat(b.getShort(i + 2)); val bl = Half.toFloat(b.getShort(i + 4))
+                val lum = 0.2126f * r + 0.7152f * g + 0.0722f * bl
+                val q = qy * qw + px / 2
+                y2[q] += lum; cr2[q] += r - lum; cb2[q] += bl - lum
+            }
+            val ny = minOf(h, 2 * qy + 2) - 2 * qy
+            for (qx in 0 until qw) {
+                val n = ny * (minOf(w, 2 * qx + 2) - 2 * qx)
+                val q = qy * qw + qx
+                y2[q] /= n; cr2[q] /= n; cb2[q] /= n
+            }
         }
-        for (q in y2.indices) { val n = max(cnt[q], 1); y2[q] /= n; cr2[q] /= n; cb2[q] /= n }
 
         // 1/8 resolution for the widest blotches
         val sw = (qw + 3) / 4; val sh = (qh + 3) / 4
         val y8 = FloatArray(sw * sh); val cr8 = FloatArray(sw * sh); val cb8 = FloatArray(sw * sh)
-        val cnt8 = IntArray(sw * sh)
-        for (qy in 0 until qh) for (qx in 0 until qw) {
-            val s = (qy / 4) * sw + qx / 4; val q = qy * qw + qx
-            y8[s] += y2[q]; cr8[s] += cr2[q]; cb8[s] += cb2[q]; cnt8[s]++
+        rows(sh) { sy ->
+            for (qy in 4 * sy until minOf(qh, 4 * sy + 4)) for (qx in 0 until qw) {
+                val s = sy * sw + qx / 4; val q = qy * qw + qx
+                y8[s] += y2[q]; cr8[s] += cr2[q]; cb8[s] += cb2[q]
+            }
+            val ny = minOf(qh, 4 * sy + 4) - 4 * sy
+            for (sx in 0 until sw) {
+                val n = ny * (minOf(qw, 4 * sx + 4) - 4 * sx)
+                val s = sy * sw + sx
+                y8[s] /= n; cr8[s] /= n; cb8[s] /= n
+            }
         }
-        for (s in y8.indices) { val n = max(cnt8[s], 1); y8[s] /= n; cr8[s] /= n; cb8[s] /= n }
 
         // coarse pass, then push its correction into the half-resolution planes and filter those
         val dCr8 = FloatArray(sw * sh); val dCb8 = FloatArray(sw * sh)
-        filter(y8, cr8, cb8, sw, sh, varScale / 64f, varOffset / 64f, dCr8, dCb8)
-        for (qy in 0 until qh) for (qx in 0 until qw) {
-            val q = qy * qw + qx
-            cr2[q] += bilinear(dCr8, sw, sh, (qx + 0.5f) / 4f - 0.5f, (qy + 0.5f) / 4f - 0.5f)
-            cb2[q] += bilinear(dCb8, sw, sh, (qx + 0.5f) / 4f - 0.5f, (qy + 0.5f) / 4f - 0.5f)
+        filter(y8, cr8, cb8, sw, sh, varScale / 64f, varOffset / 64f, dCr8, dCb8, ::rows)
+        rows(qh) { qy ->
+            for (qx in 0 until qw) {
+                val q = qy * qw + qx
+                cr2[q] += bilinear(dCr8, sw, sh, (qx + 0.5f) / 4f - 0.5f, (qy + 0.5f) / 4f - 0.5f)
+                cb2[q] += bilinear(dCb8, sw, sh, (qx + 0.5f) / 4f - 0.5f, (qy + 0.5f) / 4f - 0.5f)
+            }
         }
         val dCr2 = FloatArray(qw * qh); val dCb2 = FloatArray(qw * qh)
-        filter(y2, cr2, cb2, qw, qh, varScale / 4f, varOffset / 4f, dCr2, dCb2)
-        for (q in cr2.indices) { cr2[q] += dCr2[q]; cb2[q] += dCb2[q] }
+        filter(y2, cr2, cb2, qw, qh, varScale / 4f, varOffset / 4f, dCr2, dCb2, ::rows)
+        rows(qh) { qy -> for (q in qy * qw until qy * qw + qw) { cr2[q] += dCr2[q]; cb2[q] += dCb2[q] } }
 
         // full resolution: move each pixel's chroma to the clean one unless the difference is real detail
-        for (py in 0 until h) for (px in 0 until w) {
-            val i = (py * w + px) * 8
-            val r = Half.toFloat(b.getShort(i)); val g = Half.toFloat(b.getShort(i + 2)); val bl = Half.toFloat(b.getShort(i + 4))
-            val lum = 0.2126f * r + 0.7152f * g + 0.0722f * bl
-            val fx = (px + 0.5f) / 2f - 0.5f; val fy = (py + 0.5f) / 2f - 0.5f
-            val dr = (r - lum) - bilinear(cr2, qw, qh, fx, fy)
-            val db = (bl - lum) - bilinear(cb2, qw, qh, fx, fy)
-            // per-pixel chroma variance; beyond about 3 sigma the difference is kept
-            val v = 2.5f * (varScale * max(lum, 0f) + varOffset) + 1e-9f
-            val keep = 1f - exp(-(dr * dr + db * db) / (2f * 9f * v))
-            val nr = dr * keep - dr; val nb = db * keep - db          // change applied to (R - Y), (B - Y)
-            if (nr == 0f && nb == 0f) continue
-            b.putShort(i, Half.fromFloat(r + nr))
-            b.putShort(i + 4, Half.fromFloat(bl + nb))
-            b.putShort(i + 2, Half.fromFloat(g - (0.2126f * nr + 0.0722f * nb) / 0.7152f))
+        rows(h) { py ->
+            for (px in 0 until w) {
+                val i = (py * w + px) * 8
+                val r = Half.toFloat(b.getShort(i)); val g = Half.toFloat(b.getShort(i + 2)); val bl = Half.toFloat(b.getShort(i + 4))
+                val lum = 0.2126f * r + 0.7152f * g + 0.0722f * bl
+                val fx = (px + 0.5f) / 2f - 0.5f; val fy = (py + 0.5f) / 2f - 0.5f
+                val dr = (r - lum) - bilinear(cr2, qw, qh, fx, fy)
+                val db = (bl - lum) - bilinear(cb2, qw, qh, fx, fy)
+                // per-pixel chroma variance; beyond about 3 sigma the difference is kept
+                val v = 2.5f * (varScale * max(lum, 0f) + varOffset) + 1e-9f
+                val keep = 1f - exp(-(dr * dr + db * db) / (2f * 9f * v))
+                val nr = dr * keep - dr; val nb = db * keep - db          // change applied to (R - Y), (B - Y)
+                if (nr == 0f && nb == 0f) continue
+                b.putShort(i, Half.fromFloat(r + nr))
+                b.putShort(i + 4, Half.fromFloat(bl + nb))
+                b.putShort(i + 2, Half.fromFloat(g - (0.2126f * nr + 0.0722f * nb) / 0.7152f))
+            }
         }
     }
 
@@ -440,8 +560,8 @@ object ChromaDenoise {
      * (filtered - input) to [dCr] / [dCb].
      */
     private fun filter(y: FloatArray, cr: FloatArray, cb: FloatArray, w: Int, h: Int, varScale: Float, varOffset: Float,
-                       dCr: FloatArray, dCb: FloatArray) {
-        for (py in 0 until h) for (px in 0 until w) {
+                       dCr: FloatArray, dCb: FloatArray, rows: (Int, (Int) -> Unit) -> Unit) = rows(h) { py ->
+        for (px in 0 until w) {
             val i = py * w + px
             val lum = max(y[i], 0f)
             // expected variance of a difference between two pixels at this brightness

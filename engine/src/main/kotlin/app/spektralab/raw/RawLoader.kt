@@ -8,10 +8,11 @@ class DevelopedRaw(val image: LinearImage, val fullWidth: Int, val fullHeight: I
 /**
  * Loads and develops a raw file with a hard cap on the bytes read whole.
  *
- * Every registered reader ([RawReader]) decodes from one byte array, then a `ShortArray`
- * no larger than [RawDecodeLimits.MAX_SAMPLES]. This loader refuses the read before that
- * allocation when the file is larger than the caller's budget or [MAX_WHOLE_FILE].
- * Development uses [RawDeveloper], including its heap budget (`workingBytes` / `longEdgeWithin`).
+ * Seekable Bayer/linear DNG strips are decoded in bounded row bands. Other layouts and
+ * maker formats retain the hardened [RawReader] whole-file path, capped before allocation
+ * by the caller, [MAX_WHOLE_FILE], and current heap headroom. X-Trans development keeps
+ * its existing whole-frame input and banded developer. Development budgets include gain
+ * tables, decoder scratch, sample bands and Malvar halos; callers may supply mapped output.
  */
 object RawLoader {
     /**
@@ -21,9 +22,13 @@ object RawLoader {
      *   about a third of the free heap, because the file and the decoded frame sit together.
      */
     fun open(source: ByteSource, maxWholeFile: Long = MAX_WHOLE_FILE): RawImage? {
+        if (!RawReader.withinBudget(source.size, minOf(maxWholeFile, MAX_WHOLE_FILE))) return null
+        DngReader.open(source)?.takeIf { it.linear || it.cfa.isBayer }?.let { return it }
         if (!RawReader.withinBudget(source.size, acceptableFileBytes(maxWholeFile))) return null
         val bytes = try {
             source.readAll()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             null
         } catch (e: OutOfMemoryError) {
@@ -31,6 +36,8 @@ object RawLoader {
         } ?: return null
         val img = try {
             RawReader.read(bytes)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             null
         } catch (e: OutOfMemoryError) {
@@ -42,16 +49,36 @@ object RawLoader {
     /**
      * Develops [source] to at most about [maxLongEdge] (see [RawDeveloper.develop]).
      * Returns null when the file cannot be read or developed.
-     * @throws CancellationException when [cancelled] is already true before development
+     * @throws CancellationException when [cancelled] becomes true before or during reads/development
+     * @param rawHeapBudget development heap budget, excluding output storage and existing source metadata;
+     *   zero keeps the requested size. Supply a mapped [allocate] callback for budgeted export.
      */
     fun load(source: ByteSource, maxLongEdge: Int, fast: Boolean = true,
              options: RawDeveloper.Options = RawDeveloper.Options(), maxWholeFile: Long = MAX_WHOLE_FILE,
-             cancelled: (() -> Boolean)? = null): DevelopedRaw? {
+             cancelled: (() -> Boolean)? = null, rawHeapBudget: Long = 0,
+             allocate: (Int) -> java.nio.ByteBuffer = java.nio.ByteBuffer::allocateDirect): DevelopedRaw? {
         if (cancelled?.invoke() == true) throw CancellationException("load cancelled")
-        val img = try { open(source, maxWholeFile) } catch (e: Exception) { null } catch (e: OutOfMemoryError) { null } ?: return null
+        val checked = object : ByteSource {
+            override val size get() = source.size
+            override fun readAll(): ByteArray {
+                if (cancelled?.invoke() == true) throw CancellationException("load cancelled")
+                // Preserve ByteArraySource's zero-copy fallback for pipes already read once.
+                return source.readAll().also {
+                    if (cancelled?.invoke() == true) throw CancellationException("load cancelled")
+                }
+            }
+            override fun read(pos: Long, dst: ByteArray, off: Int, len: Int) {
+                if (cancelled?.invoke() == true) throw CancellationException("load cancelled")
+                source.read(pos, dst, off, len)
+            }
+        }
+        val img = try { open(checked, maxWholeFile) }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { null } catch (e: OutOfMemoryError) { null } ?: return null
         if (cancelled?.invoke() == true) throw CancellationException("load cancelled")
         val out = try {
-            RawDeveloper.develop(img, maxLongEdge, fast, options)
+            val edge = if (rawHeapBudget > 0) RawDeveloper.longEdgeWithin(img, maxLongEdge, fast, rawHeapBudget, false) else maxLongEdge
+            RawDeveloper.developCancellable(img, edge, fast, options, allocate, cancelled)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

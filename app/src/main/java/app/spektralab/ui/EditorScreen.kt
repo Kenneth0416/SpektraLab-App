@@ -198,9 +198,12 @@ fun EditorScreen(state: AppState, id: Long) {
         worthFull = item.isRaw || maxOf(item.width, item.height) > previewDecodeEdge(context),
         load = { full ->
             withContext(Dispatchers.IO) {
-                runCatching { Media.loadSource(context, Uri.parse(item.uri),
+                val job = coroutineContext[Job]
+                try { Media.loadSource(context, Uri.parse(item.uri),
                     if (full) FilmPreviewView.FULL_EDGE else previewDecodeEdge(context),
-                    tryRaw = item.isRaw, fast = !full) }.getOrNull()
+                    tryRaw = item.isRaw, fast = !full, cancelled = { job?.isActive == false }) }
+                catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                catch (e: Exception) { null }
             }?.also { src ->
                 // a raw has just been read and developed: keep a small proxy so the next open is immediate
                 if (!full && item.isRaw) state.app.appScope.launch(Dispatchers.IO) { state.app.quick.keep(item, src) }

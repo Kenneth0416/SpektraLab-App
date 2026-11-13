@@ -17,10 +17,17 @@ const sourcePaths = [
   'tsconfig.json', 'vite.config.ts', 'index.html', '.gitignore', 'src', 'scripts',
   'prototype', 'android', 'app', 'engine', 'tools', 'build.gradle.kts',
   'settings.gradle.kts', 'gradle.properties', 'gradlew', 'gradlew.bat', 'gradle',
-  'public/assets', 'public/favicon.svg', 'public/_redirects', 'public/_headers',
+  'public/assets', 'public/favicon.svg', 'public/logo-dichroic-prism.svg',
+  'public/logo-dichroic-prism-mark.svg', 'public/_redirects', 'public/_headers',
 ];
 export const prototypePaths = ['README.md', 'LICENSE', 'NOTICE.md', 'docs/YSJF_SAMPLES.md', 'prototype'];
-const excluded = new Set(['src/generated/download-meta.ts', 'android/local.properties', 'local.properties']);
+const excluded = new Set([
+  'src/generated/download-meta.ts',
+  'android/local.properties',
+  'local.properties',
+  'docs/icon-concepts',
+  'docs/logo-concepts',
+]);
 
 async function collect(relative, files) {
   if (excluded.has(relative)) return;

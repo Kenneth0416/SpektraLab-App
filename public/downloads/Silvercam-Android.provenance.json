@@ -1,10 +1,10 @@
 {
   "schema": 1,
   "version": "0.1.0",
-  "builtAt": "2026-11-11T17:04:59.078Z",
-  "apkSha256": "7128f98c87e17dd778d729143b39b924fae7b81bba4f32739f3735fc75303f8d",
-  "sourceSha256": "453878fbb0e822c0dc13869816219304f4c73e1b9d79075a863bef3aea921839",
-  "sourceDigest": "6e892d6af49a92f10ea0ef737da5a3782c605cd4fce951817b91cc422a567911",
+  "builtAt": "2026-11-13T04:19:19.408Z",
+  "apkSha256": "a9d0468ceae082bfe86fa64c7c4d0edb7630e7ba618af63d3b4179ebefa47357",
+  "sourceSha256": "a8fbf671efb5cbc4ba52e5576141e1116ede388cc59473d363871e01151cd0ff",
+  "sourceDigest": "39a581017d59d708839c28959cd8c13a2478d830a3e14a40431190bb40f90e16",
   "files": [
     {
       "name": ".gitignore",
@@ -24,7 +24,7 @@
     {
       "name": "README.md",
       "mode": 420,
-      "sha256": "40a81d53666e6b40421947681f86104198905b9ccc0ec30068b61838dc5bc2f4"
+      "sha256": "26cded541df6b28621b10517de0b770fc902c7d4322b8ca8c2343b00bd5d358d"
     },
     {
       "name": "android/app/build.gradle",
@@ -159,7 +159,7 @@
     {
       "name": "android/app/src/main/res/drawable/ic_launcher_foreground.xml",
       "mode": 420,
-      "sha256": "84b6455080b91500585ff6947f45a4a905ddac506d6a7d51da98e6e88dc34893"
+      "sha256": "b245796c686d6d6f2b7e58b6cfdaf834eea75a01661795fb71cb7b3db494c9b7"
     },
     {
       "name": "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
@@ -184,7 +184,7 @@
     {
       "name": "android/app/src/main/res/values/colors.xml",
       "mode": 420,
-      "sha256": "e39fb79029ff04e74c27187a2f928aeb912f00cbea56627105029845c052e478"
+      "sha256": "f2ea24b74302069fd54679709659e19c4d6306e36dfec7048956741f66789a14"
     },
     {
       "name": "android/app/src/main/res/values/strings.xml",
@@ -234,12 +234,102 @@
     {
       "name": "app/build.gradle.kts",
       "mode": 420,
-      "sha256": "22422c59cf987b546503601f21e9fbdac21cdcc59c29b53aff877a601743e703"
+      "sha256": "65e2e4837bd5fe7a4388033ff75b3e6a5555717645c55cdfad53e0159feba0c0"
     },
     {
       "name": "app/src/main/AndroidManifest.xml",
       "mode": 420,
-      "sha256": "8ebc32a958e646838c5e8a16f6660fe96e1ac3672d06ce8b43ee6409fbb8b322"
+      "sha256": "8abbf46cc8569cedf3c81f3328b8af4126d23c036e91fec6f8b3eca025f4b374"
+    },
+    {
+      "name": "app/src/main/assets/film-packages/fujifilm_c200.svg",
+      "mode": 420,
+      "sha256": "390c08f0bba59aebdf9b47671f900850f8e3acee5324e24fb9d7010a954b70a9"
+    },
+    {
+      "name": "app/src/main/assets/film-packages/fujifilm_pro_400h.svg",
+      "mode": 420,
+      "sha256": "49b1d3ae2bdfa76ecef3637ca53c0760ab0eee88a7e5a2b0442d682af8e700bf"
+    },
+    {
+      "name": "app/src/main/assets/film-packages/fujifilm_provia_100f.svg",
+      "mode": 420,
+      "sha256": "05f9a3e06a5ab0319299916628621c0ac9a7f1c77c293cce1aee700543d79dbe"
+    },
+    {
+      "name": "app/src/main/assets/film-packages/fujifilm_velvia_100.svg",
+      "mode": 420,
+      "sha256": "6bae4bb159d83f734e4ea6bab7a5862d1e67af81f5ab6b373b2434eb28634ae3"
+    },
+    {
+      "name": "app/src/main/assets/film-packages/fujifilm_xtra_400.svg",
+      "mode": 420,
+      "sha256": "da94f092d8c39f9d9227d913701414286bff2ba9390f6c936e997150ccb48dc4"
+    },
+    {
+      "name": "app/src/main/assets/film-packages/kodak_ektachrome_100.svg",
+      "mode": 420,
+      "sha256": "4f3050957472ed518747a7d6cfdaa7a5827a8b94d6fdbeb87261c2a749dd72f1"
+    },
+    {
+      "name": "app/src/main/assets/film-packages/kodak_ektar_100.svg",
+      "mode": 420,
+      "sha256": "1e8274c403401b4e2da0b5db91449e2e69fc5e001abec614f125681492a83f27"
+    },
+    {
+      "name": "app/src/main/assets/film-packages/kodak_gold_200.svg",
+      "mode": 420,
+      "sha256": "41c7793242f03ee58a34a8d5f27e66e67d9e4acd4e4f7d0fb08519cdb6602ebd"
+    },
+    {
+      "name": "app/src/main/assets/film-packages/kodak_kodachrome_64.svg",
+      "mode": 420,
+      "sha256": "5044420c16e341f0d356432f5ea5690d997640ff080740734901e66423cdc8bf"
+    },
+    {
+      "name": "app/src/main/assets/film-packages/kodak_portra_160.svg",
+      "mode": 420,
+      "sha256": "1eef761a33d973f8051eee322859534c5cf9c75faa21d3ca9b1fd689df776bca"
+    },
+    {
+      "name": "app/src/main/assets/film-packages/kodak_portra_400.svg",
+      "mode": 420,
+      "sha256": "9300337f50a9d63e4da295e011d43a9b36a8306ba1aa21c6c0949b079c65007f"
+    },
+    {
+      "name": "app/src/main/assets/film-packages/kodak_portra_800.svg",
+      "mode": 420,
+      "sha256": "f57c91c24fe42581313886a87fba5a1bdbdcd505defb8d3ea0accac7c20a755f"
+    },
+    {
+      "name": "app/src/main/assets/film-packages/kodak_ultramax_400.svg",
+      "mode": 420,
+      "sha256": "d58fc21926ee7d44e2bc6981f6bb54b7e2ffc8d069fc455249a784b230c0e757"
+    },
+    {
+      "name": "app/src/main/assets/film-packages/kodak_verita_200d.svg",
+      "mode": 420,
+      "sha256": "1cc2b771937ccf0981997a157b8daf8bf541dbaa9b30014035a971040a5f3ef6"
+    },
+    {
+      "name": "app/src/main/assets/film-packages/kodak_vision3_200t.svg",
+      "mode": 420,
+      "sha256": "84f8bb6b1a9de319e8e2e495b73e84407de3206a4a1ca58f0deb477d2464325b"
+    },
+    {
+      "name": "app/src/main/assets/film-packages/kodak_vision3_250d.svg",
+      "mode": 420,
+      "sha256": "f38d83ce8c076fbb58ff973c7a361c2384ced5778586c6f5ac737517f82bce5d"
+    },
+    {
+      "name": "app/src/main/assets/film-packages/kodak_vision3_500t.svg",
+      "mode": 420,
+      "sha256": "ac007a2437cc7cc6ef7f9aa43956d110682f578e3083806a6db7e83ffd8f99a0"
+    },
+    {
+      "name": "app/src/main/assets/film-packages/kodak_vision3_50d.svg",
+      "mode": 420,
+      "sha256": "9a47d0963de7b5d68d2c415a3dd0395b1cb6402d124227495b87c4ae8aa5ecab"
     },
     {
       "name": "app/src/main/assets/licenses/APACHE-2.0.txt",
@@ -432,24 +522,34 @@
       "sha256": "98b191c31fc6b9dfc37d6e54fb1020fb148ba8c9e7a87ecac56765160b3e4235"
     },
     {
+      "name": "app/src/main/java/app/spektralab/HeavyWork.kt",
+      "mode": 420,
+      "sha256": "c1052733d963e5a58494cd57a163d2275aa5cbb836ccbb4fc362c8fb39ae5f8c"
+    },
+    {
       "name": "app/src/main/java/app/spektralab/MainActivity.kt",
       "mode": 420,
-      "sha256": "54f23870db96f4e8c4fbecf1b12257fdfd44e856ad9989c189f654db6e036592"
+      "sha256": "f845b7ae3a05129d90217d5889a076c51dcbf04e4904220c9b3b11cf60f8134a"
     },
     {
       "name": "app/src/main/java/app/spektralab/SpektraApp.kt",
       "mode": 420,
-      "sha256": "548f54b46e3bd78727b6df1919c97b29135aca699ae0b37be5558f0bfc7183f1"
+      "sha256": "99ad411471eb2d5103d2b5743ac0ddb2b3460708f73839f07bd4dd38153001ab"
     },
     {
       "name": "app/src/main/java/app/spektralab/camera/FilmViewfinderEffect.kt",
       "mode": 420,
-      "sha256": "253f4303787c95268db625b6acf3e5adb28ef5b561441e914fb0d055eff707a7"
+      "sha256": "539bdaabc0749876f5eb3e4f6747e433a10c1c80774eccac68aa0271b73c80a2"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/camera/LensZoomStops.kt",
+      "mode": 420,
+      "sha256": "45b8fe7584055107064ac8c07163cf19f3ec1a8d2f3efb748370eba5965ddcbb"
     },
     {
       "name": "app/src/main/java/app/spektralab/camera/RawShooter.kt",
       "mode": 420,
-      "sha256": "51f08cd3f9c41f485101b1f9df0cd944856f2008ab60202dc176efefdd158fbd"
+      "sha256": "511907d55d48b0141cb74df5df8dd600093bd51d3ec2b1d70fbf342d0c2643b0"
     },
     {
       "name": "app/src/main/java/app/spektralab/camera/ShotAdmission.kt",
@@ -459,17 +559,37 @@
     {
       "name": "app/src/main/java/app/spektralab/data/Library.kt",
       "mode": 420,
-      "sha256": "06c9a47278b61ca1af509c125c96f29d77b92e1a3cbc8fffd5e74e86de383b2e"
+      "sha256": "788e845329fa06480e183ab8c353485479d7d88f58c96a548844a9d7a85b04e6"
     },
     {
       "name": "app/src/main/java/app/spektralab/data/Media.kt",
       "mode": 420,
-      "sha256": "07ac52cde0a55ee0ee78d4c07a39fea5411446fe7bdc9b522a078c6eb5ca81f2"
+      "sha256": "a26fda1610fadff223d6865599638813abfed506b5dcf5c39c575d85395e4f5d"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/data/QuickSources.kt",
+      "mode": 420,
+      "sha256": "aae9ab0cf948316d5559658ee8f0b0b0aaa85d3b0f258db731551b2dac779f87"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/data/RawMemoryGate.kt",
+      "mode": 420,
+      "sha256": "cbf3c509bee47bee7b5c3760fa212896a47aec70894327b093e121ba1688ce5b"
     },
     {
       "name": "app/src/main/java/app/spektralab/export/ExportManager.kt",
       "mode": 420,
-      "sha256": "df672fe311e7e663a7a98c0d7de160f25b96888509ad6b3237124a17d4a9b9f6"
+      "sha256": "50677f4ea144a6eed47bb89157b31779abc12e4f6ba79d3f78168a3e18c1a7d3"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/export/ExportQueue.kt",
+      "mode": 420,
+      "sha256": "8407b156a17233cf5ef006265972ceccbf9576fbcebf50f1a2dedc4be6a34fef"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/export/PrintExif.kt",
+      "mode": 420,
+      "sha256": "39ae3f6370032bafbbc033baed68d9005a181cb8530ca9535087a1485702ef17"
     },
     {
       "name": "app/src/main/java/app/spektralab/export/VideoExporter.kt",
@@ -489,12 +609,12 @@
     {
       "name": "app/src/main/java/app/spektralab/gl/FilmRenderer.kt",
       "mode": 420,
-      "sha256": "2192d30d4b6b7e0920060c42a0cf09ca5d342c24974b6fa3ebe78ba44a222093"
+      "sha256": "51f410cb00e969c5e833df758a7910a7dfc515d7b7d719f1e8bad4e45a429377"
     },
     {
       "name": "app/src/main/java/app/spektralab/gl/GlUtil.kt",
       "mode": 420,
-      "sha256": "c3e93f503bb0568d67ba409f69a543b887aeb8fef11764270e794eb3b217a052"
+      "sha256": "9aa2ba726bd7d7838151c97086f50f9f6e0dc96366130f41c0d1499bc6d3747d"
     },
     {
       "name": "app/src/main/java/app/spektralab/render/Borders.kt",
@@ -504,7 +624,7 @@
     {
       "name": "app/src/main/java/app/spektralab/render/FilmPreviewView.kt",
       "mode": 420,
-      "sha256": "b96101e5424903e7783f8981e5e336edc1b6dcf20fe5ab108da8905b75d4d374"
+      "sha256": "497ee3441148cca32509ac2ef284b6549a7280bebd8f3d55bb3a8608d1e7cb7f"
     },
     {
       "name": "app/src/main/java/app/spektralab/render/Framing.kt",
@@ -514,12 +634,12 @@
     {
       "name": "app/src/main/java/app/spektralab/render/GlWorker.kt",
       "mode": 420,
-      "sha256": "2904841630538c70414560c671d981561bf1cb50e4649ef97fef1c97e3092c94"
+      "sha256": "063f1fc2ae46e7ab2674f50ece4be783e0d7c690465fff21358ed557ebcc185e"
     },
     {
       "name": "app/src/main/java/app/spektralab/render/OverlayPainter.kt",
       "mode": 420,
-      "sha256": "d49d4bdf16fa4b5e07c49e12426184d118fed53275f0389f476b6c2bcaeecb25"
+      "sha256": "c1c45a9c39710f8a237920996ce1c8c3fc9a92852055e02afd642d0353014749"
     },
     {
       "name": "app/src/main/java/app/spektralab/render/PaperBack.kt",
@@ -529,7 +649,7 @@
     {
       "name": "app/src/main/java/app/spektralab/ui/AboutSheet.kt",
       "mode": 420,
-      "sha256": "ed8e8363055e36cab536ab6b57d716279b0f265f6f27b9593e75b1283f4cab64"
+      "sha256": "92c15b6b99cf8d4f1afe96b638b64d6708b9c8f1fec1d818f33ea996763a0f57"
     },
     {
       "name": "app/src/main/java/app/spektralab/ui/Adaptive.kt",
@@ -539,7 +659,7 @@
     {
       "name": "app/src/main/java/app/spektralab/ui/AppState.kt",
       "mode": 420,
-      "sha256": "c35a8e7fbec677d020164f3941c35a5cad84b810e48775415fbe5153e7e27111"
+      "sha256": "4e449a0a7e93705c9d9ebddee408a690c8d4d1a0a72c718ef6ac33328c783ac7"
     },
     {
       "name": "app/src/main/java/app/spektralab/ui/CameraControls.kt",
@@ -549,27 +669,52 @@
     {
       "name": "app/src/main/java/app/spektralab/ui/CameraScreen.kt",
       "mode": 420,
-      "sha256": "bf4b59b1aac855f28dfb8dbf7cfaabdb80f8c17d7cd178d97a7dea8997085c71"
+      "sha256": "0589c35262feef4a82f3809020ebd46d709aaa583f04bac9155d024703ae8435"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/ui/CatalogText.kt",
+      "mode": 420,
+      "sha256": "10012b5a2534e4b48b425432127d51d7121e65b24101723c4b726489f9dcea46"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/ui/CoffeePrompt.kt",
+      "mode": 420,
+      "sha256": "90fa93fe9763b69e73ab6b074ade86bafc4b51cc3a4a21e0a75c986cfe79a70c"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/ui/CoffeePromptDialog.kt",
+      "mode": 420,
+      "sha256": "089d1aae1077ec5ee042f5c2807972b9d87e82e2101f766d292b5e43c8267282"
     },
     {
       "name": "app/src/main/java/app/spektralab/ui/Controls.kt",
       "mode": 420,
-      "sha256": "28955ef25b83f5ffe759e2176cf4cfcfdc3dfec1b22fe58dbac136e7f3d54173"
+      "sha256": "58b05f307fe48c51cb3e01082c878ec822a146d609a0ddb223b8ec7c9f6c676c"
     },
     {
       "name": "app/src/main/java/app/spektralab/ui/EditorScreen.kt",
       "mode": 420,
-      "sha256": "9cba97599c5f9fc7707d327ec82673a0d5394c591c8e0219f355f57ce9d65ace"
+      "sha256": "62c5a40dc8a968a57158ebab88c9c7f2b4c72963bb55bfd55284bdbd64b33d90"
     },
     {
       "name": "app/src/main/java/app/spektralab/ui/FilmAdvance.kt",
       "mode": 420,
-      "sha256": "08dcb0697aa91fce69839cbc5cd5a64e0333e88ed9bb01fca6cce607fa6464c8"
+      "sha256": "dbd2ac491cc33c8f757bacc77ca30d64ac50235a7d6fc72eac643ae51f74dc93"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/ui/FilmPackages.kt",
+      "mode": 420,
+      "sha256": "40b10cd2a6011b98ca7375c7921f313d00c54a35c0e16be87c859fca404b8f26"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/ui/Language.kt",
+      "mode": 420,
+      "sha256": "0e0f9aac0a39120ba97e209031728afb3629057b0e71d2cb631fe72031fdd465"
     },
     {
       "name": "app/src/main/java/app/spektralab/ui/LibraryScreen.kt",
       "mode": 420,
-      "sha256": "da8c893d072ebbd33ee141dedacacb9a8f8d3eca9c01085d315c1c1a241a96d5"
+      "sha256": "25f16dcc0b035e61435ec7ca481af96b5c8a1d6477a0c0eb618d029aaa6a19ae"
     },
     {
       "name": "app/src/main/java/app/spektralab/ui/Motion.kt",
@@ -579,7 +724,7 @@
     {
       "name": "app/src/main/java/app/spektralab/ui/PhotoSourceEffects.kt",
       "mode": 420,
-      "sha256": "0afa035bfcc8a5421119376fd165feca5cd9dca5d13dc7e19dadc9299f58eaaa"
+      "sha256": "55c9f503cfd754703a9a01fc118ab2e3f22f8b27a62b1fd9c46303b4f1cf0ddb"
     },
     {
       "name": "app/src/main/java/app/spektralab/ui/PreviewPresentation.kt",
@@ -592,14 +737,19 @@
       "sha256": "5192c96fa6c97c2d70d7291ee7a896fa6fce07b8f03121393a03bec4a18f2fb2"
     },
     {
+      "name": "app/src/main/java/app/spektralab/ui/SettingsScreen.kt",
+      "mode": 420,
+      "sha256": "2de23495827fae01e6d71fa37775ce3f273795147f811c19cd6f50e91ba30921"
+    },
+    {
       "name": "app/src/main/java/app/spektralab/ui/Sheets.kt",
       "mode": 420,
-      "sha256": "9ed382fc7a08f2c958709e97a89fedc1a8206f2dc253f7348d0fc17ce33183c9"
+      "sha256": "ae384cb7591ca09aa5c5799e260d4f53ae805e9595ef10db8d120026a516283a"
     },
     {
       "name": "app/src/main/java/app/spektralab/ui/Swatches.kt",
       "mode": 420,
-      "sha256": "5c775f3e28b8b8225cf4f2e24f39ab0c8acc79b1b74b27f144837425aed3e398"
+      "sha256": "adcdbf40e23fb1dff9c5ddfc789d71a418cf6a8fd58ab021748a00d0d348f093"
     },
     {
       "name": "app/src/main/java/app/spektralab/ui/Theme.kt",
@@ -612,9 +762,19 @@
       "sha256": "714ed93c0c7e058582de2eae52c8199ffee1faac5a517362a28e7baffc7847f3"
     },
     {
+      "name": "app/src/main/res/drawable-nodpi/pay_alipay.png",
+      "mode": 420,
+      "sha256": "f5bfbc3b158d8d4a5441908fa7e2bb35ee2ef110809b4916bdda3e36ad136733"
+    },
+    {
+      "name": "app/src/main/res/drawable-nodpi/pay_wechat.png",
+      "mode": 420,
+      "sha256": "e9770356fc5d2d31fcc8998fb741768bbf74a20d600d7d6d5cbc9f223d070ac0"
+    },
+    {
       "name": "app/src/main/res/drawable/ic_launcher_foreground.xml",
       "mode": 420,
-      "sha256": "f77934cef16c3e4d347011b6b9ff7419efa3e59749961c8057d9a547762cc426"
+      "sha256": "b245796c686d6d6f2b7e58b6cfdaf834eea75a01661795fb71cb7b3db494c9b7"
     },
     {
       "name": "app/src/main/res/drawable/ic_notification.xml",
@@ -652,24 +812,84 @@
       "sha256": "d4537cd25f8ceec7a57e80b207dfa55dab0557a147ede37064b032df0a6cb5c7"
     },
     {
+      "name": "app/src/main/res/values-zh-rCN/strings.xml",
+      "mode": 420,
+      "sha256": "af1935e847bcfb10c61f4c84d0fc070c9557d4b51ba7ea60307793c4e2b96655"
+    },
+    {
+      "name": "app/src/main/res/values-zh-rTW/strings.xml",
+      "mode": 420,
+      "sha256": "6c003b70a7ff78e8a8b14413bcc90a00209f123e0c4ccbb93cd1332c0008f9bf"
+    },
+    {
       "name": "app/src/main/res/values/colors.xml",
       "mode": 420,
-      "sha256": "650c792f548b6f3366c1775f5a2b3ddce14f7d5c17ed3f44d705a35868c19c78"
+      "sha256": "31f361bb3d701b5c4becf50e1b5adb8c0c2d190341b356ca2529424e11790de4"
     },
     {
       "name": "app/src/main/res/values/strings.xml",
       "mode": 420,
-      "sha256": "3fb0495002d89704cb0b5df2219d6037bd0d714ade5e9f686987ad6fd1a3ec65"
+      "sha256": "cf70c99df7e264a06f6ca21389ddcb4c6ee36e2368b6fdd120b302ce96194042"
     },
     {
       "name": "app/src/main/res/values/themes.xml",
       "mode": 420,
-      "sha256": "5f50e943f5a45bd3782ae0eff8a83ae2aa7c06a12d7dd387f49a7b72f441fe5d"
+      "sha256": "f42010660cb2aeebad13a5f5e85fb3a4e938c0a66bc9e7ddb9821c77f4e16d12"
+    },
+    {
+      "name": "app/src/main/res/xml/locales_config.xml",
+      "mode": 420,
+      "sha256": "a162c660b8921edb8354c82298ab29f809207e0e5eb1c0a9efb9476c101ea141"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/camera/CaptureResultRetentionTest.kt",
+      "mode": 420,
+      "sha256": "72d3fce998e5eec4367859edae1cad356fe3b477e300f9b877374d5b54671c60"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/camera/LensZoomStopsTest.kt",
+      "mode": 420,
+      "sha256": "14bec66d51793662fa5ac797101010dcd85c84fd3cab8ee842a9de35885a6fe3"
     },
     {
       "name": "app/src/test/java/app/spektralab/camera/ShotAdmissionTest.kt",
       "mode": 420,
       "sha256": "aa2fa0ad828e3148be5ea12a4d4a0b8aed150ee500a51c8788d05fef24e62708"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/data/QuickSourcesTest.kt",
+      "mode": 420,
+      "sha256": "cf7b968fbf0fcf26179a4a3d45cff69737da2fd0bee5aac520905c3035857499"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/data/RawImportDetectionTest.kt",
+      "mode": 420,
+      "sha256": "a68d86dd5b87df5d56f0792de8865fa36acde1056f18650888d9e25649538b49"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/data/RawMemoryTest.kt",
+      "mode": 420,
+      "sha256": "7fe8069105e292e0c8103036b73c0e34387fa3f78922d13f61a3fa662164f474"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/export/ExportQueueTest.kt",
+      "mode": 420,
+      "sha256": "8178477c48dd9847c6b49d64f10f93d42641409bef3263f53dbd4a13a747d65b"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/export/PrintExifTest.kt",
+      "mode": 420,
+      "sha256": "51dc052a581573248a730c58c41dd0a37c12752b00f277652f3d3ba088c3740b"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/export/TiledExportTest.kt",
+      "mode": 420,
+      "sha256": "56964a4a911fd50e4f140d49d121e05ecb4a8f232a58ee2d224eda887b38ecf0"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/gl/GroundGlassTest.kt",
+      "mode": 420,
+      "sha256": "438f53fbf80f15a52247bc5c55db319d47b1a217b61d0938ee25ed83fc82122f"
     },
     {
       "name": "app/src/test/java/app/spektralab/render/PaperBackTest.kt",
@@ -687,19 +907,29 @@
       "sha256": "b80e88ab97a5c97213d37c5c5620054de43e8334292b1d3428e4faec80de8a36"
     },
     {
+      "name": "app/src/test/java/app/spektralab/ui/CoffeePromptTest.kt",
+      "mode": 420,
+      "sha256": "eac6bce976df019144087008ae1f85b372d85c76322e429c9d5c067adc967d5f"
+    },
+    {
       "name": "app/src/test/java/app/spektralab/ui/EditorLayoutTest.kt",
       "mode": 420,
-      "sha256": "262f7697265a8944e2e813aa04c215fc02051d74f14e0fb9e8b06a6e765bcf34"
+      "sha256": "0d8970f98413aa174486e0a900b9fd847bdbabe587305d42bbcf810f445e49f0"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/ui/LanguagePreferenceTest.kt",
+      "mode": 420,
+      "sha256": "b289b1480b746b18c8cc70fc0fe7c058639b36720625895662780f0bfc9d023a"
     },
     {
       "name": "app/src/test/java/app/spektralab/ui/MotionSnapshotTest.kt",
       "mode": 420,
-      "sha256": "1042a8ef328e9d05f7c8df365c86801d569363393deded2b2a41c376190952e4"
+      "sha256": "1f156d2b136df8d51c8a3662afbf8c0c5a8258b545e8a4a75cc9213456a90cd9"
     },
     {
       "name": "app/src/test/java/app/spektralab/ui/PhotoSourceEffectsTest.kt",
       "mode": 420,
-      "sha256": "585260b48d417ed2d5469484f93564f66b64239251f69a691b47232ae7365077"
+      "sha256": "492af1ba21fb12e3690f2b4a31751f4ba348cd33157b20d7b41a62febc074e2f"
     },
     {
       "name": "app/src/test/java/app/spektralab/ui/PreviewGesturesTest.kt",
@@ -710,6 +940,16 @@
       "name": "app/src/test/java/app/spektralab/ui/PreviewZoomTest.kt",
       "mode": 420,
       "sha256": "d2407f8de3fcda47fb139f27f7961c69b582663957fffaf698f1bb5dbe5bdb8f"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/ui/SettingsNavigationTest.kt",
+      "mode": 420,
+      "sha256": "f6b2fd8084cdbfd4b76564f6e8cdfa7da87e992a51e969632b6e8d0273a2f849"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/ui/SettingsScreenTest.kt",
+      "mode": 420,
+      "sha256": "5ed0e6a378c9ee246b39b8c2454d4aa83014a4c61ca629fa19222dc322e550a1"
     },
     {
       "name": "build.gradle.kts",
@@ -749,7 +989,7 @@
     {
       "name": "engine/src/main/kotlin/app/spektralab/engine/Look.kt",
       "mode": 420,
-      "sha256": "69a5ec253aafe63aaf29b640d190e03c5452ee628fd785d1dfbff8b9e2f1ad6d"
+      "sha256": "30d983fdd79f7a2cf8902fbb90b28cca9fa1898e9b6fdc5eb8fd24c7c9cf2213"
     },
     {
       "name": "engine/src/main/kotlin/app/spektralab/engine/Params.kt",
@@ -782,14 +1022,29 @@
       "sha256": "90ec1a52fcc73aa78e179a1d9c8fd3f9196e34e9bb1f6e8e076b98b13b41db98"
     },
     {
+      "name": "engine/src/main/kotlin/app/spektralab/gl/GroundGlassSizing.kt",
+      "mode": 420,
+      "sha256": "d226a32b0d3152ee3ab39d9ccc413a90a1ee1dd93e73ac365e6a95c6ee7645de"
+    },
+    {
       "name": "engine/src/main/kotlin/app/spektralab/gl/Shaders.kt",
       "mode": 420,
-      "sha256": "179ea6f6e82951e931642bf8b89e3cf794614bd2d2815d9787f7f5657a069301"
+      "sha256": "912f80141d6e8d9a5bfc98d630bfbf250dd14fb765eb4058896a71832429dd4c"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/gl/TilePlan.kt",
+      "mode": 420,
+      "sha256": "74cde201e74c32edce0f0dfe30045537df63946c3664c587e8f72600b2a0f465"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/raw/Arw.kt",
+      "mode": 420,
+      "sha256": "ca9264e30dcaf78bba1eb5f514ce9da3e19d9af5ceaba8ef2981f9b688cedfe2"
     },
     {
       "name": "engine/src/main/kotlin/app/spektralab/raw/Bits.kt",
       "mode": 420,
-      "sha256": "102116fd35f262c4b28484afc65ccb1a158ae26f703a98b1b2ba74e07fe5c672"
+      "sha256": "f9f6e6ab0510001ed97d10163c3e5d4a5302bc8ed3516374b1b043bc4dfe5faf"
     },
     {
       "name": "engine/src/main/kotlin/app/spektralab/raw/BurstMerge.kt",
@@ -799,7 +1054,27 @@
     {
       "name": "engine/src/main/kotlin/app/spektralab/raw/CameraMatrices.kt",
       "mode": 420,
-      "sha256": "827d432412cb30a0ee3ee203eef213396a66b38735c00962059a2d1c1ab05695"
+      "sha256": "23db4ce1dd01fd97f54e6dde49508c204a5a49dac51b319c07abea116b472316"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/raw/CanonSizes.kt",
+      "mode": 420,
+      "sha256": "36326acb738242cc83199a5dfce870ee9c9410424eff083329967e03a74e6c94"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/raw/Cr2.kt",
+      "mode": 420,
+      "sha256": "48e89252c90c0c337fd438b7607b228ce0103985e808aba6b36dda3950673ed1"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/raw/Cr3.kt",
+      "mode": 420,
+      "sha256": "15575215cc5fb3c130ac21ddc6504911dc1d7c99ea36b2bd56b227b657a8f86c"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/raw/Crx.kt",
+      "mode": 420,
+      "sha256": "557b620a3ca144cb9700291c60bb712c86b4d8d12bc74d76c6b2709179f2f000"
     },
     {
       "name": "engine/src/main/kotlin/app/spektralab/raw/Dng.kt",
@@ -812,9 +1087,34 @@
       "sha256": "573c977b133038ed29f70b545de09e5220c0bb99536ee8bbfbdc3601c581ae54"
     },
     {
+      "name": "engine/src/main/kotlin/app/spektralab/raw/FujiCompressed.kt",
+      "mode": 420,
+      "sha256": "6ed11604a330311488794a56de10f6ac7e0ae47f20056d5949bed628f6b2b9d4"
+    },
+    {
       "name": "engine/src/main/kotlin/app/spektralab/raw/LosslessJpeg.kt",
       "mode": 420,
       "sha256": "24e4645fe7cedf1b30cd6564bf89f289b7693ecdb03477a3f5e25894040d0d1b"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/raw/Nef.kt",
+      "mode": 420,
+      "sha256": "09e294c25b43d90d85e93fd9c204603927e0e337362c8ec3d6d76a67a07758f5"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/raw/Orf.kt",
+      "mode": 420,
+      "sha256": "a22606d8efc9d216e017745f6f6a7abbe5f917785e9d610527ce87267d6606f8"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/raw/Pef.kt",
+      "mode": 420,
+      "sha256": "97317736effe7f2139da0fcd1158906f031d485e70c51aeb9b24fdcc02da4677"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/raw/Raf.kt",
+      "mode": 420,
+      "sha256": "22b5ec0ec6df630e44cd52a433412e64b495c0b153046bb70d6d408723911388"
     },
     {
       "name": "engine/src/main/kotlin/app/spektralab/raw/RawColor.kt",
@@ -824,7 +1124,7 @@
     {
       "name": "engine/src/main/kotlin/app/spektralab/raw/RawDeveloper.kt",
       "mode": 420,
-      "sha256": "6b4478f7984b2687c41aeb619da166869621f921b3ca4b529aeae5e1efc8462c"
+      "sha256": "eaaa330a0089d14e30db785e6177604d3f54e5ac94a0cd9b13596ba9dca4b74d"
     },
     {
       "name": "engine/src/main/kotlin/app/spektralab/raw/RawImage.kt",
@@ -832,14 +1132,39 @@
       "sha256": "246ed8bb1b1997cc7434392e182f5abdb4c1a9775e0014dc484e18f3c8eac3a3"
     },
     {
+      "name": "engine/src/main/kotlin/app/spektralab/raw/RawLoader.kt",
+      "mode": 420,
+      "sha256": "a026fa6972468efad9b464f7a699bba74f682e0d4d2c3f609d331915c307ea3a"
+    },
+    {
       "name": "engine/src/main/kotlin/app/spektralab/raw/RawReader.kt",
       "mode": 420,
-      "sha256": "da7d7532743afa0e88de16056d62778ca71bd4164536e11792b2df0f68b92408"
+      "sha256": "a152d4a3220c0fe2925b262e1495ceb5a6478a2fd21ad4783e6a9b68b133a817"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/raw/RawSource.kt",
+      "mode": 420,
+      "sha256": "4b64b72caf2fdda11b3ce2a3ddf1f106cb87197b5ccc9cc76164586a10f9504c"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/raw/Rw2.kt",
+      "mode": 420,
+      "sha256": "86276fcf9a0d3ff7bd05fcd499d58fbb56094e4c5ce69467976b2cd65d291ce1"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/raw/Srw.kt",
+      "mode": 420,
+      "sha256": "69fc7af5380b353bceb80ce4c9c1744e21f308a455cc32e26d1bc2fcbc9071cd"
     },
     {
       "name": "engine/src/main/kotlin/app/spektralab/raw/Tiff.kt",
       "mode": 420,
       "sha256": "241b2f05f87e0a6515f40f5223d6ea029db8036cb87fef1aab58276d8c1aa3b7"
+    },
+    {
+      "name": "engine/src/main/kotlin/app/spektralab/raw/XTrans.kt",
+      "mode": 420,
+      "sha256": "ff148058e421fe9b2c29aac4712659547ff4a65d4c412ad920a5e830e4734f40"
     },
     {
       "name": "engine/src/main/resources/silvercam/ENGINE_NOTICE.txt",
@@ -854,7 +1179,7 @@
     {
       "name": "engine/src/test/kotlin/app/spektralab/engine/GlDumpTest.kt",
       "mode": 420,
-      "sha256": "f66a66156ba7a269cd4db991613b7df70559cef82819d97a49558c578f36be6e"
+      "sha256": "0a54f86be23493710ebfabccb1f1ec42fea5eef414cc736a0c3558f6c4b8e7cd"
     },
     {
       "name": "engine/src/test/kotlin/app/spektralab/engine/ReferenceTest.kt",
@@ -872,6 +1197,16 @@
       "sha256": "540a2f04c0ca38d26ad998d492257bc85048af7f9dc3e60c5b0d2116a1a6d542"
     },
     {
+      "name": "engine/src/test/kotlin/app/spektralab/engine/TilePlanTest.kt",
+      "mode": 420,
+      "sha256": "454424c9fab419131bef5a1ccf39d9f562a3928b92a99e3e88805557ccc73bf1"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/ArwTest.kt",
+      "mode": 420,
+      "sha256": "3ccf2b2251b72dc570b2bb05833e12d48a166ee5315f7968000ce603fc79ca41"
+    },
+    {
       "name": "engine/src/test/kotlin/app/spektralab/raw/BitsTest.kt",
       "mode": 420,
       "sha256": "c6d4f286734ce60daa9adcc00372cc35691f3ef07db39fd6f29c6890befee094"
@@ -884,7 +1219,27 @@
     {
       "name": "engine/src/test/kotlin/app/spektralab/raw/CameraMatricesTest.kt",
       "mode": 420,
-      "sha256": "09923647936a2c505f7bd2735a93597e90d2d251020dd1b12f2aec23b207dccd"
+      "sha256": "d8a5d2a45c85d8d9ede3d480aeee6c066243ba75d81a85a6741cb71ec3aee8d6"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/Cr2Test.kt",
+      "mode": 420,
+      "sha256": "5e89100fda9189b480647aa7d64399380e4d5b1b5f5ca1c9a53d58272ac641c0"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/Cr3SampleTest.kt",
+      "mode": 420,
+      "sha256": "50e9a2488d6ff368d22c039c10a21a53122f6ba796d67d6a9cda1ef1821975bc"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/Cr3Test.kt",
+      "mode": 420,
+      "sha256": "bdc3b6e20313988d1290736df33bacc8ddfc9e8bb0fb818c0427313f1838daea"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/Cr3TestSupport.kt",
+      "mode": 420,
+      "sha256": "783c1567d3561fd2204473030c20aa97d450f22780feab99b77a2fde6f709a62"
     },
     {
       "name": "engine/src/test/kotlin/app/spektralab/raw/DecoderSafetyTest.kt",
@@ -894,12 +1249,17 @@
     {
       "name": "engine/src/test/kotlin/app/spektralab/raw/DngFormatsTest.kt",
       "mode": 420,
-      "sha256": "10d9792fd75607a0325201d2edeb93cc5d2595e9a0faa371096946a1eb79933d"
+      "sha256": "d1e30e6d4b40adc8563e626143b29b73ccd130b95e1cd7a7610419a4baa8c52a"
     },
     {
       "name": "engine/src/test/kotlin/app/spektralab/raw/DngTest.kt",
       "mode": 420,
       "sha256": "78e0bca9bd7196805494ad8b7ae91127c182358f7847fc23d40aae58722494db"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/FujiCompressedTest.kt",
+      "mode": 420,
+      "sha256": "cb93e064ac871372054b9dfbc359d3a42ec9f40e6f46938a96bd62a2ae7aed70"
     },
     {
       "name": "engine/src/test/kotlin/app/spektralab/raw/LinearDngIntegrationTest.kt",
@@ -912,9 +1272,64 @@
       "sha256": "be95af9cad1588d865fc4e752b33833a07389b3ecaf159ce16eb949251cde65f"
     },
     {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/NefSamplesTest.kt",
+      "mode": 420,
+      "sha256": "276a7dc5050d39da5502ae0c5c35dac360251cbda82aad8e3ac1bb072839ea88"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/NefTest.kt",
+      "mode": 420,
+      "sha256": "d1a166cfadc9a8ac8a5eaeb4f08305a93c05c5ab2cade2c5b814c5ff10b468ce"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/OrfTest.kt",
+      "mode": 420,
+      "sha256": "968a7d0d8dec767f7b6056614d6ebdf870d99c20d0c329ab1d446a096ad1641e"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/PefTest.kt",
+      "mode": 420,
+      "sha256": "1b860b248abf0077f8b92e6b0dd6b173c228da4e957e5a6af98353105bf00b7c"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/RafSampleTest.kt",
+      "mode": 420,
+      "sha256": "9f48077e90cd995cfeba57490002bfdb01cb5a5cb3d89b685b496c5dac95b41e"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/RafTest.kt",
+      "mode": 420,
+      "sha256": "6dd7083cf9f76f99aa9a04d5ece3470c2a6507e973390f89daedd7c3c6ca2b62"
+    },
+    {
       "name": "engine/src/test/kotlin/app/spektralab/raw/RawColorTest.kt",
       "mode": 420,
-      "sha256": "016f739a0f7bdc4c02252f0a73861259b6a029cd09e3dafd7c9a6f6e4a4d1d63"
+      "sha256": "9b6aa76332d0b4a4f49392ed8480c1f60bc20ec70e19b87f0fa925ca2600c69e"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/RawFixtures.kt",
+      "mode": 420,
+      "sha256": "e6a3abf74550839b7ff15ebed30d6ac93105f139231c2193f81df070778dcde5"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/RawLoaderBudgetTest.kt",
+      "mode": 420,
+      "sha256": "99330cf9b92ee33ff4d3461b7b43c883e5dd582db516fedfdfbc260f1cd9004e"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/RawReaderTest.kt",
+      "mode": 420,
+      "sha256": "7f015c2bf513c5a5ac0e0cba3b83e7d76ea17cf93c16bcb030676b1f12e43b72"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/Rw2Test.kt",
+      "mode": 420,
+      "sha256": "490cb842b95234743611b9fbc127e4c1f9a2530a5b53edd09b5eeccea815c7b6"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/SrwTest.kt",
+      "mode": 420,
+      "sha256": "fd5ab06146a07f1502871b5f4b07feca05e7ef611b268b6be955c341d121c2d8"
     },
     {
       "name": "engine/src/test/kotlin/app/spektralab/raw/TestSupport.kt",
@@ -925,6 +1340,11 @@
       "name": "engine/src/test/kotlin/app/spektralab/raw/TiffTest.kt",
       "mode": 420,
       "sha256": "3630bfd823ca4c3c6bac2ef329cd210d1844f5b9e001477ab513d1dacdaaead6"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/XTransTest.kt",
+      "mode": 420,
+      "sha256": "fe1feeff5a17b0174028ea04e97c9d4639da133b993245989c77ae90e9ab8cf1"
     },
     {
       "name": "engine/src/test/resources/reference/c200_crystal.spk",
@@ -1174,7 +1594,17 @@
     {
       "name": "public/favicon.svg",
       "mode": 420,
-      "sha256": "70fded0c5f582e53532a87bc48fe5cbfe8567820825dfe2b785cbd278ff05b6d"
+      "sha256": "17000758aed1b33fca23580ca2326a262128c7e65bf64e1cfa4f157cacd5a6bb"
+    },
+    {
+      "name": "public/logo-dichroic-prism-mark.svg",
+      "mode": 420,
+      "sha256": "66c76f309c397adfeb4bd9a6f09468d5c83a1fd1330ef90857a569844048b0ee"
+    },
+    {
+      "name": "public/logo-dichroic-prism.svg",
+      "mode": 420,
+      "sha256": "62e2f0c80da929e3a7e32229aad98ed516956a86dded403c3ab84f889f23e680"
     },
     {
       "name": "scripts/build-android.mjs",
@@ -1189,7 +1619,12 @@
     {
       "name": "scripts/download-archives.mjs",
       "mode": 420,
-      "sha256": "af85e12e796f884a4bce2028611b99aebffafff6e2f04942bc4e917b405f0b47"
+      "sha256": "bd25095b9b3333c37a222f2dbfe57dd05416fdd10f2f9630652b30848f7dd602"
+    },
+    {
+      "name": "scripts/generate-film-packages.py",
+      "mode": 420,
+      "sha256": "b312a853faac0702b10582d462b6b5cfd9ecbb6a8dd211c9eba5b4ed01a17dda"
     },
     {
       "name": "scripts/package-downloads.mjs",
@@ -1204,7 +1639,7 @@
     {
       "name": "src/App.tsx",
       "mode": 420,
-      "sha256": "096115f9434fffc8c1fbb49869f8636f9b365fef9f23f2223bc35f39426f3576"
+      "sha256": "edb46f78f2eea189878eb0023035d475894f1ac5b99e8a4b9800ea91490e8b3e"
     },
     {
       "name": "src/components/FilmLab.tsx",
@@ -1214,7 +1649,7 @@
     {
       "name": "src/components/FilmStrip.tsx",
       "mode": 420,
-      "sha256": "d3f46db7bc4848100c6f4f1d00d59377ea3e0add89a4fbcc9e6ab6c9bb43dcd6"
+      "sha256": "7ca45d1dfd929aab9d6afc53187d0e5d5fa49eff7261b109efeb7c38c023ec48"
     },
     {
       "name": "src/components/LanguageSwitcher.tsx",
@@ -1224,7 +1659,7 @@
     {
       "name": "src/components/Logo.tsx",
       "mode": 420,
-      "sha256": "99215de869f56ef90bcd598f847165abbbc6876bbbd60d0e4db91585898fd286"
+      "sha256": "e6976e4695278be68548ab37bd45186ada982ad4701323d1aed8439f9c4d16a9"
     },
     {
       "name": "src/components/Reveal.tsx",
@@ -1239,7 +1674,7 @@
     {
       "name": "src/components/SiteHeader.tsx",
       "mode": 420,
-      "sha256": "6a24bcd2c4782c09b0cd0007e8234e12f81a2b264465261ab93aaa9b7de82065"
+      "sha256": "94d77ef71c7070bd1684ac70f2135aa7206de243361b5147854475f223236556"
     },
     {
       "name": "src/download-meta-types.ts",
@@ -1272,6 +1707,11 @@
       "sha256": "8a53f8850e45fa6a626fe376a8d113ebc632274db450e6dc8a00d915cbf2337e"
     },
     {
+      "name": "src/pages/CoffeePage.tsx",
+      "mode": 420,
+      "sha256": "f7c27b40e3828e6af3669fe255b05921c6271f9225735668e02d565ec78a597e"
+    },
+    {
       "name": "src/pages/CreditsPage.tsx",
       "mode": 420,
       "sha256": "0ef389fcefa3a7821998d73f40de08c345c4ffd14ec498bf9ed095eb203da637"
@@ -1279,7 +1719,7 @@
     {
       "name": "src/pages/DownloadPage.tsx",
       "mode": 420,
-      "sha256": "cf8dc55159fe6335c665149ec2e28cbf6f4c61a1f728c4a6d69153a11d29eb23"
+      "sha256": "adca0c2908168c2fdf42b92b0d933f5d8d5d73b71645900c02b632d2f655fb60"
     },
     {
       "name": "src/pages/HomePage.tsx",
@@ -1287,24 +1727,39 @@
       "sha256": "ddee590cebbc9aab1cabc387820295e852f0b902cbbaae5def3f7882788b3c53"
     },
     {
+      "name": "src/pages/ThanksPage.tsx",
+      "mode": 420,
+      "sha256": "29785b54794945af3b19d182128c9e6a5db926b13437ae4888ef4df052c792ad"
+    },
+    {
+      "name": "src/pages/coffeeCopy.ts",
+      "mode": 420,
+      "sha256": "d0a504b272413254a96aecc4df6cdc99b63394724c788d33c3e92593fb2c665e"
+    },
+    {
       "name": "src/styles/base.css",
       "mode": 420,
-      "sha256": "acd09a0bd86fe25e9f29c4fb649d816bb37945b6b441bd87eda1e9d63e155b29"
+      "sha256": "4141d4d33355fb130cf6b819f0f9b5636438b921aa8ef33ef5dcf95a8a99cbc8"
+    },
+    {
+      "name": "src/styles/coffee.css",
+      "mode": 420,
+      "sha256": "c334eff291e4b351ec6b1dc469a12830448080f63ca81960a98987cef3cec795"
     },
     {
       "name": "src/styles/credits.css",
       "mode": 420,
-      "sha256": "0ec80579adfc60a25e0eab6e84f97df56bdb7a7638a48d0b9e8cd21443b73307"
+      "sha256": "4b627079993f7dc13b1b476b41d4fb3178195e024d1746cbceccf1e99bc0c683"
     },
     {
       "name": "src/styles/download.css",
       "mode": 420,
-      "sha256": "06e2684e8af03d5119efbbe02bada991e739b2763ef1cee034bf61445e4872a4"
+      "sha256": "ca9c3ede266c8e7a36b389cf85230ce55b0a5a9b0b66516deef070018c066fb3"
     },
     {
       "name": "src/styles/home.css",
       "mode": 420,
-      "sha256": "fe3b0f521205ecb7499f63f6638406ffc34afe9885d87ba8fc8c3125bce0f2bb"
+      "sha256": "ae44a1d4cd1ab6e53f44e7183f8959406c7568bdac7ef24b56769013dfa49e82"
     },
     {
       "name": "src/styles/i18n.css",
@@ -1312,9 +1767,24 @@
       "sha256": "4b7252f9417aab66b732837dc827bace82073d0e0a390dc6ef2d9690617cdf84"
     },
     {
+      "name": "src/support/gate.test.ts",
+      "mode": 420,
+      "sha256": "3835b90d7a768212aab0ff56ed7263679a259feae3643c8f5f91d7a0681c7bf8"
+    },
+    {
+      "name": "src/support/gate.ts",
+      "mode": 420,
+      "sha256": "d8ae88164ae8b8972cdf3c81df1e78f084358b7857025cd830532ec9473a4735"
+    },
+    {
       "name": "src/vite-env.d.ts",
       "mode": 420,
       "sha256": "65996936fbb042915f7b74a200fcdde7e410f32a669b1ab9597cfaa4b0faddb5"
+    },
+    {
+      "name": "tools/arw_libraw_check.py",
+      "mode": 420,
+      "sha256": "7d83ff160d7ce12e67d79d45d245f935a5ace4ab948740ddd5e1fe549b380096"
     },
     {
       "name": "tools/bake/README.md",
@@ -1342,6 +1812,21 @@
       "sha256": "27c5b45b8943c4f2a60483ffd2d2bfc92bf4c83f074866a2728803104a51dd46"
     },
     {
+      "name": "tools/check_i18n.py",
+      "mode": 420,
+      "sha256": "38afb49e3e36f238c0539a7e71487ff78309ef66d577af8d8d4d7f5f58fb7781"
+    },
+    {
+      "name": "tools/cr3_reference.py",
+      "mode": 420,
+      "sha256": "b8640529e6a4ab41218320caf07e0e5770ce6505fb7f3ca1fbf4cf319f5f5e3d"
+    },
+    {
+      "name": "tools/develop_compare.py",
+      "mode": 420,
+      "sha256": "609b8dc830f353b769cede9f1eb7dc463893435c41767546d608408af84e7383"
+    },
+    {
       "name": "tools/gen_camera_matrices.py",
       "mode": 420,
       "sha256": "f3f0378e1e7b1a79e39ee87c55a4923a11538744d5aaf316ed3b57def43be6b5"
@@ -1349,7 +1834,7 @@
     {
       "name": "tools/glcheck/README.md",
       "mode": 420,
-      "sha256": "99208a71060ae101a37ec7942aa1ab08fa94955e08ca3932d8ee72732d5568ea"
+      "sha256": "4bd225e5d282737b4d2d76330ce5c51f23f648be2d1a4102a03fcb5e3155d600"
     },
     {
       "name": "tools/glcheck/blur.js",
@@ -1360,6 +1845,11 @@
       "name": "tools/glcheck/grain.js",
       "mode": 420,
       "sha256": "1de3d0608e52ceba6dd6f98d4dec7665800c3aa7a958435295df4adfd40365aa"
+    },
+    {
+      "name": "tools/glcheck/ground_glass.js",
+      "mode": 420,
+      "sha256": "77aeb75b18abd1f802c078edb0cd2e670bf19638b656470b437722c48a27c5e8"
     },
     {
       "name": "tools/glcheck/merge.js",
@@ -1382,9 +1872,44 @@
       "sha256": "89045d57f209aabcde154e24d6e60a7eb25db62bab0aef19b7f19c37416a6217"
     },
     {
+      "name": "tools/glcheck/run_ground_glass.cjs",
+      "mode": 420,
+      "sha256": "11a4ac0f6519cf9b406664988cb4268376d840a1bc1dd4c97f8c94bfb71a35dc"
+    },
+    {
+      "name": "tools/glcheck/tiles.js",
+      "mode": 420,
+      "sha256": "542fa200a521e932c6879ec1d39860e53b5f40b96a6a6178aa868dfb5ed5d8cf"
+    },
+    {
       "name": "tools/libraw-provenance.json",
       "mode": 420,
       "sha256": "b43ac7cf9c8da0c8e04c4094c05531a334c76cbbfb71ad4c47dd08e77724d1e2"
+    },
+    {
+      "name": "tools/nef_reference.py",
+      "mode": 420,
+      "sha256": "74d4d6e1aa4193407af20cd1f07a2433edceb83a332c40a0e1cfb23a111dbb3f"
+    },
+    {
+      "name": "tools/nef_synth_check.py",
+      "mode": 420,
+      "sha256": "a3423380bef8ed54aea3b28cd12e58f4a43164169a0e49e9e2a1860acd40d6a1"
+    },
+    {
+      "name": "tools/orf_pef_libraw_check.py",
+      "mode": 420,
+      "sha256": "4e5d2d972138ec4b291dc47a5f7d0c6afa47d0529658f394b2992fb6f426adb8"
+    },
+    {
+      "name": "tools/raf_compare.py",
+      "mode": 420,
+      "sha256": "fee4a95b3bb2a9487186767a5da226cc744dc557662cdb637c0b4d75e2c2bcfe"
+    },
+    {
+      "name": "tools/raf_synthetic_check.py",
+      "mode": 420,
+      "sha256": "0c9023b821a7f9993b5278e209e0d2494f69d87b349f10c179404cc8f48f8973"
     },
     {
       "name": "tools/rawcheck.py",
@@ -1392,9 +1917,19 @@
       "sha256": "dd06b6ad8bbc4b28684d857b8eac6521fa4ef1d747c7dae0567fc6aa69861de5"
     },
     {
+      "name": "tools/synth_raw_check.py",
+      "mode": 420,
+      "sha256": "5eab860a54fc562688363f71146c8e92295dd216d5e47727add383708c308c81"
+    },
+    {
+      "name": "tools/xtrans_scene_check.py",
+      "mode": 420,
+      "sha256": "15d0face2445b3371396e4a4b5ab83fd148be327698ac4f8fc5fe413b926b964"
+    },
+    {
       "name": "tsconfig.json",
       "mode": 420,
-      "sha256": "0c30224d102176c8aff5f8bed938bfec35be7998ad2674f33f5208ff7411a437"
+      "sha256": "06aa8f76b7881b4ae472990f718341576f385eaee324e461198f2af049c0da12"
     },
     {
       "name": "vite.config.ts",

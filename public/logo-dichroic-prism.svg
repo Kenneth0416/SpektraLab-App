@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>銀鹽工坊 Silvercam — 三色分色光閥 (Dichroic Enlarger Prism)</title>
+  <!-- Darkroom Matte Obsidian Ground -->
+  <rect width="1024" height="1024" fill="#131315"/>
+  <!-- YMC Dichroic Filter Blades (60° Optical Hexagonal Geometry) -->
+  <polygon points="330.1,308.0 443.3,308.0 269.2,609.6 212.6,511.5" fill="#F0C542"/>
+  <polygon points="465.7,308.0 693.3,308.0 810.9,511.7 754.0,610.4 638.0,409.5 407.1,409.5" fill="#CB3272"/>
+  <polygon points="271.6,614.0 615.4,614.0 554.2,720.0 332.8,720.0" fill="#29A1C3"/>
+  <polygon points="685.7,528.9 742.9,628.0 637.8,810.0 523.4,810.0" fill="#29A1C3"/>
+  <!-- Pure Silver-White 35mm Linear Film Gate -->
+  <rect x="396" y="428" width="232" height="168" fill="#ECF1F4"/>
+</svg>

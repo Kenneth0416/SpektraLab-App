@@ -1,6 +1,8 @@
 package app.spektralab
 
 import android.os.Bundle
+import android.content.Intent
+import app.spektralab.data.IncomingShare
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -33,6 +35,17 @@ import app.spektralab.ui.SettingsScreen
 class MainActivity : AppCompatActivity() {
     private val state: AppState by viewModels()
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        receiveShare(intent)
+    }
+
+    private fun receiveShare(intent: Intent) {
+        if (intent.action != Intent.ACTION_SEND && intent.action != Intent.ACTION_SEND_MULTIPLE) return
+        state.importSharedUris(IncomingShare.uris(intent), intent.type)
+    }
+
     /** Volume keys release the shutter in the camera, like on every phone camera. */
     override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent): Boolean {
         val isVolume = keyCode == android.view.KeyEvent.KEYCODE_VOLUME_DOWN || keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP
@@ -46,6 +59,8 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // The retained ViewModel owns ongoing imports across Activity recreation.
+        if (savedInstanceState == null) receiveShare(intent)
         // share sheets can only be started by a foreground activity: open finished
         // "share" exports when we are (back) on screen
         lifecycleScope.launch {

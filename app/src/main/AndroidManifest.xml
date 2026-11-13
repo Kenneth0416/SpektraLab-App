@@ -21,6 +21,7 @@
         android:theme="@style/Theme.SpektraLab">
         <activity
             android:name=".MainActivity"
+            android:launchMode="singleTop"
             android:exported="true"
             android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|density|keyboardHidden"
             android:resizeableActivity="true"
@@ -28,6 +29,17 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Document providers often label camera RAW files as binary data. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="video/*" />
+                <data android:mimeType="application/octet-stream" />
+                <data android:mimeType="application/x-unknown" />
+                <data android:mimeType="*/*" />
             </intent-filter>
         </activity>
         <service

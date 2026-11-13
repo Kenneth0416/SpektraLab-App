@@ -333,13 +333,14 @@ object Media {
 
     /** Inspect a picked uri and build a library item (blocking; call off the main thread). */
     fun importItem(context: Context, uri: Uri, id: Long, quick: QuickSources? = null,
-                   captured: RawPreview? = null): LibraryItem? {
+                   captured: RawPreview? = null, mimeType: String? = null): LibraryItem? {
         val cr = context.contentResolver
         runCatching { cr.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-        val type = cr.getType(uri) ?: ""
+        val type = mimeType ?: runCatching { cr.getType(uri) }.getOrNull() ?: ""
         val name = displayName(cr, uri)
         val ext = name.substringAfterLast('.', "").lowercase()
-        val isVideo = type.startsWith("video/")
+        val isVideo = type.startsWith("video/") ||
+            (isOpaqueMime(type) && ext in setOf("mp4", "m4v", "mov", "mkv", "webm", "3gp", "avi", "mpeg", "mpg"))
         val isRaw = captured != null || ext in RAW_EXT || isRawMime(type) || (isOpaqueMime(type) && sniffRaw(cr, uri))
         return try {
             if (isVideo) {

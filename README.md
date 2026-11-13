@@ -28,6 +28,8 @@ npm run preview
 
 下载页提供根目录 `app/` 原生 Android 应用，包名为 `app.spektralab`，最低 Android 10（API 29），需要 OpenGL ES 3.0。它包含相册导入、Kotlin/GLSL 冲洗、实时相机、RAW 多帧合成、照片 JPEG/PNG 导出与视频处理。拍摄和编辑可离线使用；网络权限用于检查更新，下载由浏览器处理，无需账号。
 
+可在系统相册、聊天软件或文件管理器中选择照片、影片或 RAW 文件，点「分享 → 银盐工坊」直接导入，支持多选和应用已打开时接收。共享原件会复制到应用私有存储，避免发送方临时权限失效。文件入口沿用现有媒体格式支持；PDF、Word 等非媒体文档会提示无法导入或跳过，不提供通用文档编辑。
+
 构建需要 JDK 17、Android SDK，以及 `ANDROID_HOME` 或 `ANDROID_SDK_ROOT`（macOS 默认会尝试 `~/Library/Android/sdk`）：
 
 ```sh

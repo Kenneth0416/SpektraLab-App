@@ -12,6 +12,7 @@ import app.spektralab.R
 import app.spektralab.SpektraApp
 import app.spektralab.camera.CameraFormat
 import app.spektralab.camera.RawShooter
+import app.spektralab.data.IncomingShare
 import app.spektralab.data.LibraryItem
 import app.spektralab.data.Media
 import app.spektralab.data.RawPreview
@@ -330,26 +331,50 @@ class AppState(application: Application) : AndroidViewModel(application) {
     }
 
     // ----------------------------------------------------------- import
-    fun importUris(uris: List<Uri>) {
+    private val importMutex = kotlinx.coroutines.sync.Mutex()
+
+    fun importSharedUris(uris: List<Uri>, mimeType: String? = null) {
+        if (uris.isEmpty()) { say(R.string.no_importable_media); return }
+        importUris(uris, shared = true, sharedMimeType = mimeType)
+    }
+
+    fun importUris(uris: List<Uri>, shared: Boolean = false, sharedMimeType: String? = null) {
         if (uris.isEmpty()) return
         sheet.value = Sheet.NONE
-        importing.value = true
         viewModelScope.launch {
-            val items = withContext(Dispatchers.IO) {
-                val first = library.reserveIds(uris.size)
-                uris.mapIndexedNotNull { i, u -> Media.importItem(app, u, first + i, quick = app.quick) }
+            // A second share can arrive while a large video is being copied.
+            importMutex.lock()
+            try {
+                importing.value = true
+                if (shared) {
+                    back()
+                    settingsOpen.value = false
+                    cameraOpen.value = false
+                    selecting.value = false
+                    picked.value = emptyList()
+                    coffeePrompt.value = false
+                }
+                val items = withContext(Dispatchers.IO) {
+                    val first = library.reserveIds(uris.size)
+                    uris.mapIndexedNotNull { i, u ->
+                        if (shared) IncomingShare.importItem(app, u, first + i, quick = app.quick, mimeType = sharedMimeType)
+                        else Media.importItem(app, u, first + i, quick = app.quick)
+                    }
+                }
+                if (items.isEmpty()) return@launch say(R.string.no_importable_media)
+                library.add(items)
+                filter.value = Filter.ALL
+                val photos = items.count { !it.isVideo }
+                val showCoffee = coffee.recordImportedPhotos(photos)
+                // A single imported photo normally opens the darkroom. Keep that frame on the
+                // lightbox while the optional prompt is up, so the two screens do not stack.
+                if (showCoffee) coffeePrompt.value = true
+                if (items.size == 1 && !showCoffee) openEdit(items[0].id) else say(R.string.items_imported, items.size)
+                if (items.size < uris.size) say(R.string.items_import_skipped, uris.size - items.size)
+            } finally {
+                importing.value = false
+                importMutex.unlock()
             }
-            importing.value = false
-            if (items.isEmpty()) return@launch say(R.string.no_importable_media)
-            library.add(items)
-            filter.value = Filter.ALL
-            val photos = items.count { !it.isVideo }
-            val showCoffee = coffee.recordImportedPhotos(photos)
-            // A single imported photo normally opens the darkroom. Keep that frame on the
-            // lightbox while the optional prompt is up, so the two screens do not stack.
-            if (showCoffee) coffeePrompt.value = true
-            if (items.size == 1 && !showCoffee) openEdit(items[0].id) else say(R.string.items_imported, items.size)
-            if (items.size < uris.size) say(R.string.items_import_skipped, uris.size - items.size)
         }
     }
 

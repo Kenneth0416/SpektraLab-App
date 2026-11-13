@@ -1,23 +1,23 @@
 {
   "schema": 1,
-  "builtAt": "2026-11-13T08:52:38.622Z",
+  "builtAt": "2026-11-13T10:33:23.107Z",
   "apk": {
     "applicationId": "app.spektralab",
-    "versionCode": 3,
-    "versionName": "0.1.2",
+    "versionCode": 4,
+    "versionName": "0.1.3",
     "minSdk": 29
   },
   "signerSha256": "4b813e686aab33e66b24d08b7a77e1085cc5070d0ea521a31200bd5d292a7822",
-  "releaseProperties": "# Native Android release. Keep this URL stable once an APK has been distributed.\n# For website hosting, set this to the site's HTTPS origin (without a trailing slash).\nupdateBaseUrl=https://raw.githubusercontent.com/Kenneth0416/SpektraLab-App/main/public\nversionCode=3\nversionName=0.1.2\n",
+  "releaseProperties": "# Native Android release. Keep this URL stable once an APK has been distributed.\n# For website hosting, set this to the site's HTTPS origin (without a trailing slash).\nupdateBaseUrl=https://raw.githubusercontent.com/Kenneth0416/SpektraLab-App/main/public\nversionCode=4\nversionName=0.1.3\n",
   "releaseNotes": {
-    "en": "Added automatic update checks and a manual check in Settings. The website download and update feed now share one verified APK. RAW capture reuses bounded previews; supported DNG files develop in cancellable row bands with bounded memory. Includes memory-budget fixes while preserving JPEG, single RAW, RAW burst, ultrawide switching and the folding viewfinder.",
-    "zh-Hans": "新增自动检查更新及设置中的手动检查入口，网站下载与更新通知同步使用同一份已验证 APK。RAW 拍摄复用小尺寸预览，支持的 DNG 按行分段解码，可取消并限制内存占用。修复内存预算，同时保留 JPEG、单张 RAW、RAW 连拍、超广角切换和折叠屏取景器。",
-    "zh-Hant": "新增自動檢查更新及設定中的手動檢查入口，網站下載與更新通知同步使用同一份已驗證 APK。RAW 拍攝重用小尺寸預覽，支援的 DNG 按行分段解碼，可取消並限制記憶體用量。修正記憶體預算，同時保留 JPEG、單張 RAW、RAW 連拍、超廣角切換和摺疊螢幕取景器。"
+    "en": "Import photos, videos and RAW files directly from other apps through the Android share sheet, including multiple files. Shared originals are saved locally so they remain available after temporary permissions expire. Improved button wrapping and large-font layouts in the app and website. General documents such as PDF and Word are not supported.",
+    "zh-Hans": "新增系统分享导入：从相册、聊天软件或文件管理器直接分享照片、影片和 RAW 文件到银盐工坊，支持多选。共享原件保存在本地，临时权限失效后仍可使用。优化应用与网站的按钮换行及大字体布局。暂不支持 PDF、Word 等普通文档。",
+    "zh-Hant": "新增系統分享匯入：從相簿、聊天軟體或檔案管理器直接分享照片、影片和 RAW 檔案到銀鹽工坊，支援多選。共享原件儲存在本機，臨時權限失效後仍可使用。改善應用程式與網站的按鈕換行及大字體版面。暫不支援 PDF、Word 等一般文件。"
   },
-  "apkSha256": "877bd85de1797508475def8b87b89db557707be66a8693f6ab4d15ef29af583e",
-  "sourceSha256": "23320adb36d1af3e4b11bd5fd8dfa564e62694ce9114a3477aecfddd5075031e",
-  "sourceDigest": "e29172ef968db79d35619627001aacd98e9bd9a2a842558426fcb97ef4e8f73b",
-  "nativeInputDigest": "4e11ed20ec1c1acba84459b82c3e5e14b37a7546577cd2817f638df41b74f13d",
+  "apkSha256": "4392a808befa26f744265b6ebe1b53af671ad7bad21722c712d0b196dba7d14c",
+  "sourceSha256": "f8e703915bd501a556d1e53e3aa05c967268919e54564c42b1f6d90afeaffd99",
+  "sourceDigest": "48c47c883cfa6e540433c1cf4554277bb073b0b447d40dafc894afe68a53099d",
+  "nativeInputDigest": "183f46d0b7e1bc4cfb872677937125219b1c808555c52972f91ff79275252898",
   "files": [
     {
       "name": ".gitignore",
@@ -37,7 +37,7 @@
     {
       "name": "README.md",
       "mode": 420,
-      "sha256": "def4bf2c67fb2eef0266f1247e0cc8adcd30e19ef548feda5e665ce43809087b"
+      "sha256": "8496a9769f82f1d039da2704362d4dd37f972b27fa2b1a8cce36b236305b9f9d"
     },
     {
       "name": "android/app/build.gradle",
@@ -252,7 +252,7 @@
     {
       "name": "app/src/main/AndroidManifest.xml",
       "mode": 420,
-      "sha256": "23a10bc7d30b2568d1a4fe8c722af6a6717640e979e5117e2b2599e2826022a3"
+      "sha256": "8990cd5a8816ebc54fd08a508a27f30cf81c5612f6490f4a56c7666dfaeb7146"
     },
     {
       "name": "app/src/main/assets/film-packages/fujifilm_c200.svg",
@@ -542,7 +542,7 @@
     {
       "name": "app/src/main/java/app/spektralab/MainActivity.kt",
       "mode": 420,
-      "sha256": "6bc9df26f4b77083fca9cfe4901112d1f151d7dbe2ae87cf1ce4f18e1c707726"
+      "sha256": "9d9def3c1f3b11306b6206f3311a1b766a8f1bdb8096ada2741c07bdad0d51ab"
     },
     {
       "name": "app/src/main/java/app/spektralab/SpektraApp.kt",
@@ -575,6 +575,11 @@
       "sha256": "d0706301c3a342589fe383cb33f842aab526db6cec61e30f35d4a9fa3fbc34b2"
     },
     {
+      "name": "app/src/main/java/app/spektralab/data/IncomingShare.kt",
+      "mode": 420,
+      "sha256": "90fb357398b4e7969c73fa7054df6d643a28559e242e1f08796f3992e0c48606"
+    },
+    {
       "name": "app/src/main/java/app/spektralab/data/Library.kt",
       "mode": 420,
       "sha256": "788e845329fa06480e183ab8c353485479d7d88f58c96a548844a9d7a85b04e6"
@@ -582,7 +587,7 @@
     {
       "name": "app/src/main/java/app/spektralab/data/Media.kt",
       "mode": 420,
-      "sha256": "48eeccf149d6d1ef82473816024cdf3c5315b37f02beb8817105d039455b978c"
+      "sha256": "a40ce7ad74415267f0bc3a0c4b79e52ab96e25244cb26ed4aeb8e9aab49fad58"
     },
     {
       "name": "app/src/main/java/app/spektralab/data/QuickSources.kt",
@@ -675,6 +680,11 @@
       "sha256": "92c15b6b99cf8d4f1afe96b638b64d6708b9c8f1fec1d818f33ea996763a0f57"
     },
     {
+      "name": "app/src/main/java/app/spektralab/ui/ActionGroup.kt",
+      "mode": 420,
+      "sha256": "c88a648fbecc8f47bc2ce31e1c058eb25104a95508f16fb90a58b6c6d337a032"
+    },
+    {
       "name": "app/src/main/java/app/spektralab/ui/Adaptive.kt",
       "mode": 420,
       "sha256": "45018aafcada082e0e2e0ec5f9499c09f5bd452faba152c40062523559701e3a"
@@ -682,7 +692,7 @@
     {
       "name": "app/src/main/java/app/spektralab/ui/AppState.kt",
       "mode": 420,
-      "sha256": "c8c72b962d6bd2e1b94bc051b66ea21d99044cd25481a2110484e559a65d236f"
+      "sha256": "9bf3c1ef3f1b7de9efa4a7bc6db558f77d5d5988e9758c6f37968d11e67ad0d6"
     },
     {
       "name": "app/src/main/java/app/spektralab/ui/CameraControls.kt",
@@ -712,7 +722,7 @@
     {
       "name": "app/src/main/java/app/spektralab/ui/Controls.kt",
       "mode": 420,
-      "sha256": "58b05f307fe48c51cb3e01082c878ec822a146d609a0ddb223b8ec7c9f6c676c"
+      "sha256": "3e065a7dfc6ccd7449b478a5e9bea04d03434bdf6b46456fdca1eff8c7daa851"
     },
     {
       "name": "app/src/main/java/app/spektralab/ui/EditorScreen.kt",
@@ -727,7 +737,7 @@
     {
       "name": "app/src/main/java/app/spektralab/ui/FilmPackages.kt",
       "mode": 420,
-      "sha256": "40b10cd2a6011b98ca7375c7921f313d00c54a35c0e16be87c859fca404b8f26"
+      "sha256": "dc92bfc7b2df1c5adc1952f259babeb7370aeb818ab743fd50e38bce001c6445"
     },
     {
       "name": "app/src/main/java/app/spektralab/ui/Language.kt",
@@ -737,7 +747,7 @@
     {
       "name": "app/src/main/java/app/spektralab/ui/LibraryScreen.kt",
       "mode": 420,
-      "sha256": "76587e0162624d492ce41734bd3494dc89d0b011be412941a93155482e3d1cd7"
+      "sha256": "e54a763b7545014473b75020e3402b11a873e6bf7587ad720bdf1e10640f0a4e"
     },
     {
       "name": "app/src/main/java/app/spektralab/ui/Motion.kt",
@@ -767,7 +777,7 @@
     {
       "name": "app/src/main/java/app/spektralab/ui/Sheets.kt",
       "mode": 420,
-      "sha256": "ae384cb7591ca09aa5c5799e260d4f53ae805e9595ef10db8d120026a516283a"
+      "sha256": "3b28a5258c67294f717491b6e55cba3b61c084cb8a5fcc64d411bf2045b5cb6b"
     },
     {
       "name": "app/src/main/java/app/spektralab/ui/Swatches.kt",
@@ -920,6 +930,16 @@
       "sha256": "0d18da5a495da91fd5646b5116bc34ac5842c3374acd6adc408bdeb6a39bcbb5"
     },
     {
+      "name": "app/src/test/java/app/spektralab/data/FileImageDecoder.java",
+      "mode": 420,
+      "sha256": "f56f31842b62a6204a2e77ad22b26aeb94c9a96b532f5227d68459b4d301c96f"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/data/IncomingShareTest.kt",
+      "mode": 420,
+      "sha256": "5f853e7de3013573244745b8d44baf3df7aeeae47e1b438d4c1ca561caf5529a"
+    },
+    {
       "name": "app/src/test/java/app/spektralab/data/QuickSourcesTest.kt",
       "mode": 420,
       "sha256": "cf7b968fbf0fcf26179a4a3d45cff69737da2fd0bee5aac520905c3035857499"
@@ -963,6 +983,11 @@
       "name": "app/src/test/java/app/spektralab/ui/AboutAndLicensingTest.kt",
       "mode": 420,
       "sha256": "3a69289a365dfc37ac5acd0e07828a3a10f74acdff5dbb3eceb0f51a584ae7f3"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/ui/ActionGroupTest.kt",
+      "mode": 420,
+      "sha256": "69a1c5e2fa52dad54e3424a1a91893c742692f71c1bb1d8ab623c5ff60a46a4b"
     },
     {
       "name": "app/src/test/java/app/spektralab/ui/BurstSourceRetentionTest.kt",
@@ -1737,12 +1762,12 @@
     {
       "name": "release/android-notes.json",
       "mode": 420,
-      "sha256": "f0c1941befa6df944c91a32f8eeb68ed798c73e54ac3d395c952b2c8b3d39796"
+      "sha256": "e2980188ab89750167e3791e886b5a1835d0ad0632f41b690e65e0b9482afffa"
     },
     {
       "name": "release/android.properties",
       "mode": 420,
-      "sha256": "e26264b68f7a8f7c9d283f4de82c130bbb5d0dd67d9be847c1c78bfdecbf65b1"
+      "sha256": "a399fc9caf37474eb17ce24864a66652cc1be47db7410cd4fe24b0b4cb64c5bd"
     },
     {
       "name": "scripts/build-android.mjs",
@@ -1867,22 +1892,22 @@
     {
       "name": "src/pages/CoffeePage.tsx",
       "mode": 420,
-      "sha256": "f7c27b40e3828e6af3669fe255b05921c6271f9225735668e02d565ec78a597e"
+      "sha256": "94da0f44829f968c40f1c5ac06aae7107049ba62d6c4cef264845a456915b4cf"
     },
     {
       "name": "src/pages/CreditsPage.tsx",
       "mode": 420,
-      "sha256": "0ef389fcefa3a7821998d73f40de08c345c4ffd14ec498bf9ed095eb203da637"
+      "sha256": "015c73cab9c8e95b45b6da35c5791fd8059a667ed71ff86bc99bd5bce30a4505"
     },
     {
       "name": "src/pages/DownloadPage.tsx",
       "mode": 420,
-      "sha256": "3d8c0a109f02af34236c1f8f34342a4337c41854d1c40a420e9731739bf67d5c"
+      "sha256": "27b38e338eb989378ea6d56bd563bf1ff528c3b42338f5ecd30aad563ae3bf5a"
     },
     {
       "name": "src/pages/HomePage.tsx",
       "mode": 420,
-      "sha256": "ddee590cebbc9aab1cabc387820295e852f0b902cbbaae5def3f7882788b3c53"
+      "sha256": "640e64101e3e5775d5322b8c2c33f11f46a39a16377eea44090ae821a472b071"
     },
     {
       "name": "src/pages/ThanksPage.tsx",
@@ -1897,12 +1922,12 @@
     {
       "name": "src/styles/base.css",
       "mode": 420,
-      "sha256": "4141d4d33355fb130cf6b819f0f9b5636438b921aa8ef33ef5dcf95a8a99cbc8"
+      "sha256": "a38762e337973d1994a3522231dec703b2b0230aa337092721ebf36836136bd0"
     },
     {
       "name": "src/styles/coffee.css",
       "mode": 420,
-      "sha256": "c334eff291e4b351ec6b1dc469a12830448080f63ca81960a98987cef3cec795"
+      "sha256": "7d39b3b99b368b33179cb2d22c5ef04a99888f7e137792bbbe1590df24af246f"
     },
     {
       "name": "src/styles/credits.css",
@@ -1912,12 +1937,12 @@
     {
       "name": "src/styles/download.css",
       "mode": 420,
-      "sha256": "ca9c3ede266c8e7a36b389cf85230ce55b0a5a9b0b66516deef070018c066fb3"
+      "sha256": "c6a9bfa555b36d2e6a0c9607297773c0a26b749ffe304288d29622fc1d1d4949"
     },
     {
       "name": "src/styles/home.css",
       "mode": 420,
-      "sha256": "ae44a1d4cd1ab6e53f44e7183f8959406c7568bdac7ef24b56769013dfa49e82"
+      "sha256": "de7f71075b13fdf464a9661c36d73a0832ffb2c97ca393c14d783d6046f1f3dc"
     },
     {
       "name": "src/styles/i18n.css",

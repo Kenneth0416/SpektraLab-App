@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
   "applicationId": "app.spektralab",
-  "versionCode": 3,
-  "versionName": "0.1.2",
+  "versionCode": 4,
+  "versionName": "0.1.3",
   "minSdk": 29,
   "downloadUrl": "https://raw.githubusercontent.com/Kenneth0416/SpektraLab-App/main/public/downloads/Silvercam-Android.apk",
-  "sha256": "877bd85de1797508475def8b87b89db557707be66a8693f6ab4d15ef29af583e",
+  "sha256": "4392a808befa26f744265b6ebe1b53af671ad7bad21722c712d0b196dba7d14c",
   "releaseNotes": {
-    "en": "Added automatic update checks and a manual check in Settings. The website download and update feed now share one verified APK. RAW capture reuses bounded previews; supported DNG files develop in cancellable row bands with bounded memory. Includes memory-budget fixes while preserving JPEG, single RAW, RAW burst, ultrawide switching and the folding viewfinder.",
-    "zh-Hans": "新增自动检查更新及设置中的手动检查入口，网站下载与更新通知同步使用同一份已验证 APK。RAW 拍摄复用小尺寸预览，支持的 DNG 按行分段解码，可取消并限制内存占用。修复内存预算，同时保留 JPEG、单张 RAW、RAW 连拍、超广角切换和折叠屏取景器。",
-    "zh-Hant": "新增自動檢查更新及設定中的手動檢查入口，網站下載與更新通知同步使用同一份已驗證 APK。RAW 拍攝重用小尺寸預覽，支援的 DNG 按行分段解碼，可取消並限制記憶體用量。修正記憶體預算，同時保留 JPEG、單張 RAW、RAW 連拍、超廣角切換和摺疊螢幕取景器。"
+    "en": "Import photos, videos and RAW files directly from other apps through the Android share sheet, including multiple files. Shared originals are saved locally so they remain available after temporary permissions expire. Improved button wrapping and large-font layouts in the app and website. General documents such as PDF and Word are not supported.",
+    "zh-Hans": "新增系统分享导入：从相册、聊天软件或文件管理器直接分享照片、影片和 RAW 文件到银盐工坊，支持多选。共享原件保存在本地，临时权限失效后仍可使用。优化应用与网站的按钮换行及大字体布局。暂不支持 PDF、Word 等普通文档。",
+    "zh-Hant": "新增系統分享匯入：從相簿、聊天軟體或檔案管理器直接分享照片、影片和 RAW 檔案到銀鹽工坊，支援多選。共享原件儲存在本機，臨時權限失效後仍可使用。改善應用程式與網站的按鈕換行及大字體版面。暫不支援 PDF、Word 等一般文件。"
   }
 }

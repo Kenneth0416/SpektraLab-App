@@ -76,6 +76,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import app.spektralab.R
+import app.spektralab.camera.CameraFormat
 import app.spektralab.camera.RawShooter
 import app.spektralab.camera.FilmViewfinder
 import app.spektralab.engine.Catalog
@@ -136,7 +137,11 @@ fun CameraScreen(state: AppState) {
     var selectedCameraId by remember { mutableStateOf<String?>(null) }
     var separateLenses by remember { mutableStateOf<List<SeparateLens>>(emptyList()) }
     var busy by remember { mutableStateOf(false) }
-    val multiFrame by state.multiFrame.collectAsState()
+    // what the shutter keeps as the original: JPEG (film effect on the preview), single RAW, or a RAW burst
+    val format by state.cameraFormat.collectAsState()
+    val multiFrame = format == CameraFormat.RAW_BURST
+    // whether the bound camera's hardware can take RAW at all (queried per lens)
+    var rawSupported by remember { mutableStateOf(false) }
     val merging by state.merging.collectAsState()
     // frames the next shot will take: follows the light (sensor gain) while multi-frame is on
     var burstFrames by remember { mutableIntStateOf(RawShooter.MAX_FRAMES) }
@@ -178,8 +183,9 @@ fun CameraScreen(state: AppState) {
         }
     }
 
-    // bind the camera while this screen is shown
-    DisposableEffect(granted, front, selectedCameraId) {
+    // bind the camera while this screen is shown; a format change re-binds, because the
+    // use case group (JPEG or RAW capture) and the preview effect change with it
+    DisposableEffect(granted, front, selectedCameraId, format) {
         var provider: ProcessCameraProvider? = null
         var disposed = false
         if (granted) {
@@ -199,7 +205,7 @@ fun CameraScreen(state: AppState) {
                 }
                 val fourThree = ResolutionSelector.Builder()
                     .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY).build()
-                val rawSupported = runCatching {
+                rawSupported = runCatching {
                     val info = p.getCameraInfo(selector)
                     logRawCameraCapabilities(info)
                     val formats = ImageCapture.getImageCaptureCapabilities(info).supportedOutputFormats
@@ -232,9 +238,9 @@ fun CameraScreen(state: AppState) {
                         Log.i(CAMERA_LOG_TAG, "Camera bound: raw=$raw rawCharacteristicsAvailable=${it.chars != null}")
                     }
                 }
-                session = runCatching { bind(rawSupported) }.recoverCatching {
+                session = runCatching { bind(format != CameraFormat.JPEG && rawSupported) }.recoverCatching {
                     // some devices list raw but cannot stream it next to the preview
-                    if (rawSupported) {
+                    if (format != CameraFormat.JPEG && rawSupported) {
                         Log.e(CAMERA_LOG_TAG, "RAW binding failed; retrying JPEG", it)
                         bind(false)
                     } else throw it
@@ -362,7 +368,9 @@ fun CameraScreen(state: AppState) {
     fun shoot() {
         val s = session ?: return state.say(if (granted) R.string.camera_not_ready else R.string.camera_permission_required)
         if (busy) return
-        if (!state.shooter.available) return state.say(R.string.previous_shot_processing)
+        // RAW frames are held in memory until they are merged; JPEG hands the file to CameraX
+        // in the background and never blocks the next shot.
+        if (s.raw && !state.shooter.available) return state.say(R.string.previous_shot_processing)
         if (!cocked) {
             // shutter is locked until the film is advanced
             haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -416,17 +424,28 @@ fun CameraScreen(state: AppState) {
             }
             s.capture.flashMode = flash
             val options = ImageCapture.OutputFileOptions.Builder(context.contentResolver, MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values).build()
-            s.capture.takePicture(options, ContextCompat.getMainExecutor(context), object : ImageCapture.OnImageSavedCallback {
-                override fun onImageSaved(result: ImageCapture.OutputFileResults) {
-                    captured.complete(true)
-                    result.savedUri?.let { state.onCaptured(it, evBias) } ?: state.say(R.string.original_not_saved)
-                }
+            val initiated = runCatching {
+                s.capture.takePicture(options, ContextCompat.getMainExecutor(context), object : ImageCapture.OnImageSavedCallback {
+                    override fun onImageSaved(result: ImageCapture.OutputFileResults) {
+                        if (s.raw) captured.complete(true)
+                        result.savedUri?.let { state.onCaptured(it, evBias) } ?: state.say(R.string.original_not_saved)
+                    }
 
-                override fun onError(e: ImageCaptureException) {
-                    captured.complete(false)
-                    state.say(R.string.capture_failed, e.message ?: e.imageCaptureError.toString())
-                }
-            })
+                    override fun onError(e: ImageCaptureException) {
+                        // JPEG already released the transport when the request was accepted; a
+                        // late failure is reported, but the advanced frame is not rewound.
+                        if (!captured.isCompleted) captured.complete(false)
+                        state.say(R.string.capture_failed, e.message ?: e.imageCaptureError.toString())
+                    }
+                })
+            }
+            // JPEG: the request is in CameraX's hands. The film transport only waits for the
+            // shutter curtain, so consecutive shots are not blocked by background saves.
+            if (initiated.isSuccess && !s.raw) captured.complete(true)
+            if (initiated.isFailure) {
+                captured.complete(false)
+                state.say(R.string.capture_failed, initiated.exceptionOrNull()?.message ?: context.getString(R.string.unknown_error))
+            }
         }
         val chars = s.chars
         if (s.raw && chars != null && !state.shooter.unsupported) {
@@ -477,15 +496,19 @@ fun CameraScreen(state: AppState) {
         Text(stringResource(R.string.back_to_lightbox), color = Pal.text, fontSize = 15.sp, modifier = Modifier.springClick { state.closeCamera() }.graphicsLayer { rotationZ = iconTurn }.padding(6.dp))
         // what the shutter will keep as the original
         AnimatedContent(session?.raw, label = "format", transitionSpec = { fadeIn() togetherWith fadeOut() }) { raw ->
-            // tapping the badge switches multi-frame capture (raw only)
+            // tapping the badge cycles JPEG → RAW → RAW burst; without RAW hardware it stays on JPEG
             Text(when (raw) { true -> if (multiFrame) "RAW×$burstFrames" else "RAW"; false -> "JPEG"; null -> "…" },
                 fontFamily = Fonts.mono, fontSize = 10.sp,
                 color = if (raw == true) accent else Pal.dim,
                 modifier = Modifier.springClick {
-                    if (raw == true) {
-                        state.setMultiFrame(!multiFrame)
-                        state.say(if (!multiFrame) context.getString(R.string.multi_frame_on, RawShooter.MAX_FRAMES) else context.getString(R.string.single_frame_raw))
-                    }
+                    val next = CameraFormat.cycle(format, rawSupported)
+                    if (next == format) return@springClick
+                    state.setCameraFormat(next)
+                    state.say(when (next) {
+                        CameraFormat.JPEG -> R.string.camera_format_jpeg
+                        CameraFormat.RAW_SINGLE -> R.string.camera_format_raw
+                        CameraFormat.RAW_BURST -> R.string.camera_format_raw_burst
+                    })
                 }.graphicsLayer { rotationZ = iconTurn }.padding(6.dp).border(1.dp, if (raw == true) accent else Pal.off, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp))
         }
         merging?.let { Text(stringResource(R.string.merging_percent, (it * 100).toInt()), fontFamily = Fonts.mono, fontSize = 10.sp, color = Pal.dim,

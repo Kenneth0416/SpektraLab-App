@@ -288,8 +288,9 @@
     <string name="previous_shot_processing">上一張還在處理，請稍候</string>
     <string name="burst_hold_steady">連拍 %1$d 幀，請拿穩</string>
     <string name="capture_failed_short">拍攝失敗</string>
-    <string name="multi_frame_on">多幀合成：按光線連拍 1–%1$d 幀 RAW，合成更乾淨的原片</string>
-    <string name="single_frame_raw">單幀 RAW</string>
+    <string name="camera_format_jpeg">JPEG 標準拍攝</string>
+    <string name="camera_format_raw">單幀 RAW</string>
+    <string name="camera_format_raw_burst">多幀 RAW</string>
     <string name="merging_percent">合成 %1$d%%</string>
     <string name="focus_locked">對焦鎖定</string>
     <string name="burst_merged">%.1f 幀合成完成</string>

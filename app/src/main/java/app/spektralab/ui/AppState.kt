@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.spektralab.R
 import app.spektralab.SpektraApp
+import app.spektralab.camera.CameraFormat
 import app.spektralab.camera.RawShooter
 import app.spektralab.data.LibraryItem
 import app.spektralab.data.Media
@@ -109,11 +110,16 @@ class AppState(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** Multi-frame capture: each shot is a short raw burst merged into one cleaner original. */
-    val multiFrame = MutableStateFlow(application.getSharedPreferences("camera", android.content.Context.MODE_PRIVATE).getBoolean("multiFrame", false))
-    fun setMultiFrame(on: Boolean) {
-        multiFrame.value = on
-        app.getSharedPreferences("camera", android.content.Context.MODE_PRIVATE).edit().putBoolean("multiFrame", on).apply()
+    /** What the shutter keeps as the original; kept between sessions. */
+    val cameraFormat = MutableStateFlow(application.getSharedPreferences("camera", android.content.Context.MODE_PRIVATE).let { prefs ->
+        CameraFormat.fromName(prefs.getString("cameraFormat", null))
+            // legacy preference: burst shooters keep their merged originals, everyone else starts on JPEG
+            ?: if (prefs.getBoolean("multiFrame", false)) CameraFormat.RAW_BURST else CameraFormat.JPEG
+    })
+
+    fun setCameraFormat(format: CameraFormat) {
+        cameraFormat.value = format
+        app.getSharedPreferences("camera", android.content.Context.MODE_PRIVATE).edit().putString("cameraFormat", format.persistName).apply()
     }
 
     /** Progress 0..1 of the burst being merged, null when idle. */

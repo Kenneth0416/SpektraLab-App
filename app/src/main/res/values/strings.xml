@@ -289,8 +289,9 @@
     <string name="previous_shot_processing">The previous shot is still processing</string>
     <string name="burst_hold_steady">Burst of %1$d frames — hold steady</string>
     <string name="capture_failed_short">Capture failed</string>
-    <string name="multi_frame_on">Multi-frame: capture 1–%1$d RAW frames by the light and merge a cleaner original</string>
-    <string name="single_frame_raw">Single-frame RAW</string>
+    <string name="camera_format_jpeg">JPEG standard capture</string>
+    <string name="camera_format_raw">Single RAW</string>
+    <string name="camera_format_raw_burst">Multi-frame RAW</string>
     <string name="merging_percent">Merging %1$d%%</string>
     <string name="focus_locked">Focus locked</string>
     <string name="burst_merged">Merged %.1f frames</string>

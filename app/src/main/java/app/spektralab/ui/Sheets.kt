@@ -135,7 +135,7 @@ private fun ImportSheet(state: AppState) {
             photos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
         }
         SourceCard(stringResource(R.string.files), stringResource(R.string.files_subtitle), Modifier.weight(1f).dealIn(2, fromY = 50f, tilt = 4f)) {
-            files.launch(arrayOf("image/*", "video/*"))
+            files.launch(app.spektralab.data.Media.PICKER_TYPES)
         }
     }
     Spacer(Modifier.height(12.dp))

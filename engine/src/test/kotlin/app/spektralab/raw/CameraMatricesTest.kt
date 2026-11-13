@@ -213,4 +213,16 @@ class CameraMatricesTest {
             assertEquals(c.expected, ints(e), "${c.make} / ${c.model}")
         }
     }
+
+    @Test
+    fun canonBodiesAreFoundByTheirMakerNoteModelId() {
+        val t2i = assertNotNull(CameraMatrices.findCanon(0x80000270L, "Canon", "Canon EOS Rebel T2i"))
+        assertEquals("EOS 550D", t2i.modelPrefix)
+        assertEquals("EOS 550D", CameraMatrices.canonModelName(0x80000270L))
+        assertEquals("EOS R6", CameraMatrices.findCanon(0x80000453L, "Canon", "Canon EOS R6")!!.modelPrefix)
+        assertEquals("EOS M50", CameraMatrices.canonModelName(0x412L))
+        assertEquals("EOS 7D", CameraMatrices.findCanon(0L, "Canon", "Canon EOS 7D")!!.modelPrefix)
+        assertEquals("EOS 7D", CameraMatrices.findCanon(0x12345L, "Canon", "Canon EOS 7D")!!.modelPrefix)
+        assertNull(CameraMatrices.canonModelName(0x80000520L))
+    }
 }

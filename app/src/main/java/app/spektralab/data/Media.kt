@@ -18,6 +18,7 @@ import app.spektralab.engine.Look
 import app.spektralab.raw.LinearImage
 import app.spektralab.raw.RawDeveloper
 import app.spektralab.raw.RawImage
+import app.spektralab.raw.RawLoader
 import app.spektralab.raw.RawReader
 import java.io.File
 import java.io.RandomAccessFile
@@ -99,7 +100,28 @@ internal fun readDeclaredBytes(input: java.io.InputStream, offset: Long, length:
 internal fun readRawBytes(input: java.io.InputStream, size: Long): ByteArray = readDeclaredBytes(input, 0, size)
 
 object Media {
-    private val RAW_EXT = setOf("dng", "cr2", "cr3", "nef", "arw", "orf", "rw2", "raf", "pef", "srw")
+    /** Extensions of the raw formats the engine's readers handle (NRW is Nikon, SR2 Sony, RWL Leica's RW2). */
+    private val RAW_EXT = setOf("dng", "cr2", "cr3", "nef", "nrw", "arw", "sr2", "orf", "rw2", "rwl", "raf", "pef", "srw")
+
+    /**
+     * Raw MIME types as providers report them: `image/x-adobe-dng`, `image/x-sony-arw`,
+     * `image/x-canon-cr3`, `image/x-panasonic-raw` / `-rw2`, `image/x-fuji-raf`, `image/dng` ...
+     */
+    internal fun isRawMime(type: String): Boolean {
+        val t = type.lowercase()
+        if ("dng" in t) return true
+        if (!t.startsWith("image/x-")) return false
+        return "raw" in t || t.substringAfterLast('-') in RAW_EXT
+    }
+
+    /**
+     * MIME filter of the document picker. `application/octet-stream` is included because many
+     * document providers report it for camera raw files they do not recognise.
+     */
+    val PICKER_TYPES = arrayOf("image/*", "video/*", "application/octet-stream")
+
+    private fun isOpaqueMime(type: String) = type.isEmpty() || type == "application/octet-stream" ||
+        type == "image/tiff" || type == "image/*" || type == "*/*" || type == "application/x-unknown"
 
     /** Decode an upright, sRGB, software bitmap whose long edge is at most [maxLongEdge]. */
     fun decodeImage(context: Context, uri: Uri, maxLongEdge: Int): Bitmap {
@@ -154,9 +176,49 @@ object Media {
     private fun readRaw(context: Context, uri: Uri): RawImage? {
         val descriptor = context.contentResolver.openAssetFileDescriptor(uri, "r") ?: return null
         val bytes = descriptor.use {
-            readDeclaredBytes(it.createInputStream(), it.startOffset, it.declaredLength)
+            val cap = RawLoader.acceptableFileBytes()
+            val length = it.declaredLength
+            if (length > cap) return null
+            if (length < 0) readAtMost(it.createInputStream(), cap) ?: return null
+            else readDeclaredBytes(it.createInputStream(), it.startOffset, length)
         }
+        if (bytes.size.toLong() > RawLoader.acceptableFileBytes()) return null
         return RawReader.read(bytes)?.takeIf { RawDeveloper.supports(it) }
+    }
+
+    /** The whole stream, or null when it is longer than [limit] bytes. Does not grow past the cap. */
+    private fun readAtMost(input: java.io.InputStream, limit: Long): ByteArray? {
+        if (limit < 0) return null
+        val out = java.io.ByteArrayOutputStream()
+        val buf = ByteArray(1 shl 16)
+        var total = 0L
+        while (true) {
+            val n = input.read(buf)
+            if (n < 0) break
+            if (n == 0) continue
+            total += n
+            if (total > limit) return null
+            out.write(buf, 0, n)
+        }
+        return out.toByteArray()
+    }
+
+    /** True when the first bytes look like a registered raw container. A short read is not raw. */
+    private fun sniffRaw(cr: ContentResolver, uri: Uri): Boolean {
+        val head = runCatching {
+            cr.openInputStream(uri)?.use { input ->
+                val buf = ByteArray(RawReader.SNIFF_BYTES)
+                var filled = 0
+                while (filled < buf.size) {
+                    val n = input.read(buf, filled, buf.size - filled)
+                    if (n < 0) break
+                    if (n == 0) continue
+                    filled += n
+                }
+                buf.copyOf(filled)
+            }
+        }.getOrNull() ?: return false
+        return RawReader.mayBeRaw(head)
     }
 
     /**
@@ -264,7 +326,7 @@ object Media {
         val name = displayName(cr, uri)
         val ext = name.substringAfterLast('.', "").lowercase()
         val isVideo = type.startsWith("video/")
-        val isRaw = ext in RAW_EXT || type.contains("raw") || type.contains("dng")
+        val isRaw = ext in RAW_EXT || isRawMime(type) || (isOpaqueMime(type) && sniffRaw(cr, uri))
         return try {
             if (isVideo) {
                 val r = MediaMetadataRetriever()

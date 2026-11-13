@@ -15,14 +15,14 @@ class LinearImage(val width: Int, val height: Int, val halfRgba: ByteBuffer) {
 }
 
 /**
- * Develops a Bayer raw frame to scene-linear sRGB — the input spektrafilm is designed
+ * Develops a Bayer or X-Trans (XTrans.kt) raw frame to scene-linear sRGB — the input spektrafilm is designed
  * for. Steps: black level, white balance, demosaic, highlight reconstruction, lens
  * shading (gain maps), camera colour matrix, chroma noise reduction. There is no tone
  * curve and no sharpening; luminance noise is left alone (the film's own grain sits on
  * top of it), only the colour blotches that film never has are removed.
  */
 object RawDeveloper {
-    fun supports(img: RawImage): Boolean = img.linear || img.cfa.isBayer
+    fun supports(img: RawImage): Boolean = img.linear || img.cfa.isBayer || XTrans.supports(img.cfa)
 
     class Options(
         /** Rebuild channels that clipped from the ones that did not (about one extra stop). */
@@ -40,13 +40,22 @@ object RawDeveloper {
      */
     fun develop(img: DngImage, maxLongEdge: Int, fast: Boolean = false, options: Options = Options(),
                 allocate: (Int) -> ByteBuffer = ByteBuffer::allocateDirect): LinearImage {
-        require(supports(img)) { "Only Bayer and linear RGB frames can be developed" }
+        require(supports(img)) { "Only Bayer, X-Trans and linear RGB frames can be developed" }
         val long = maxOf(img.cropWidth, img.cropHeight)
         if (img.linear) {
             // already demosaiced (merged burst): only reduce the size when asked for less
             val k = maxOf(1, long / maxOf(maxLongEdge, 1))
             val out = linear(img, k, options, allocate)
             if (options.chromaDenoise) ChromaDenoise.apply(out, img, samplesPerChannel = (k * k).toFloat())
+            return out
+        }
+        if (!img.cfa.isBayer) {
+            val cell = XTrans.baseCell(img)
+            val binX = fast || long / cell >= maxLongEdge
+            val kx = if (binX) maxOf(1, long / cell / maxOf(maxLongEdge, 1)) else 0
+            val p = Prep(img, options)
+            val out = if (binX) XTrans.binned(img, kx, p, allocate) else XTrans.full(img, p, allocate)
+            if (options.chromaDenoise) ChromaDenoise.apply(out, img, samplesPerChannel = if (binX) (kx * kx * cell * cell) * 2f / 9f else 1f)
             return out
         }
         val bin = fast || long / 2 >= maxLongEdge
@@ -61,8 +70,21 @@ object RawDeveloper {
      * output pixel 6 for the chroma denoise planes (more than Malvar's 4-byte plane, which
      * is freed before) and, when [outputOnHeap], 8 for the result.
      */
-    fun workingBytes(img: RawImage, maxLongEdge: Int, fast: Boolean, outputOnHeap: Boolean): Long =
-        workingBytes(img.cropWidth, img.cropHeight, img.linear, maxLongEdge, fast, outputOnHeap)
+    fun workingBytes(img: RawImage, maxLongEdge: Int, fast: Boolean, outputOnHeap: Boolean): Long {
+        if (!img.linear && !img.cfa.isBayer && XTrans.supports(img.cfa)) {
+            val long = maxOf(img.cropWidth, img.cropHeight)
+            val base = XTrans.baseCell(img)
+            val binned = fast || long / base >= maxLongEdge
+            val px = if (binned) {
+                val cell = base * maxOf(1, long / base / maxOf(maxLongEdge, 1))
+                (img.cropWidth / cell).toLong() * (img.cropHeight / cell)
+            } else img.cropWidth.toLong() * img.cropHeight
+            // Full X-Trans keeps one band of sample and green planes besides the chroma buffers.
+            val band = if (binned) 0L else (64 + 12).toLong() * img.cropWidth * 16
+            return px * (6 + if (outputOnHeap) 8 else 0) + band
+        }
+        return workingBytes(img.cropWidth, img.cropHeight, img.linear, maxLongEdge, fast, outputOnHeap)
+    }
 
     fun workingBytes(cropWidth: Int, cropHeight: Int, linear: Boolean, maxLongEdge: Int, fast: Boolean, outputOnHeap: Boolean): Long {
         val long = maxOf(cropWidth, cropHeight)
@@ -80,8 +102,20 @@ object RawDeveloper {
      * The long edge to ask [develop] for so that [workingBytes] stays within [budget]:
      * [maxLongEdge] if it fits, else the largest binned size that does.
      */
-    fun longEdgeWithin(img: RawImage, maxLongEdge: Int, fast: Boolean, budget: Long, outputOnHeap: Boolean): Int =
-        longEdgeWithin(img.cropWidth, img.cropHeight, img.linear, maxLongEdge, fast, budget, outputOnHeap)
+    fun longEdgeWithin(img: RawImage, maxLongEdge: Int, fast: Boolean, budget: Long, outputOnHeap: Boolean): Int {
+        if (img.linear || img.cfa.isBayer) {
+            return longEdgeWithin(img.cropWidth, img.cropHeight, img.linear, maxLongEdge, fast, budget, outputOnHeap)
+        }
+        if (workingBytes(img, maxLongEdge, fast, outputOnHeap) <= budget) return maxLongEdge
+        val long = maxOf(img.cropWidth, img.cropHeight)
+        val base = XTrans.baseCell(img).coerceAtLeast(1)
+        for (k in 1..16) {
+            val edge = long / base / k
+            if (edge < 1) break
+            if (edge < maxLongEdge && workingBytes(img, edge, fast, outputOnHeap) <= budget) return edge
+        }
+        return 1
+    }
 
     fun longEdgeWithin(cropWidth: Int, cropHeight: Int, linear: Boolean, maxLongEdge: Int, fast: Boolean, budget: Long, outputOnHeap: Boolean): Int {
         if (workingBytes(cropWidth, cropHeight, linear, maxLongEdge, fast, outputOnHeap) <= budget) return maxLongEdge
@@ -96,7 +130,7 @@ object RawDeveloper {
     }
 
     // ------------------------------------------------------------------ shared
-    private class Prep(val img: DngImage, val options: Options) {
+    internal class Prep(val img: DngImage, val options: Options) {
         val cfa = IntArray(4) { img.cfa.color(img.cropY + it / 2, img.cropX + it % 2) }
         val black = FloatArray(4) { img.blackAt(img.cropY + it / 2, img.cropX + it % 2) }
         val scale = FloatArray(4) { 1f / (img.white - black[it]).coerceAtLeast(1f) }
@@ -163,7 +197,7 @@ object RawDeveloper {
         }
     }
 
-    private class Writer(img: RawImage, val w: Int, val h: Int, allocate: (Int) -> ByteBuffer) {
+    internal class Writer(img: RawImage, val w: Int, val h: Int, allocate: (Int) -> ByteBuffer) {
         private val o = img.orientation
         val outW = if (o >= 5) h else w
         val outH = if (o >= 5) w else h

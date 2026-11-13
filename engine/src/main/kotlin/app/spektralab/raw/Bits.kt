@@ -134,25 +134,49 @@ class MsbWordBitPump(private val buf: ByteArray, start: Int = 0, private val end
     private var pos = start.coerceAtLeast(0)
     private var cache = 0L
     private var count = 0
+    /** Bits loaded from bytes actually inside [end], not zero padding past it. */
+    private var realBits = 0
     var overrun = false; private set
+    /** True when a read consumed bits past [end]. A peek that only looks ahead does not set this. */
+    var consumedPadding = false; private set
 
     private fun fill() {
         val wordBits = wordBytes * 8
         while (count <= 64 - wordBits) {
             var w = 0L
+            var got = 0
             for (i in 0 until wordBytes) {
-                val v = if (pos + i < end) buf[pos + i].toLong() and 0xff else { overrun = true; 0L }
+                val p = pos.toLong() + i
+                val v = if (p >= 0 && p < end && p < buf.size) {
+                    got += 8
+                    buf[p.toInt()].toLong() and 0xff
+                } else {
+                    overrun = true
+                    0L
+                }
                 w = w or (v shl (8 * i))
             }
             pos += wordBytes
             cache = (cache shl wordBits) or w
             count += wordBits
+            realBits += got
         }
     }
 
     fun peek(n: Int): Int { if (count < n) fill(); return ((cache ushr (count - n)) and ((1L shl n) - 1)).toInt() }
-    fun skip(n: Int) { if (count < n) fill(); count -= n }
-    fun bits(n: Int): Int { val v = peek(n); count -= n; return v }
+    fun skip(n: Int) {
+        if (count < n) fill()
+        if (n > realBits) consumedPadding = true
+        realBits = (realBits - n).coerceAtLeast(0)
+        count -= n
+    }
+    fun bits(n: Int): Int {
+        val v = peek(n)
+        if (n > realBits) consumedPadding = true
+        realBits = (realBits - n).coerceAtLeast(0)
+        count -= n
+        return v
+    }
 }
 
 /** Unpackers for uncompressed sensor rows into a 16-bit [RawImage.data]-style array. */

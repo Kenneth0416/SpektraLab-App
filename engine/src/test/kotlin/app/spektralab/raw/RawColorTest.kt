@@ -126,13 +126,18 @@ class RawColorTest {
     }
 
     @Test
-    fun developerRefusesXTrans() {
+    fun developerAcceptsXTransButNotOtherPatterns() {
         val cfa = CfaPattern.parse(6, 6, XTRANS)
         val img = RawImage(24, 24, ShortArray(24 * 24), cfa, FloatArray(36) { 256f }, 4095f, 0, 0, 24, 24,
             floatArrayOf(2f, 1f, 1.5f), FloatArray(9) { if (it % 4 == 0) 1f else 0f })
-        assertFalse(RawDeveloper.supports(img))
-        assertFailsWith<IllegalArgumentException> { RawDeveloper.develop(img, 1024) }
+        assertTrue(RawDeveloper.supports(img))
+        assertEquals(24, RawDeveloper.develop(img, 1024).width)
         assertEquals(256f, img.blackAt(7, 13))
+        val odd = CfaPattern.parse(6, 6, "RRRRRR" + "GGGGGG".repeat(4) + "BBBBBB")
+        val bad = RawImage(24, 24, ShortArray(24 * 24), odd, FloatArray(36) { 256f }, 4095f, 0, 0, 24, 24,
+            floatArrayOf(2f, 1f, 1.5f), FloatArray(9) { if (it % 4 == 0) 1f else 0f })
+        assertFalse(RawDeveloper.supports(bad))
+        assertFailsWith<IllegalArgumentException> { RawDeveloper.develop(bad, 1024) }
     }
 
     @Test

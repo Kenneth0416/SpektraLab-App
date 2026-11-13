@@ -157,7 +157,7 @@ export function DownloadPage() {
             <div className="prototype-file-icon"><FileArchive size={29} /></div>
             <div className="prototype-file-copy"><span>{m.prototypeKicker}</span><h3>{m.prototypeTitle}</h3><p>{m.prototypeDescription}</p></div>
             <div className="prototype-file-meta"><strong>{downloadMeta.prototype.size}</strong><span>{downloadMeta.prototype.fileCount} {m.prototypeFiles}</span></div>
-            <a className="button button-dark" href={downloadMeta.prototype.href} download={downloadMeta.prototype.filename}><Download size={17} />{m.prototypeDownload}</a>
+            <a className="button button-dark button-compact" href={downloadMeta.prototype.href} download={downloadMeta.prototype.filename}><Download size={17} /><span className="button-label">{m.prototypeDownload}</span></a>
             <button className="prototype-hash" type="button" onClick={() => handleCopy('prototype', downloadMeta.prototype.sha256)} title={m.copyPrototypeHash}>
               {copied === 'prototype' ? <Check size={14} /> : <Clipboard size={14} />}{copied === 'prototype' ? m.prototypeHashCopied : m.copyPrototypeHash}
             </button>
@@ -208,7 +208,7 @@ export function DownloadPage() {
           <FolderOpen size={35} strokeWidth={1.4} />
           <h2>{m.bottomTitle}</h2>
           <p>{apk?.size ?? '—'} · {m.bottomMeta}</p>
-          {choice.href && <a className="button button-light" href={choice.href} download={apk?.filename}><Download size={18} />{m.downloadPrefix} {apk?.filename}</a>}
+          {choice.href && <a className="button button-light" href={choice.href} download={apk?.filename}><Download size={18} /><span className="button-label">{m.downloadPrefix} {apk?.filename}</span></a>}
           <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '10px' }}>
             <Link to="/">{m.backHome}<ArrowRight size={16} /></Link>
             <Link to="/credits" style={{ color: '#bbb3a6', textDecoration: 'underline' }}>{m.viewCredits}</Link>

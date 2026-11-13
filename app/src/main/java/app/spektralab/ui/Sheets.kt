@@ -129,13 +129,16 @@ private fun ImportSheet(state: AppState) {
         Text(stringResource(R.string.cancel), color = Pal.grey, modifier = Modifier.clickable { state.sheet.value = Sheet.NONE }.padding(6.dp))
     }
     Spacer(Modifier.height(14.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    ActionGroup(2, minCellWidth = 140.dp) { index, cell ->
         // the two slide mounts are dealt out one after the other
-        SourceCard(stringResource(R.string.gallery), stringResource(R.string.gallery_subtitle), Modifier.weight(1f).dealIn(1, fromY = 50f, tilt = -4f)) {
-            photos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
-        }
-        SourceCard(stringResource(R.string.files), stringResource(R.string.files_subtitle), Modifier.weight(1f).dealIn(2, fromY = 50f, tilt = 4f)) {
-            files.launch(app.spektralab.data.Media.PICKER_TYPES)
+        if (index == 0) {
+            SourceCard(stringResource(R.string.gallery), stringResource(R.string.gallery_subtitle), cell.dealIn(1, fromY = 50f, tilt = -4f)) {
+                photos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
+            }
+        } else {
+            SourceCard(stringResource(R.string.files), stringResource(R.string.files_subtitle), cell.dealIn(2, fromY = 50f, tilt = 4f)) {
+                files.launch(app.spektralab.data.Media.PICKER_TYPES)
+            }
         }
     }
     Spacer(Modifier.height(12.dp))
@@ -144,7 +147,7 @@ private fun ImportSheet(state: AppState) {
 
 @Composable
 private fun SourceCard(title: String, sub: String, modifier: Modifier, onClick: () -> Unit) {
-    Column(modifier.clip(RoundedCornerShape(10.dp)).background(Color.White).border(1.dp, Pal.ink, RoundedCornerShape(10.dp))
+    Column(modifier.heightIn(min = 48.dp).clip(RoundedCornerShape(10.dp)).background(Color.White).border(1.dp, Pal.ink, RoundedCornerShape(10.dp))
         .springClick(0.95f, onClick = onClick).padding(16.dp)) {
         Text(title, fontSize = 18.sp, color = Pal.ink, fontWeight = FontWeight.Bold)
         Text(sub, fontSize = 12.sp, color = Pal.grey)
@@ -200,21 +203,24 @@ private fun ExportSheet(state: AppState) {
     }
     if (targets.any { !it.isVideo }) {
         Label(stringResource(R.string.format))
-        Row { PhotoFormat.entries.forEach { f -> Chip(f.label, o.photoFormat == f, Pal.paper) { state.exportOptions.value = o.copy(photoFormat = f) } } }
+        ActionGroup(PhotoFormat.entries.size) { index, cell ->
+            val f = PhotoFormat.entries[index]
+            Chip(f.label, o.photoFormat == f, Pal.paper, cell) { state.exportOptions.value = o.copy(photoFormat = f) }
+        }
         Label(stringResource(R.string.size))
-        Row {
-            listOf(2048 to stringResource(R.string.long_edge, 2048), 3400 to stringResource(R.string.long_edge, 3400),
-                0 to stringResource(R.string.full_size)).forEach { (v, l) ->
-                Chip(l, o.photoLongEdge == v, Pal.paper) { state.exportOptions.value = o.copy(photoLongEdge = v) }
-            }
+        val sizes = listOf(2048 to stringResource(R.string.long_edge, 2048), 3400 to stringResource(R.string.long_edge, 3400),
+            0 to stringResource(R.string.full_size))
+        ActionGroup(sizes.size) { index, cell ->
+            val (v, l) = sizes[index]
+            Chip(l, o.photoLongEdge == v, Pal.paper, cell) { state.exportOptions.value = o.copy(photoLongEdge = v) }
         }
     }
     if (targets.any { it.isVideo }) {
         Label(stringResource(R.string.video))
-        Row {
-            listOf(1920 to "1080p", 3840 to "4K").forEach { (v, l) ->
-                Chip(l, o.videoLongEdge == v, Pal.paper) { state.exportOptions.value = o.copy(videoLongEdge = v) }
-            }
+        val sizes = listOf(1920 to "1080p", 3840 to "4K")
+        ActionGroup(sizes.size) { index, cell ->
+            val (v, l) = sizes[index]
+            Chip(l, o.videoLongEdge == v, Pal.paper, cell) { state.exportOptions.value = o.copy(videoLongEdge = v) }
         }
     }
     Spacer(Modifier.height(8.dp))
@@ -224,12 +230,12 @@ private fun ExportSheet(state: AppState) {
         if (Build.VERSION.SDK_INT >= 33) notifier.launch(Manifest.permission.POST_NOTIFICATIONS)
         state.startExport(share)
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(stringResource(R.string.share), color = Pal.text, fontSize = 15.sp, modifier = Modifier.weight(1f).clip(RoundedCornerShape(22.dp))
-            .border(1.dp, Pal.text, RoundedCornerShape(22.dp)).springClick { go(true) }.padding(12.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-        Text(stringResource(R.string.save_to_gallery), color = Pal.dink, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f)
-            .clip(RoundedCornerShape(22.dp)).background(acc).springClick { go(false) }.padding(12.dp),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+    ActionGroup(2) { index, cell ->
+        if (index == 0) {
+            ActionButton(stringResource(R.string.share), Pal.text, cell, border = Pal.text) { go(true) }
+        } else {
+            ActionButton(stringResource(R.string.save_to_gallery), Pal.dink, cell, fill = acc, bold = true) { go(false) }
+        }
     }
 }
 

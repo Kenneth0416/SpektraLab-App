@@ -194,7 +194,8 @@ private fun snap(v: Double, range: ClosedFloatingPointRange<Double>, step: Doubl
 }
 
 @Composable
-fun Chip(label: String, active: Boolean, accent: Color, onClick: () -> Unit) {
+fun Chip(label: String, active: Boolean, accent: Color,
+         modifier: Modifier = Modifier.padding(end = 8.dp, bottom = 8.dp), onClick: () -> Unit) {
     val fill by animateColorAsState(if (active) accent else Color.Transparent, tween(220), label = "chipFill")
     val ink by animateColorAsState(if (active) Pal.dink else Pal.text, tween(220), label = "chipInk")
     val line by animateColorAsState(if (active) accent else Color(0xFF5A2A21), tween(220), label = "chipLine")
@@ -203,13 +204,16 @@ fun Chip(label: String, active: Boolean, accent: Color, onClick: () -> Unit) {
     LaunchedEffect(active) {
         if (active) { pop.snapTo(0.88f); pop.animateTo(1f, Motion.settle) }
     }
-    Text(label, color = ink, fontSize = 13.sp,
-        modifier = Modifier.padding(end = 8.dp, bottom = 8.dp)
-            .graphicsLayer { scaleX = pop.value; scaleY = pop.value }
-            .clip(RoundedCornerShape(16.dp))
-            .background(fill)
-            .border(1.dp, line, RoundedCornerShape(16.dp))
-            .springClick(onClick = onClick).padding(horizontal = 12.dp, vertical = 6.dp))
+    Box(modifier.width(IntrinsicSize.Max).heightIn(min = 48.dp)
+        .graphicsLayer { scaleX = pop.value; scaleY = pop.value }
+        .clip(RoundedCornerShape(16.dp))
+        .background(fill)
+        .border(1.dp, line, RoundedCornerShape(16.dp))
+        .springClick(onClick = onClick).padding(horizontal = 12.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center) {
+        Text(label, modifier = Modifier.fillMaxWidth(), color = ink, fontSize = 13.sp,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+    }
 }
 
 @Composable

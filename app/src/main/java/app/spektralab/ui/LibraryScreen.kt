@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -78,6 +79,8 @@ fun LibraryScreen(state: AppState) {
     val importing by state.importing.collectAsState()
     // the lightbox "switches on" like a fluorescent tube
     val tube by tubeFlicker()
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    var actionBarHeight by remember { mutableStateOf(110.dp) }
     // strips are dealt onto the table only when the lightbox opens, not while scrolling
     var dealing by remember { mutableStateOf(true) }
     LaunchedEffect(Unit) { delay(900); dealing = false }
@@ -155,9 +158,9 @@ fun LibraryScreen(state: AppState) {
                 }
             }
             if (shown.isEmpty()) {
-                EmptyLightbox(Modifier.weight(1f).fillMaxWidth(), filter)
+                EmptyLightbox(Modifier.weight(1f).fillMaxWidth().padding(bottom = actionBarHeight), filter)
             } else {
-                LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 110.dp)) {
+                LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = actionBarHeight)) {
                     itemsIndexed(strips, key = { _, it -> it.key }) { i, strip ->
                         // tossed onto the table from alternating sides, then they settle;
                         // removing / filtering slides the remaining strips together
@@ -170,23 +173,30 @@ fun LibraryScreen(state: AppState) {
             }
         }
         // bottom bar
-        Row(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(16.dp).widthIn(max = SheetMaxWidth).fillMaxWidth()
+        Row(Modifier.align(Alignment.BottomCenter)
+            .onSizeChanged { actionBarHeight = with(density) { it.height.toDp() } }
+            .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal))
+            .navigationBarsPadding().padding(16.dp).widthIn(max = SheetMaxWidth).fillMaxWidth()
             .clip(RoundedCornerShape(26.dp)).background(Pal.ink).padding(horizontal = 8.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
             val clip by state.clip.collectAsState()
             AnimatedContent(selecting, Modifier.fillMaxWidth(), label = "bar", transitionSpec = {
                 (fadeIn(tween(200, delayMillis = 80)) + scaleIn(Motion.settle, initialScale = 0.9f)) togetherWith fadeOut(tween(100))
             }) { sel ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                ActionGroup(if (sel) 4 else 2) { index, cell ->
                     if (!sel) {
-                        BarButton(stringResource(if (importing) R.string.importing else R.string.import_action) + if (importing) busyDots() else "",
-                            Pal.paper, filled = true) { if (!importing) state.sheet.value = Sheet.IMPORT }
-                        BarButton(stringResource(R.string.camera), Pal.paper) { state.openCamera() }
+                        when (index) {
+                            0 -> BarButton(stringResource(if (importing) R.string.importing else R.string.import_action) + if (importing) busyDots() else "",
+                                Pal.paper, cell, filled = true) { if (!importing) state.sheet.value = Sheet.IMPORT }
+                            else -> BarButton(stringResource(R.string.camera), Pal.paper, cell) { state.openCamera() }
+                        }
                     } else {
-                        BarButton(stringResource(R.string.paste_settings), if (clip != null) Pal.paper else Color(0xFF8F8A7E)) { state.pasteToPicked() }
-                        BarButton(stringResource(R.string.recipes), Pal.paper) { state.openRecipes() }
-                        BarButton(stringResource(R.string.export_action), Pal.paper) { state.openExport(state.picked.value) }
-                        BarButton(stringResource(R.string.remove), Pal.paper) { state.removePicked() }
+                        when (index) {
+                            0 -> BarButton(stringResource(R.string.paste_settings), if (clip != null) Pal.paper else Color(0xFF8F8A7E), cell) { state.pasteToPicked() }
+                            1 -> BarButton(stringResource(R.string.recipes), Pal.paper, cell) { state.openRecipes() }
+                            2 -> BarButton(stringResource(R.string.export_action), Pal.paper, cell) { state.openExport(state.picked.value) }
+                            else -> BarButton(stringResource(R.string.remove), Pal.paper, cell) { state.removePicked() }
+                        }
                     }
                 }
             }
@@ -195,11 +205,9 @@ fun LibraryScreen(state: AppState) {
 }
 
 @Composable
-private fun BarButton(label: String, color: Color, filled: Boolean = false, onClick: () -> Unit) {
-    Text(label, color = if (filled) Pal.ink else color, fontSize = 15.sp, fontWeight = FontWeight.Medium,
-        modifier = Modifier.clip(RoundedCornerShape(20.dp))
-            .background(if (filled) Pal.paper else Color.Transparent)
-            .springClick(0.9f, onClick = onClick).padding(horizontal = 18.dp, vertical = 10.dp))
+private fun BarButton(label: String, color: Color, modifier: Modifier = Modifier, filled: Boolean = false, onClick: () -> Unit) {
+    ActionButton(label, if (filled) Pal.ink else color, modifier,
+        fill = if (filled) Pal.paper else Color.Transparent, onClick = onClick)
 }
 
 /** "…" that fills up one dot at a time while something is in progress. */

@@ -37,8 +37,10 @@ export function CoffeePage() {
       <p className="coffee-amount">{copy.amount}</p>
 
       <div className="pay-jump">
-        <a className="pay-button wechat" href={WECHAT_PAY} onClick={pay}>{copy.wechat}</a>
-        <a className="pay-button alipay" href={ALIPAY_PAY} onClick={pay}>{copy.alipay}</a>
+        <div className="pay-actions">
+          <a className="pay-button wechat" href={WECHAT_PAY} onClick={pay}><span className="button-label">{copy.wechat}</span></a>
+          <a className="pay-button alipay" href={ALIPAY_PAY} onClick={pay}><span className="button-label">{copy.alipay}</span></a>
+        </div>
         <p className="pay-hint">{copy.wechatHint}</p>
         <div className="pay-fallback">
           <img src="/payments/wechat-card.png" alt={copy.wechat} width="1076" height="1461" />

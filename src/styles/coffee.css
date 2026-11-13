@@ -34,18 +34,33 @@
 }
 .pay-jump, .pay-codes { margin: 0 auto; }
 .pay-codes { display: none; }
+.pay-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: 1fr;
+  gap: 12px;
+  max-width: 420px;
+  margin: 0 auto 12px;
+}
+.pay-actions .pay-button { width: 100%; margin: 0; }
 .pay-button {
   display: flex;
   align-items: center;
   justify-content: center;
   width: min(100%, 420px);
-  min-height: 52px;
+  min-height: 3.25rem;
+  min-width: 0;
+  height: auto;
+  padding: .75em 1.375em;
   margin: 0 auto 12px;
   border: 0;
   border-radius: 4px;
   color: #fff;
   font: inherit;
-  font-size: 16px;
+  font-size: 1rem;
+  line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: anywhere;
   text-decoration: none;
   cursor: pointer;
 }

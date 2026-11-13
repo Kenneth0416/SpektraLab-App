@@ -94,7 +94,7 @@ fun FilmPackageRow(selected: String, onPick: (String) -> Unit) {
                 }
                 Spacer(Modifier.height(6.dp))
                 Text(film.name, color = if (on) accent else Pal.text, fontSize = 12.sp,
-                    fontWeight = if (on) FontWeight.Bold else FontWeight.Normal, maxLines = 2)
+                    fontWeight = if (on) FontWeight.Bold else FontWeight.Normal, minLines = 2)
             }
         }
     }

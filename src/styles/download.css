@@ -49,12 +49,12 @@
 .ticket-stats > div { display: flex; flex-direction: column; gap: 6px; }
 .ticket-stats span { color: #847b6b; font-size: 9px; }
 .ticket-stats strong { font-family: var(--mono); font-size: 13px; font-weight: 500; }
-.ticket-download { margin-top: 24px; min-height: 67px; padding: 0 18px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 13px; color: #fff8ef; background: #c94935; transition: background .2s, transform .2s; }
+.ticket-download { margin-top: 24px; min-height: 4.1875rem; padding: .75rem 1.125rem; display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 13px; color: #fff8ef; background: #c94935; transition: background .2s, transform .2s; }
 .ticket-download:hover { background: #dd543c; transform: translateY(-2px); }
 button.ticket-download { width: 100%; border: 0; text-align: left; }
 .ticket-download:disabled { opacity: .5; cursor: not-allowed; transform: none; }
-.ticket-download > span { display: flex; flex-direction: column; gap: 4px; font-size: 14px; font-weight: 650; }
-.ticket-download small { max-width: 245px; overflow: hidden; color: #efb7a8; font-family: var(--mono); font-size: 6px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
+.ticket-download > span { min-width: 0; display: flex; flex-direction: column; gap: 4px; font-size: .875rem; line-height: 1.3; font-weight: 650; overflow-wrap: anywhere; }
+.ticket-download small { max-width: 100%; color: #efb7a8; font-family: var(--mono); font-size: .375rem; font-weight: 400; white-space: normal; overflow-wrap: anywhere; }
 .ticket-checksum { padding: 13px 0; display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; border-bottom: 1px dashed #bdb4a3; }
 .ticket-checksum > span { color: #8b8272; font-family: var(--mono); font-size: 7px; }
 .ticket-checksum code { color: #696152; font-family: var(--mono); font-size: 7px; }
@@ -87,7 +87,6 @@ button.ticket-download { width: 100%; border: 0; text-align: left; }
 .prototype-file-meta { display: flex; flex-direction: column; gap: 6px; text-align: right; }
 .prototype-file-meta strong { font-family: var(--mono); font-size: 15px; font-weight: 500; }
 .prototype-file-meta span { color: #857c6b; font-family: var(--mono); font-size: 7px; }
-.prototype-download .button { min-height: 47px; font-size: 12px; }
 .prototype-hash { position: absolute; right: 28px; bottom: -27px; padding: 4px 0; display: flex; align-items: center; gap: 5px; border: 0; color: #776f61; background: none; font-size: 9px; cursor: pointer; }
 
 .quickstart-section { padding: 130px 0; background: #12100e; }
@@ -213,5 +212,5 @@ button.ticket-download { width: 100%; border: 0; text-align: left; }
   .honesty-icon { margin-bottom: 30px; }
   .faq-list summary { font-size: 13px; line-height: 1.6; }
   .download-bottom { padding: 85px 16px; }
-  .download-bottom .button { width: 100%; font-size: 11px; }
+  .download-bottom .button { width: 100%; }
 }

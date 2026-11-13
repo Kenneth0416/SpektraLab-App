@@ -167,12 +167,12 @@ export function CreditsPage() {
           <div className="provenance-box" style={{ marginTop: '20px' }}>
             <h4>{c.correspondingSourceTitle}</h4>
             <p>{c.correspondingSourceBody}</p>
-            <div style={{ marginTop: '14px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <div className="button-group" style={{ marginTop: '14px' }}>
               <a className="button button-dark" href={downloadMeta.source.href} download={downloadMeta.source.filename}>
-                <Download size={16} />{c.sourceDownloadButton} ({downloadMeta.source.size})
+                <Download size={16} /><span className="button-label">{c.sourceDownloadButton} ({downloadMeta.source.size})</span>
               </a>
               <a className="button button-ghost" href="https://github.com/Kenneth0416/SpektraLab-App" target="_blank" rel="noreferrer">
-                GitHub Repository <ArrowUpRight size={16} />
+                <span className="button-label">GitHub Repository</span> <ArrowUpRight size={16} />
               </a>
             </div>
           </div>

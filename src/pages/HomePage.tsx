@@ -40,9 +40,9 @@ export function HomePage() {
             <div className="hero-eyebrow"><span className="safety-dot" />{m.heroEyebrow}</div>
             <h1>{m.title1}<br />{m.title2}{locale === 'en' ? ' ' : null}<span className="memory-word">{m.memory}<svg viewBox="0 0 240 18" aria-hidden="true"><path d="M4 12C55 2 112 18 235 6" /></svg></span></h1>
             <p className="hero-intro">{m.intro}</p>
-            <div className="hero-actions">
-              <Link className="button button-primary" to="/download"><Download size={18} />{m.download}<ArrowRight size={17} /></Link>
-              <a className="button button-ghost" href="#craft">{m.explore}<ArrowDown size={17} /></a>
+            <div className="hero-actions button-group">
+              <Link className="button button-primary" to="/download"><Download size={18} /><span className="button-label">{m.download}</span><ArrowRight size={17} /></Link>
+              <a className="button button-ghost" href="#craft"><span className="button-label">{m.explore}</span><ArrowDown size={17} /></a>
             </div>
             <div className="hero-specs" aria-label={m.specsLabel}>
               <div><strong>06</strong><span>{m.specs[0]}</span></div>
@@ -172,9 +172,9 @@ export function HomePage() {
           <div className="cta-topline"><span className="safety-dot" />{m.ctaKicker}</div>
           <h2>{m.ctaTitle1}<br />{m.ctaTitle2}</h2>
           <p>{m.ctaDescription1}<br />{m.ctaDescription2}</p>
-          <div className="cta-actions">
-            <Link className="button button-light" to="/download"><Download size={19} />{m.ctaDownload}<ArrowRight size={18} /></Link>
-            <a className="button button-ghost" href="https://github.com/Kenneth0416/SpektraLab-App" target="_blank" rel="noreferrer">{m.ctaGithub}<ArrowUpRight size={17} /></a>
+          <div className="cta-actions button-group">
+            <Link className="button button-light" to="/download"><Download size={19} /><span className="button-label">{m.ctaDownload}</span><ArrowRight size={18} /></Link>
+            <a className="button button-ghost" href="https://github.com/Kenneth0416/SpektraLab-App" target="_blank" rel="noreferrer"><span className="button-label">{m.ctaGithub}</span><ArrowUpRight size={17} /></a>
           </div>
           <span className="cta-note">{m.ctaNote}</span>
         </Reveal>

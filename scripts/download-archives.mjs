@@ -98,25 +98,3 @@ export async function cachedArchive(filename, paths) {
   await writeFile(cachePath, JSON.stringify({ digest: current.digest, sha256: sha256(bytes) }));
   return metadata(filename, bytes, current.entries.length);
 }
-
-export async function verifiedAndroidPair() {
-  const apkPath = path.join(outputDir, apkFilename);
-  if (!existsSync(apkPath)) return null;
-  try {
-    const provenance = JSON.parse(await readFile(path.join(outputDir, provenanceFilename), 'utf8'));
-    const apk = await readFile(apkPath);
-    const source = await readFile(path.join(outputDir, sourceFilename));
-    if (provenance.schema !== 1 || provenance.apkSha256 !== sha256(apk)
-      || provenance.sourceSha256 !== sha256(source)
-      || !Array.isArray(provenance.files)
-      || provenance.sourceDigest !== sha256(JSON.stringify(provenance.files))) {
-      throw new Error('APK/source hashes do not match the build provenance');
-    }
-    return {
-      android: { ...metadata(apkFilename, apk), version: provenance.version, minAndroid: '8.0+' },
-      source: metadata(sourceFilename, source, provenance.files.length),
-    };
-  } catch (error) {
-    throw new Error(`Cannot publish an unverified APK/source pair. Run npm run android:build. ${error.message}`);
-  }
-}

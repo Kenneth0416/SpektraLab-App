@@ -6,7 +6,6 @@ dist/
 public/downloads/*.zip
 # Keep the verified corresponding-source snapshot with the versioned APK.
 !public/downloads/Silvercam-App-source.zip
-!public/downloads/Silvercam-Native-source.zip
 src/generated/download-meta.ts
 android/.gradle/
 android/build/

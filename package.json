@@ -10,7 +10,8 @@
     "package:downloads": "node scripts/package-downloads.mjs",
     "build:licenses-data": "node scripts/build-licenses-data.mjs",
     "android:build": "node scripts/build-android.mjs",
-    "android:build:native": "node scripts/build-native-android.mjs",
+    "android:build:native": "node scripts/build-android.mjs",
+    "android:verify": "node scripts/verify-native-release.mjs",
     "test:updates": "node --test scripts/native-release.test.mjs"
   },
   "dependencies": {

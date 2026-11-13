@@ -1,10 +1,12 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { outputDir, sha256 } from './download-archives.mjs';
+import { isDeepStrictEqual } from 'node:util';
+import { root, outputDir, sha256, snapshot, metadata, apkFilename, sourceFilename, provenanceFilename } from './download-archives.mjs';
 
-export const nativeApkFilename = 'Silvercam-Native.apk';
-export const nativeSourceFilename = 'Silvercam-Native-source.zip';
-export const nativeProvenanceFilename = 'Silvercam-Native.provenance.json';
+// One release serves the website and the installed app. Keep existing public URLs.
+export const nativeApkFilename = apkFilename;
+export const nativeSourceFilename = sourceFilename;
+export const nativeProvenanceFilename = provenanceFilename;
 
 export function parseReleaseProperties(text) {
   const entries = text.split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('#'));
@@ -25,41 +27,93 @@ export function parseReleaseProperties(text) {
 export function makeNativeFeed(config, apk, notes, apkSha256) {
   if (apk.applicationId !== 'app.spektralab') throw new Error('Refusing to publish a prototype or unrelated APK as a native update');
   if (apk.versionCode !== config.versionCode || apk.versionName !== config.versionName) throw new Error('APK version does not match release configuration');
-  if (!Number.isInteger(apk.minSdk) || apk.minSdk < 29) throw new Error('Invalid native minimum SDK');
+  if (!Number.isInteger(apk.minSdk) || apk.minSdk !== 29) throw new Error('Update the website Android requirement before changing native minSdk');
   if (!/^[a-f0-9]{64}$/.test(apkSha256)) throw new Error('Invalid APK checksum');
   for (const locale of ['en', 'zh-Hans', 'zh-Hant']) {
     if (typeof notes[locale] !== 'string' || !notes[locale].trim() || notes[locale].length > 8000) throw new Error(`Missing or invalid ${locale} release notes`);
   }
-  return {
+  const feed = {
     schemaVersion: 1, applicationId: apk.applicationId,
     versionCode: apk.versionCode, versionName: apk.versionName, minSdk: apk.minSdk,
     downloadUrl: `${config.updateBaseUrl}/downloads/${nativeApkFilename}`,
     sha256: apkSha256, releaseNotes: notes,
   };
+  if (Buffer.byteLength(JSON.stringify(feed, null, 2) + '\n') > 64 * 1024) throw new Error('Release notes exceed the update client response limit');
+  return feed;
+}
+
+// Also accepts legacy provenance, solely so the builder can verify the old pair
+// and inspect its actual package/version/certificate before the one-time migration.
+export function verifyArtifactHashes(provenance, apk, source) {
+  if (provenance.schema !== 1 || provenance.apkSha256 !== sha256(apk)
+      || provenance.sourceSha256 !== sha256(source) || !Array.isArray(provenance.files)
+      || provenance.sourceDigest !== sha256(JSON.stringify(provenance.files))) {
+    throw new Error('APK/source pair does not match its build provenance');
+  }
+}
+
+// Website copy and promo files are not native inputs. Hash paths, content and
+// modes from the same source snapshot used to create the corresponding archive.
+export function nativeInputDigest(manifest) {
+  const roots = ['app/', 'engine/', 'tools/', 'release/', 'gradle/'];
+  const files = new Set(['build.gradle.kts', 'settings.gradle.kts', 'gradle.properties',
+    'gradlew', 'gradlew.bat', 'scripts/build-android.mjs', 'scripts/build-native-android.mjs',
+    'scripts/native-release.mjs', 'scripts/download-archives.mjs']);
+  return sha256(JSON.stringify(manifest.filter(entry => files.has(entry.name)
+    || roots.some(prefix => entry.name.startsWith(prefix))).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)));
 }
 
 export function verifyNativeProvenance(provenance, apk, source) {
-  if (provenance.schema !== 1 || provenance.apkSha256 !== sha256(apk)
-      || provenance.sourceSha256 !== sha256(source) || !Array.isArray(provenance.files)
-      || provenance.sourceDigest !== sha256(JSON.stringify(provenance.files))
-      || !/^[a-f0-9]{64}$/.test(provenance.signerSha256)) {
-    throw new Error('Native APK/source pair does not match its build provenance');
-  }
+  verifyArtifactHashes(provenance, apk, source);
+  if (!/^[a-f0-9]{64}$/.test(provenance.signerSha256)) throw new Error('Missing native signing certificate');
+  if (provenance.nativeInputDigest !== nativeInputDigest(provenance.files)) throw new Error('Native input provenance is missing or invalid; rebuild the APK');
   const config = parseReleaseProperties(provenance.releaseProperties);
   const feed = makeNativeFeed(config, provenance.apk, provenance.releaseNotes, provenance.apkSha256);
-  return { feed, provenance };
+  return {
+    feed, provenance,
+    android: { ...metadata(nativeApkFilename, apk), version: feed.versionName, minAndroid: '10+' },
+    source: metadata(nativeSourceFilename, source, provenance.files.length),
+  };
+}
+
+export async function readArtifactPair(directory = outputDir) {
+  const readOptional = async filename => readFile(path.join(directory, filename)).catch(error => {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  });
+  const [apk, source, provenanceBytes] = await Promise.all([
+    readOptional(nativeApkFilename), readOptional(nativeSourceFilename), readOptional(nativeProvenanceFilename),
+  ]);
+  if (!apk && !source && !provenanceBytes) return null;
+  if (!apk || !source || !provenanceBytes) throw new Error('Incomplete APK/source/provenance release');
+  const provenance = JSON.parse(provenanceBytes);
+  verifyArtifactHashes(provenance, apk, source);
+  return { apk, source, provenance };
 }
 
 export async function verifiedNativePair(directory = outputDir) {
-  let apk;
-  try { apk = await readFile(path.join(directory, nativeApkFilename)); }
-  catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+  const pair = await readArtifactPair(directory);
+  return pair && verifyNativeProvenance(pair.provenance, pair.apk, pair.source);
+}
+
+export function verifyPublishedRelease(pair, current, feed) {
+  if (!pair) throw new Error('Native APK missing. Run npm run android:build.');
+  if (pair.provenance.nativeInputDigest !== nativeInputDigest(current.manifest)) {
+    throw new Error('Native APK is stale relative to the current native inputs. Bump the release version and run npm run android:build.');
+  }
+  if (!isDeepStrictEqual(feed, pair.feed)) throw new Error('Update feed does not match the website APK. Run npm run android:build.');
+  return pair;
+}
+
+export async function verifiedPublishedRelease({ directory = outputDir,
+  feedPath = path.join(root, 'public/updates/android.json'), current = snapshot() } = {}) {
   try {
-    const provenance = JSON.parse(await readFile(path.join(directory, nativeProvenanceFilename), 'utf8'));
-    const source = await readFile(path.join(directory, nativeSourceFilename));
-    return verifyNativeProvenance(provenance, apk, source);
+    const [pair, source, feed] = await Promise.all([
+      verifiedNativePair(directory), current, readFile(feedPath, 'utf8').then(JSON.parse),
+    ]);
+    return verifyPublishedRelease(pair, source, feed);
   } catch (error) {
-    throw new Error(`Cannot publish native updates. Run npm run android:build:native. ${error.message}`);
+    throw new Error(`Cannot publish the native release: ${error.message}. Run npm run android:build after integrating source and updating the release version.`, { cause: error });
   }
 }
 

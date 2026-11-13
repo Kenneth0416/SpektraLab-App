@@ -1,4 +1,8 @@
 /downloads/*.apk
   Content-Type: application/vnd.android.package-archive
-  Content-Disposition: attachment; filename="Silvercam-Android.apk"
+  Content-Disposition: attachment
   Cache-Control: no-cache
+
+/updates/*.json
+  Content-Type: application/json; charset=utf-8
+  Cache-Control: no-cache, max-age=0, must-revalidate

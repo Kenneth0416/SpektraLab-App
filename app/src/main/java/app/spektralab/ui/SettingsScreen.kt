@@ -25,6 +25,8 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.TextButton
+import app.spektralab.update.UpdateStatus
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -51,6 +53,7 @@ fun SettingsScreen(state: AppState) {
     val language by state.language.collectAsState()
     val gray18 by state.gray18.collectAsState()
     val reveal by state.reveal.collectAsState()
+    val updateStatus by state.updates.status.collectAsState()
     SettingsContent(
         language = language,
         gray18 = gray18,
@@ -59,6 +62,9 @@ fun SettingsScreen(state: AppState) {
         onLanguage = state::setLanguage,
         onGray18 = state::setGray18,
         onReveal = state::setReveal,
+        versionName = state.installedVersionName,
+        updateStatus = updateStatus,
+        onCheckUpdates = { state.updates.check(manual = true) },
     )
 }
 
@@ -71,6 +77,9 @@ internal fun SettingsContent(
     onLanguage: (AppLanguage) -> Unit,
     onGray18: (Boolean) -> Unit,
     onReveal: (Boolean) -> Unit,
+    versionName: String = "",
+    updateStatus: UpdateStatus = UpdateStatus.Idle,
+    onCheckUpdates: () -> Unit = {},
 ) {
     Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Pal.glow, Pal.paper), radius = 1800f))
         .statusBarsPadding().navigationBarsPadding().testTag("settings_screen")) {
@@ -114,8 +123,29 @@ internal fun SettingsContent(
                     onCheckedChange = onReveal,
                 )
                 Spacer(Modifier.height(24.dp))
+                UpdateSettings(versionName, updateStatus, onCheckUpdates)
+                Spacer(Modifier.height(24.dp))
             }
         }
+    }
+}
+
+@Composable
+internal fun UpdateSettings(versionName: String, status: UpdateStatus, onCheck: () -> Unit) {
+    SettingsHeading(stringResource(R.string.update_heading), stringResource(R.string.update_current_version, versionName))
+    val message = when (status) {
+        UpdateStatus.Idle -> stringResource(R.string.update_auto_hint)
+        UpdateStatus.Checking -> stringResource(R.string.update_checking)
+        UpdateStatus.Current -> stringResource(R.string.update_current)
+        UpdateStatus.Failed -> stringResource(R.string.update_failed)
+        UpdateStatus.Unsupported -> stringResource(R.string.update_unsupported)
+        is UpdateStatus.Available -> stringResource(R.string.update_available, status.release.versionName)
+    }
+    Text(message, color = if (status == UpdateStatus.Failed) Pal.red else Pal.grey,
+        fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp).testTag("update_status"))
+    TextButton(onClick = onCheck, enabled = status != UpdateStatus.Checking, modifier = Modifier.testTag("check_updates")) {
+        Text(stringResource(if (status == UpdateStatus.Checking) R.string.update_checking else R.string.update_check),
+            color = if (status == UpdateStatus.Checking) Pal.grey else Pal.red)
     }
 }
 

@@ -1,0 +1,15 @@
+<resources>
+    <string name="update_heading">App updates</string>
+    <string name="update_current_version">Current version %1$s</string>
+    <string name="update_auto_hint">Checks when you open the app, at most once a day. You can also check manually.</string>
+    <string name="update_check">Check for updates</string>
+    <string name="update_checking">Checking for updates…</string>
+    <string name="update_current">You are up to date.</string>
+    <string name="update_failed">Could not check for updates. Check your connection and try again.</string>
+    <string name="update_unsupported">The new version requires a newer Android version than this device supports.</string>
+    <string name="update_available">New version %1$s available</string>
+    <string name="update_download">Get update</string>
+    <string name="update_later">Remind me later</string>
+    <string name="update_install_hint">Opens the official APK download in your browser. Install it over the current app to keep your settings and library. Do not uninstall first.</string>
+    <string name="update_open_failed">Could not open a browser. Try again after enabling a browser.</string>
+</resources>

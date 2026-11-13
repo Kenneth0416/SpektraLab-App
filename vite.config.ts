@@ -9,7 +9,10 @@ function apkDownloadHeaders(): Plugin {
       server.middlewares.use((request, response, next) => {
         if ((request as { url?: string }).url?.split('?')[0].endsWith('.apk')) {
           response.setHeader('Content-Type', 'application/vnd.android.package-archive');
-          response.setHeader('Content-Disposition', 'attachment; filename="Silvercam-Android.apk"');
+          response.setHeader('Content-Disposition', 'attachment');
+        }
+        if ((request as { url?: string }).url?.split('?')[0] === '/updates/android.json') {
+          response.setHeader('Cache-Control', 'no-cache, max-age=0, must-revalidate');
         }
         next();
       });
@@ -18,7 +21,10 @@ function apkDownloadHeaders(): Plugin {
       server.middlewares.use((request, response, next) => {
         if ((request as { url?: string }).url?.split('?')[0].endsWith('.apk')) {
           response.setHeader('Content-Type', 'application/vnd.android.package-archive');
-          response.setHeader('Content-Disposition', 'attachment; filename="Silvercam-Android.apk"');
+          response.setHeader('Content-Disposition', 'attachment');
+        }
+        if ((request as { url?: string }).url?.split('?')[0] === '/updates/android.json') {
+          response.setHeader('Cache-Control', 'no-cache, max-age=0, must-revalidate');
         }
         next();
       });

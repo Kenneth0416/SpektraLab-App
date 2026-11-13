@@ -2,9 +2,9 @@
 
 > **名称声明**：**Silvercam**（繁体中文：**銀鹽工坊**；简体中文：**银盐工坊**）为本项目为区分上游而采用的展示品牌名，尚未进行商标检索与注册（not trademark-cleared），本项目不主张且不声明任何商标权利。源码仓库保留原路径：[Kenneth0416/SpektraLab-App](https://github.com/Kenneth0416/SpektraLab-App)。
 
-手机端胶片模拟工具的交互原型与展示网站：照片、视频、相机取景共用一套「胶片 × 相纸」参数。
+手机端原生 Android 胶片暗房与展示网站：照片、视频、相机取景共用一套「胶片 × 相纸」参数。
 
-画面与质感以 [spektrafilm](https://github.com/andreavolpato/spektrafilm)（Andrea Volpato）和 [SpektraLab](https://github.com/JamesQiu2005/SpektraLab)（James Qiu）为参考与移植来源。本项目为**独立、非官方的下游开源项目**，未获得上游项目作者或项目的赞助、认可或背书。仓库包含完整展示与下载网站、Android 互动原型、Kotlin/GLSL 引擎与工具链。
+画面与质感以 [spektrafilm](https://github.com/andreavolpato/spektrafilm)（Andrea Volpato）和 [SpektraLab](https://github.com/JamesQiu2005/SpektraLab)（James Qiu）为参考与移植来源。本项目为**独立、非官方的下游开源项目**，未获得上游项目作者或项目的赞助、认可或背书。仓库包含完整展示与下载网站、原生 Android 应用、历史互动原型、Kotlin/GLSL 引擎与工具链。
 
 ## 展示与下载网站
 
@@ -22,32 +22,40 @@ npm run build
 npm run preview
 ```
 
-`npm run dev` 和 `npm run build` 会自动运行 `scripts/package-downloads.mjs`，在 `public/downloads/` 生成真实 ZIP 包（`Silvercam-App-source.zip` 完整源码包与 `Silvercam-interaction-prototype.zip` 纯交互原型包，均内嵌 LICENSE 与 NOTICE 说明）；若 APK 已构建，也会同步 `Silvercam-Android.apk` 的大小与 SHA-256 元数据。下载页直接提供这些静态文件，不依赖第三方网盘。
+`npm run dev` 和 `npm run build` 会先运行 `scripts/package-downloads.mjs`，核对原生 APK、对应源码 ZIP、构建来源和更新 JSON，再生成网站下载元数据。若原生应用、引擎或构建配置已变化，网站构建会拒绝使用旧 APK，必须先递增版本并运行 `npm run android:build`。仅网站文案或宣传视频变化不要求重建 APK。源码 ZIP 始终保留该 APK 构建时的完整快照，不会被网站构建覆盖。纯交互原型 ZIP 仍独立提供。
 
 ## Android APK
 
-`android/` 是独立的 Android 互动原型，使用本地 WebView 加载内置暗房界面，支持三语、六款胶片、四个场景、曝光 / 颗粒 / 光晕、按住对比及配方。全部素材离线内置，不声明网络权限，也不访问真实相机或系统相册。
+下载页提供根目录 `app/` 原生 Android 应用，包名为 `app.spektralab`，最低 Android 10（API 29），需要 OpenGL ES 3.0。它包含相册导入、Kotlin/GLSL 冲洗、实时相机、RAW 多帧合成、照片 JPEG/PNG 导出与视频处理。拍摄和编辑可离线使用；网络权限用于检查更新，下载由浏览器处理，无需账号。
 
 构建需要 JDK 17、Android SDK，以及 `ANDROID_HOME` 或 `ANDROID_SDK_ROOT`（macOS 默认会尝试 `~/Library/Android/sdk`）：
 
 ```sh
 npm run android:build
+npm run android:verify
+npm run build
 ```
 
-命令通过 Gradle wrapper 构建 debug-signed APK，并输出至 `public/downloads/Silvercam-Android.apk`（应用内部 ID 为 `app.spektralab.prototype`，版本 `0.1.0`，最低 Android 8.0 / API 26）。这是用于安装与体验的原型，不是 Play Store 正式发行版。
+`npm run android:build:native` 是同一路径的别名。两个命令均构建 `:app:assembleRelease`，从实际 APK 读取包名、版本、最低系统要求与签名，并同时更新网站和应用更新源：
 
-部署时需支持 SPA 回退到 `index.html`；`public/_redirects` 已兼容使用这一规则的静态托管服务。
+- `public/downloads/Silvercam-Android.apk`
+- `public/downloads/Silvercam-App-source.zip`
+- `public/downloads/Silvercam-Android.provenance.json`
+- `public/updates/android.json`
+
+每次应用更新必须一起发布这四个文件；网站按钮和更新 JSON 使用同一个 APK、版本和 SHA-256。当前 release 构建仍使用原有 Debug 签名，并非 Play Store 正式发行版。`android/` 的 WebView 原型保留作历史设计参考，不再由上述发布命令构建。
+
+部署时需支持 SPA 回退到 `index.html`，但 `/updates/android.json` 必须直接返回 JSON；`public/_redirects` 已兼容静态托管的回退规则。
 
 ## 当前状态
 
-以下状态针对网站展示和 `android/` WebView 原型：
+原生应用包含实际相机、相册与渲染功能。默认照片导出使用原尺寸（长边上限 12000 px，超过 4096 px 时分块渲染），并从原片继承拍摄信息。RAW、视频和折叠屏功能取决于设备能力，仍需真机验证。网站预览与 `prototype/` 里的光晕、颗粒、柔焦及插画场景是交互演示，不代表原生 APK 仅能展示模拟素材。
 
-- 这是交互原型；仓库提供可安装的 Android APK，但还不是正式发行应用。
-- 预览里的光晕、颗粒、柔焦是用 CSS 近似的占位效果。
-- 取景画面和素材是四张插画，没有接真实摄像头和系统相册。
-- 导入候选、导出进度、移除都是模拟的。
+## 原生应用更新
 
-仓库另有独立的原生 Android 应用 `app/`（根目录 Gradle 工程，非下载页的 WebView APK），使用 `./gradlew :app:assembleDebug` 构建。原生应用已实现相册导入、Kotlin/GLSL 冲洗、实时相机、RAW 多帧合成、照片 JPEG/PNG 导出与视频处理；这些功能不属于上述原型 APK。默认照片导出使用原尺寸（长边上限 12000 px，超过 4096 px 时分块渲染），并从原片继承拍摄信息（相机、镜头、曝光参数、时区及拍摄位置）。设备相关功能仍需真机验证。
+原生应用支持每日自动检查更新，以及「设置 → 应用更新」中的手动检查。新版提示包含三语更新说明、「前往更新」和「稍后提醒」，自动提示会等待退出拍摄和编辑等操作后再显示。版本集中在 `release/android.properties`，更新说明在 `release/android-notes.json`。发布前须递增 `versionCode`；相同版本不能替换不同 APK。
+
+仓库未配置官网域名，默认更新源使用本项目 GitHub 静态文件地址；本地构建不会自动发布。合并所有应用修改后再构建最终 APK 和对应源码。正式部署、签名连续性和旧用户首次升级说明见 [Android 更新发布流程](docs/ANDROID_UPDATES.md)。
 
 ## 原型流程
 

@@ -27,6 +27,7 @@ import app.spektralab.ui.LocalFold
 import app.spektralab.ui.rememberFoldState
 import app.spektralab.ui.Sheet
 import app.spektralab.ui.Sheets
+import app.spektralab.ui.UpdateDialog
 import app.spektralab.ui.SettingsScreen
 
 class MainActivity : AppCompatActivity() {
@@ -49,6 +50,7 @@ class MainActivity : AppCompatActivity() {
         // "share" exports when we are (back) on screen
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                state.updates.check()
                 // prints left from a previous run: only now may the export service be started
                 state.exports.resume()
                 state.exports.pendingShare.collect { uris ->
@@ -68,6 +70,12 @@ class MainActivity : AppCompatActivity() {
                 val cameraOpen by state.cameraOpen.collectAsState()
                 val settingsOpen by state.settingsOpen.collectAsState()
                 val coffeePrompt by state.coffeePrompt.collectAsState()
+                val updatePrompt by state.updates.prompt.collectAsState()
+                val importing by state.importing.collectAsState()
+                val exporting by state.exports.state.collectAsState()
+                val merging by state.merging.collectAsState()
+                val canRemind = sheet == Sheet.NONE && !coffeePrompt && editId == null && !cameraOpen &&
+                    !selecting && !importing && exporting == null && merging == null
                 BackHandler(coffeePrompt || sheet != Sheet.NONE || editId != null || selecting || cameraOpen || settingsOpen) {
                     when {
                         coffeePrompt -> state.snoozeCoffeePrompt()
@@ -90,6 +98,10 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                     Sheets(state)
+                    updatePrompt?.takeIf { canRemind || (it.manual && settingsOpen && !coffeePrompt && sheet == Sheet.NONE) }?.let { prompt ->
+                        UpdateDialog(prompt.release, onLater = state.updates::dismissPrompt,
+                            onOpened = state.updates::dismissPrompt)
+                    }
                     if (coffeePrompt) CoffeePromptDialog(
                         onLater = state::snoozeCoffeePrompt,
                         onDismissForever = state::dismissCoffeePrompt,

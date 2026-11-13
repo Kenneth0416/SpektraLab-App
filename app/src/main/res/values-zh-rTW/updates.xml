@@ -1,0 +1,15 @@
+<resources>
+    <string name="update_heading">應用程式更新</string>
+    <string name="update_current_version">目前版本 %1$s</string>
+    <string name="update_auto_hint">開啟應用程式時自動檢查，每天最多一次。也可以隨時手動檢查。</string>
+    <string name="update_check">檢查更新</string>
+    <string name="update_checking">正在檢查更新…</string>
+    <string name="update_current">已是最新版本。</string>
+    <string name="update_failed">暫時無法檢查更新，請檢查網路後重試。</string>
+    <string name="update_unsupported">新版所需的 Android 版本高於此裝置目前支援的版本。</string>
+    <string name="update_available">發現新版本 %1$s</string>
+    <string name="update_download">前往更新</string>
+    <string name="update_later">稍後提醒</string>
+    <string name="update_install_hint">將在瀏覽器開啟官方 APK 下載。直接覆蓋安裝可保留設定和圖庫，請勿先解除安裝應用程式。</string>
+    <string name="update_open_failed">無法開啟瀏覽器，請啟用瀏覽器後重試。</string>
+</resources>

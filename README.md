@@ -49,6 +49,17 @@ npm run android:build
 
 仓库另有独立的原生 Android 应用 `app/`（根目录 Gradle 工程，非下载页的 WebView APK），使用 `./gradlew :app:assembleDebug` 构建。原生应用已实现相册导入、Kotlin/GLSL 冲洗、实时相机、RAW 多帧合成、照片 JPEG/PNG 导出与视频处理；这些功能不属于上述原型 APK。默认照片导出使用原尺寸（长边上限 12000 px，超过 4096 px 时分块渲染），并从原片继承拍摄信息（相机、镜头、曝光参数、时区及拍摄位置）。设备相关功能仍需真机验证。
 
+## 原生应用更新
+
+原生 `app/` 已支持每日自动检查更新，以及「设置 → 应用更新」中的手动检查。新版提示包含三语更新说明、「前往更新」和「稍后提醒」，自动提示会等待退出拍摄和编辑等操作后再显示。初始版本为 `0.1.1`（内部版本号 `2`）；配置集中在 `release/android.properties`，更新说明在 `release/android-notes.json`。
+
+```sh
+npm run android:build:native
+npm run build
+```
+
+原生包输出为 `public/downloads/Silvercam-Native.apk`，配套源码为 `Silvercam-Native-source.zip`，版本信息为 `public/updates/android.json`；它们与原有 WebView 原型 APK 分开。仓库未配置官网域名，默认更新源使用本项目 GitHub 静态文件地址；本地构建不会自动发布。正式部署、签名连续性和旧用户首次升级说明见 [Android 更新发布流程](docs/ANDROID_UPDATES.md)。
+
 ## 原型流程
 
 图库 → 编辑 → 导出，相机是图库的一个入口。

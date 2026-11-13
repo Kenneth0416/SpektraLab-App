@@ -9,7 +9,9 @@
     "preview": "vite preview --host 0.0.0.0",
     "package:downloads": "node scripts/package-downloads.mjs",
     "build:licenses-data": "node scripts/build-licenses-data.mjs",
-    "android:build": "node scripts/build-android.mjs"
+    "android:build": "node scripts/build-android.mjs",
+    "android:build:native": "node scripts/build-native-android.mjs",
+    "test:updates": "node --test scripts/native-release.test.mjs"
   },
   "dependencies": {
     "gsap": "^3.15.1",

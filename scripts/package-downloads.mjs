@@ -1,3 +1,4 @@
+import { verifiedNativePair } from './native-release.mjs';
 import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import {
@@ -12,6 +13,19 @@ await mkdir(generatedDir, { recursive: true });
 // Its source ZIP was captured and verified by the successful Android build.
 // Missing/tampered provenance fails closed instead of advertising a stale pair.
 const pair = await verifiedAndroidPair();
+const native = await verifiedNativePair();
+const updatesDir = path.join(root, 'public', 'updates');
+if (native) {
+  await mkdir(updatesDir, { recursive: true });
+  // Use the APK build snapshot, never today's edited release properties or notes.
+  await writeFile(path.join(updatesDir, 'android.json'), JSON.stringify(native.feed, null, 2) + '\n');
+} else {
+  const orphan = await readFile(path.join(updatesDir, 'android.json')).catch(error => {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  });
+  if (orphan) throw new Error('Native update feed exists without its APK. Run npm run android:build:native.');
+}
 const source = pair ? pair.source : await cachedArchive(sourceFilename);
 const android = pair ? pair.android : null;
 const prototype = await cachedArchive('Silvercam-interaction-prototype.zip', prototypePaths);

@@ -5,6 +5,9 @@ import android.net.Uri
 import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import app.spektralab.update.UpdateClient
+import app.spektralab.update.UpdateManager
+import app.spektralab.update.UpdatePreferences
 import app.spektralab.R
 import app.spektralab.SpektraApp
 import app.spektralab.camera.CameraFormat
@@ -34,6 +37,12 @@ class AppState(application: Application) : AndroidViewModel(application) {
     val app = application as SpektraApp
     val library = app.library
     val exports = app.exports
+    private val installedPackage = application.packageManager.getPackageInfo(application.packageName, 0)
+    val installedVersionName = installedPackage.versionName.orEmpty()
+    val updates = UpdateManager(
+        viewModelScope, UpdatePreferences(application), installedPackage.longVersionCode,
+        android.os.Build.VERSION.SDK_INT, UpdateClient(application.packageName)::fetch,
+    )
 
     val editId = MutableStateFlow<Long?>(null)
     val filter = MutableStateFlow(Filter.ALL)

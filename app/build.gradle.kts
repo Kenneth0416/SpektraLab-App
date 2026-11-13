@@ -1,7 +1,18 @@
+import java.util.Properties
+import java.net.URI
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+}
+
+val nativeRelease = Properties().apply {
+    rootProject.file("release/android.properties").inputStream().use { load(it) }
+}
+val updateBaseUrl = nativeRelease.getProperty("updateBaseUrl").trimEnd('/')
+require(URI(updateBaseUrl).let { it.scheme == "https" && !it.host.isNullOrBlank() && it.userInfo == null && it.query == null && it.fragment == null }) {
+    "release/android.properties must specify an HTTPS updateBaseUrl"
 }
 
 android {
@@ -12,8 +23,9 @@ android {
         applicationId = "app.spektralab"
         minSdk = 29
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = nativeRelease.getProperty("versionCode").toInt()
+        versionName = nativeRelease.getProperty("versionName")
+        buildConfigField("String", "UPDATE_URL", "\"${updateBaseUrl}/updates/android.json\"")
     }
 
     buildTypes {
@@ -28,7 +40,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
     androidResources {
         // baked engine data is already compact binary; keep it uncompressed for fast reads
         noCompress += "spk"
@@ -68,6 +80,7 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
     testImplementation("org.robolectric:robolectric:4.14.1")
     // real org.json for plain JVM tests (android.jar only has stubs)
     testImplementation("org.json:json:20240303")

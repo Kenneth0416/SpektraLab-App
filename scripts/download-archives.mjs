@@ -15,7 +15,7 @@ export const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex'
 const sourcePaths = [
   'README.md', 'LICENSE', 'NOTICE.md', 'docs', 'package.json', 'package-lock.json',
   'tsconfig.json', 'vite.config.ts', 'index.html', '.gitignore', 'src', 'scripts',
-  'prototype', 'android', 'app', 'engine', 'tools', 'build.gradle.kts',
+  'prototype', 'android', 'app', 'engine', 'tools', 'release', 'build.gradle.kts',
   'settings.gradle.kts', 'gradle.properties', 'gradlew', 'gradlew.bat', 'gradle',
   'public/assets', 'public/favicon.svg', 'public/logo-dichroic-prism.svg',
   'public/logo-dichroic-prism-mark.svg', 'public/_redirects', 'public/_headers',

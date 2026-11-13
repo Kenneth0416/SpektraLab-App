@@ -1,10 +1,23 @@
 {
   "schema": 1,
-  "version": "0.1.0",
-  "builtAt": "2026-11-13T04:19:19.408Z",
-  "apkSha256": "a9d0468ceae082bfe86fa64c7c4d0edb7630e7ba618af63d3b4179ebefa47357",
-  "sourceSha256": "a8fbf671efb5cbc4ba52e5576141e1116ede388cc59473d363871e01151cd0ff",
-  "sourceDigest": "39a581017d59d708839c28959cd8c13a2478d830a3e14a40431190bb40f90e16",
+  "builtAt": "2026-11-13T08:52:38.622Z",
+  "apk": {
+    "applicationId": "app.spektralab",
+    "versionCode": 3,
+    "versionName": "0.1.2",
+    "minSdk": 29
+  },
+  "signerSha256": "4b813e686aab33e66b24d08b7a77e1085cc5070d0ea521a31200bd5d292a7822",
+  "releaseProperties": "# Native Android release. Keep this URL stable once an APK has been distributed.\n# For website hosting, set this to the site's HTTPS origin (without a trailing slash).\nupdateBaseUrl=https://raw.githubusercontent.com/Kenneth0416/SpektraLab-App/main/public\nversionCode=3\nversionName=0.1.2\n",
+  "releaseNotes": {
+    "en": "Added automatic update checks and a manual check in Settings. The website download and update feed now share one verified APK. RAW capture reuses bounded previews; supported DNG files develop in cancellable row bands with bounded memory. Includes memory-budget fixes while preserving JPEG, single RAW, RAW burst, ultrawide switching and the folding viewfinder.",
+    "zh-Hans": "新增自动检查更新及设置中的手动检查入口，网站下载与更新通知同步使用同一份已验证 APK。RAW 拍摄复用小尺寸预览，支持的 DNG 按行分段解码，可取消并限制内存占用。修复内存预算，同时保留 JPEG、单张 RAW、RAW 连拍、超广角切换和折叠屏取景器。",
+    "zh-Hant": "新增自動檢查更新及設定中的手動檢查入口，網站下載與更新通知同步使用同一份已驗證 APK。RAW 拍攝重用小尺寸預覽，支援的 DNG 按行分段解碼，可取消並限制記憶體用量。修正記憶體預算，同時保留 JPEG、單張 RAW、RAW 連拍、超廣角切換和摺疊螢幕取景器。"
+  },
+  "apkSha256": "877bd85de1797508475def8b87b89db557707be66a8693f6ab4d15ef29af583e",
+  "sourceSha256": "23320adb36d1af3e4b11bd5fd8dfa564e62694ce9114a3477aecfddd5075031e",
+  "sourceDigest": "e29172ef968db79d35619627001aacd98e9bd9a2a842558426fcb97ef4e8f73b",
+  "nativeInputDigest": "4e11ed20ec1c1acba84459b82c3e5e14b37a7546577cd2817f638df41b74f13d",
   "files": [
     {
       "name": ".gitignore",
@@ -24,7 +37,7 @@
     {
       "name": "README.md",
       "mode": 420,
-      "sha256": "26cded541df6b28621b10517de0b770fc902c7d4322b8ca8c2343b00bd5d358d"
+      "sha256": "def4bf2c67fb2eef0266f1247e0cc8adcd30e19ef548feda5e665ce43809087b"
     },
     {
       "name": "android/app/build.gradle",
@@ -234,12 +247,12 @@
     {
       "name": "app/build.gradle.kts",
       "mode": 420,
-      "sha256": "65e2e4837bd5fe7a4388033ff75b3e6a5555717645c55cdfad53e0159feba0c0"
+      "sha256": "0f5e08540d459b57de5b3ac14a1742d6dd44a8a15f6aee45b25a3787ad4579dc"
     },
     {
       "name": "app/src/main/AndroidManifest.xml",
       "mode": 420,
-      "sha256": "8abbf46cc8569cedf3c81f3328b8af4126d23c036e91fec6f8b3eca025f4b374"
+      "sha256": "23a10bc7d30b2568d1a4fe8c722af6a6717640e979e5117e2b2599e2826022a3"
     },
     {
       "name": "app/src/main/assets/film-packages/fujifilm_c200.svg",
@@ -524,17 +537,22 @@
     {
       "name": "app/src/main/java/app/spektralab/HeavyWork.kt",
       "mode": 420,
-      "sha256": "c1052733d963e5a58494cd57a163d2275aa5cbb836ccbb4fc362c8fb39ae5f8c"
+      "sha256": "b6fee2fd99faecdeb9c2cec8611ebb7fd2f4b6db5ea40bd794eeda0ededd2f89"
     },
     {
       "name": "app/src/main/java/app/spektralab/MainActivity.kt",
       "mode": 420,
-      "sha256": "f845b7ae3a05129d90217d5889a076c51dcbf04e4904220c9b3b11cf60f8134a"
+      "sha256": "6bc9df26f4b77083fca9cfe4901112d1f151d7dbe2ae87cf1ce4f18e1c707726"
     },
     {
       "name": "app/src/main/java/app/spektralab/SpektraApp.kt",
       "mode": 420,
-      "sha256": "99ad411471eb2d5103d2b5743ac0ddb2b3460708f73839f07bd4dd38153001ab"
+      "sha256": "8d761de09fc57767fc7e4ee548eac0d5cbe85033ba250be492fe3f31a5585942"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/camera/CameraFormat.kt",
+      "mode": 420,
+      "sha256": "0293d835bf199f193877839f527ca25e3e20ef18a781ae3069c20c2df9ed04af"
     },
     {
       "name": "app/src/main/java/app/spektralab/camera/FilmViewfinderEffect.kt",
@@ -549,7 +567,7 @@
     {
       "name": "app/src/main/java/app/spektralab/camera/RawShooter.kt",
       "mode": 420,
-      "sha256": "511907d55d48b0141cb74df5df8dd600093bd51d3ec2b1d70fbf342d0c2643b0"
+      "sha256": "4362ab74276d6563d3906d915257de4c124ff639dbf069a77855d820b7b89ab0"
     },
     {
       "name": "app/src/main/java/app/spektralab/camera/ShotAdmission.kt",
@@ -564,17 +582,22 @@
     {
       "name": "app/src/main/java/app/spektralab/data/Media.kt",
       "mode": 420,
-      "sha256": "a26fda1610fadff223d6865599638813abfed506b5dcf5c39c575d85395e4f5d"
+      "sha256": "48eeccf149d6d1ef82473816024cdf3c5315b37f02beb8817105d039455b978c"
     },
     {
       "name": "app/src/main/java/app/spektralab/data/QuickSources.kt",
       "mode": 420,
-      "sha256": "aae9ab0cf948316d5559658ee8f0b0b0aaa85d3b0f258db731551b2dac779f87"
+      "sha256": "54018d6cbc1f05bcdd2338b1fd45fbf607a77310ccc1a385ff904fcd1aa23603"
     },
     {
       "name": "app/src/main/java/app/spektralab/data/RawMemoryGate.kt",
       "mode": 420,
-      "sha256": "cbf3c509bee47bee7b5c3760fa212896a47aec70894327b093e121ba1688ce5b"
+      "sha256": "6dd146bc9489297d1c8094cb963e9335993779f0f01ba04c9b7abd2bd3d3c11b"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/data/RawPreview.kt",
+      "mode": 420,
+      "sha256": "5f2b6bf26e7a24b0f577b81092007d09d70948098517d8ea26df3ae1ab8c62df"
     },
     {
       "name": "app/src/main/java/app/spektralab/export/ExportManager.kt",
@@ -659,7 +682,7 @@
     {
       "name": "app/src/main/java/app/spektralab/ui/AppState.kt",
       "mode": 420,
-      "sha256": "4e449a0a7e93705c9d9ebddee408a690c8d4d1a0a72c718ef6ac33328c783ac7"
+      "sha256": "c8c72b962d6bd2e1b94bc051b66ea21d99044cd25481a2110484e559a65d236f"
     },
     {
       "name": "app/src/main/java/app/spektralab/ui/CameraControls.kt",
@@ -669,7 +692,7 @@
     {
       "name": "app/src/main/java/app/spektralab/ui/CameraScreen.kt",
       "mode": 420,
-      "sha256": "0589c35262feef4a82f3809020ebd46d709aaa583f04bac9155d024703ae8435"
+      "sha256": "47a671bae72beb39f85befd18c5c6b534848340ff2ec718b0afa5c7f70960d7f"
     },
     {
       "name": "app/src/main/java/app/spektralab/ui/CatalogText.kt",
@@ -694,7 +717,7 @@
     {
       "name": "app/src/main/java/app/spektralab/ui/EditorScreen.kt",
       "mode": 420,
-      "sha256": "62c5a40dc8a968a57158ebab88c9c7f2b4c72963bb55bfd55284bdbd64b33d90"
+      "sha256": "842f9f597c87048c59ad5feb503da47c83ed2e07a41ea36bdf6ea04424652e06"
     },
     {
       "name": "app/src/main/java/app/spektralab/ui/FilmAdvance.kt",
@@ -714,7 +737,7 @@
     {
       "name": "app/src/main/java/app/spektralab/ui/LibraryScreen.kt",
       "mode": 420,
-      "sha256": "25f16dcc0b035e61435ec7ca481af96b5c8a1d6477a0c0eb618d029aaa6a19ae"
+      "sha256": "76587e0162624d492ce41734bd3494dc89d0b011be412941a93155482e3d1cd7"
     },
     {
       "name": "app/src/main/java/app/spektralab/ui/Motion.kt",
@@ -739,7 +762,7 @@
     {
       "name": "app/src/main/java/app/spektralab/ui/SettingsScreen.kt",
       "mode": 420,
-      "sha256": "2de23495827fae01e6d71fa37775ce3f273795147f811c19cd6f50e91ba30921"
+      "sha256": "25916fb9ae8351bca13d8af403360d83c52ab25ef82ee4e6a114ae253ab4f28a"
     },
     {
       "name": "app/src/main/java/app/spektralab/ui/Sheets.kt",
@@ -749,12 +772,27 @@
     {
       "name": "app/src/main/java/app/spektralab/ui/Swatches.kt",
       "mode": 420,
-      "sha256": "adcdbf40e23fb1dff9c5ddfc789d71a418cf6a8fd58ab021748a00d0d348f093"
+      "sha256": "09206d0f04777f4afdd8c135e6a51cd434e305e539a1820a605abb375c9174cf"
     },
     {
       "name": "app/src/main/java/app/spektralab/ui/Theme.kt",
       "mode": 420,
       "sha256": "d79ac5ff188c0be36fb8f74a77634244f657276677582bd7483f99e68b0a03b0"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/ui/UpdateDialog.kt",
+      "mode": 420,
+      "sha256": "0d32b08b4177d623253504604230aab930bd09f9cfe16a8f7fb39f60d17c6f53"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/update/AppRelease.kt",
+      "mode": 420,
+      "sha256": "bb4a2b94818bf49893e9b0d82562aa6d3dec474c6124c7aea65e1c6ffa6366e1"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/update/UpdateManager.kt",
+      "mode": 420,
+      "sha256": "9ece4fa573a7f0609ee25f8711523beef1b1af88445b8a57adb0a8483e94b326"
     },
     {
       "name": "app/src/main/res/drawable-nodpi/paper_back_mark.png",
@@ -814,12 +852,22 @@
     {
       "name": "app/src/main/res/values-zh-rCN/strings.xml",
       "mode": 420,
-      "sha256": "af1935e847bcfb10c61f4c84d0fc070c9557d4b51ba7ea60307793c4e2b96655"
+      "sha256": "dfd1402c689c9ba452be7956c85ec5f5dccc95d6120ea71cc5e29a0c96c396a1"
+    },
+    {
+      "name": "app/src/main/res/values-zh-rCN/updates.xml",
+      "mode": 420,
+      "sha256": "5f5b1edf4f22645c704f998ea8b07b4eb9c29ac7868764ddfb21e78e2c3c4dfc"
     },
     {
       "name": "app/src/main/res/values-zh-rTW/strings.xml",
       "mode": 420,
-      "sha256": "6c003b70a7ff78e8a8b14413bcc90a00209f123e0c4ccbb93cd1332c0008f9bf"
+      "sha256": "f2cf05040834edc9da622994a1116cbbd8f89db7090f6d20535c78f65c15b008"
+    },
+    {
+      "name": "app/src/main/res/values-zh-rTW/updates.xml",
+      "mode": 420,
+      "sha256": "c872ca1209cc80b87b15466ccf64f271269fd7b0257492725b6b15318ff94220"
     },
     {
       "name": "app/src/main/res/values/colors.xml",
@@ -829,7 +877,7 @@
     {
       "name": "app/src/main/res/values/strings.xml",
       "mode": 420,
-      "sha256": "cf70c99df7e264a06f6ca21389ddcb4c6ee36e2368b6fdd120b302ce96194042"
+      "sha256": "9f0301d75d66d1ee4f86fc6fcdf52d9e236080700903d4a2e30e32c1aeb9aea8"
     },
     {
       "name": "app/src/main/res/values/themes.xml",
@@ -837,9 +885,19 @@
       "sha256": "f42010660cb2aeebad13a5f5e85fb3a4e938c0a66bc9e7ddb9821c77f4e16d12"
     },
     {
+      "name": "app/src/main/res/values/updates.xml",
+      "mode": 420,
+      "sha256": "ba89c2e025d3bb5c51df2d4e1c59310b561c5e31803f6711f9aed9d9ec7023b3"
+    },
+    {
       "name": "app/src/main/res/xml/locales_config.xml",
       "mode": 420,
       "sha256": "a162c660b8921edb8354c82298ab29f809207e0e5eb1c0a9efb9476c101ea141"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/camera/CameraFormatTest.kt",
+      "mode": 420,
+      "sha256": "42a426bb8cfae9d90746e746253f2e3dede26b68c993e50e3fbd73b611f67f59"
     },
     {
       "name": "app/src/test/java/app/spektralab/camera/CaptureResultRetentionTest.kt",
@@ -857,6 +915,11 @@
       "sha256": "aa2fa0ad828e3148be5ea12a4d4a0b8aed150ee500a51c8788d05fef24e62708"
     },
     {
+      "name": "app/src/test/java/app/spektralab/data/CapturedPreviewTest.kt",
+      "mode": 420,
+      "sha256": "0d18da5a495da91fd5646b5116bc34ac5842c3374acd6adc408bdeb6a39bcbb5"
+    },
+    {
       "name": "app/src/test/java/app/spektralab/data/QuickSourcesTest.kt",
       "mode": 420,
       "sha256": "cf7b968fbf0fcf26179a4a3d45cff69737da2fd0bee5aac520905c3035857499"
@@ -869,7 +932,7 @@
     {
       "name": "app/src/test/java/app/spektralab/data/RawMemoryTest.kt",
       "mode": 420,
-      "sha256": "7fe8069105e292e0c8103036b73c0e34387fa3f78922d13f61a3fa662164f474"
+      "sha256": "7a7ff2dc279ab21b00530845a89428a00a48773fad9279463b793e44e50dc9fd"
     },
     {
       "name": "app/src/test/java/app/spektralab/export/ExportQueueTest.kt",
@@ -904,7 +967,7 @@
     {
       "name": "app/src/test/java/app/spektralab/ui/BurstSourceRetentionTest.kt",
       "mode": 420,
-      "sha256": "b80e88ab97a5c97213d37c5c5620054de43e8334292b1d3428e4faec80de8a36"
+      "sha256": "88c902459157f4d672e63fa4603264bf938303aca2848a91885690bb5e4a8585"
     },
     {
       "name": "app/src/test/java/app/spektralab/ui/CoffeePromptTest.kt",
@@ -952,14 +1015,54 @@
       "sha256": "5ed0e6a378c9ee246b39b8c2454d4aa83014a4c61ca629fa19222dc322e550a1"
     },
     {
+      "name": "app/src/test/java/app/spektralab/ui/ShotPreviewPublicationTest.kt",
+      "mode": 420,
+      "sha256": "01ac85dee8a1594b3da67754350c5524bec3b5746ec839d8aa12a7c2e9a5422a"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/ui/UpdateFlowTest.kt",
+      "mode": 420,
+      "sha256": "a4c006c506939eff3116625aebec150becd8565114d6648fe19fde3c0eeb3266"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/ui/UpdateUiTest.kt",
+      "mode": 420,
+      "sha256": "39090715ffae32422af5e91bb61038f9d407898ad947ba07455c3c0bd2ea07f7"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/update/AppReleaseTest.kt",
+      "mode": 420,
+      "sha256": "a51f8033e47d3d4f988beb6bf58ce246124ac729f40fea10f7fc231c89515d33"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/update/UpdateManagerTest.kt",
+      "mode": 420,
+      "sha256": "092e59e048b48fc7537492e1339ab90e3ea13fd827d5c7df1f4aaa79d3fd5e89"
+    },
+    {
       "name": "build.gradle.kts",
       "mode": 420,
       "sha256": "4cd1b7937a7970352b4f12e26818e62922b1ecf5ddbd0771b4238a8388e5d18a"
     },
     {
+      "name": "docs/ANDROID_UPDATES.md",
+      "mode": 420,
+      "sha256": "3a31571bf30f56b0223ceb7d5a5b3f4990f58b32d2d36ea0e8f57ecf7f97629a"
+    },
+    {
       "name": "docs/YSJF_SAMPLES.md",
       "mode": 420,
       "sha256": "7f2fe0650cd6dbd2562318f87d0727183282e4554046da33636f80d5b4807dd3"
+    },
+    {
+      "name": "docs/performance/raw-capture-2026-11-13.md",
+      "mode": 420,
+      "sha256": "b5bcfd82cc8614bf5dc161aae8de5fa70f3352b3bef55de7f64b3b9d24c0dbbd"
+    },
+    {
+      "name": "docs/performance/raw-optimization-2026-11-13.md",
+      "mode": 420,
+      "sha256": "d2815cbf660c387df3709b242f834fdd67e9b3fd333f1ec6467abbc375b3e3d6"
     },
     {
       "name": "engine/build.gradle.kts",
@@ -1079,7 +1182,7 @@
     {
       "name": "engine/src/main/kotlin/app/spektralab/raw/Dng.kt",
       "mode": 420,
-      "sha256": "e31ed163cac7ba6f070a31c57b87e90f4b702c2573ff35f0210705c6640e13c2"
+      "sha256": "3fac7ec3b4adcc1c6e3ed14ff49054f5dac1efbce5b23d4e712b079bda3a4e1d"
     },
     {
       "name": "engine/src/main/kotlin/app/spektralab/raw/DngWriter.kt",
@@ -1112,6 +1215,11 @@
       "sha256": "97317736effe7f2139da0fcd1158906f031d485e70c51aeb9b24fdcc02da4677"
     },
     {
+      "name": "engine/src/main/kotlin/app/spektralab/raw/PreparedGainMap.kt",
+      "mode": 420,
+      "sha256": "e9d9f90deecc59fbdbb76600e64699302e39569c3fb8953024bedf4f35674cae"
+    },
+    {
       "name": "engine/src/main/kotlin/app/spektralab/raw/Raf.kt",
       "mode": 420,
       "sha256": "22b5ec0ec6df630e44cd52a433412e64b495c0b153046bb70d6d408723911388"
@@ -1124,17 +1232,17 @@
     {
       "name": "engine/src/main/kotlin/app/spektralab/raw/RawDeveloper.kt",
       "mode": 420,
-      "sha256": "eaaa330a0089d14e30db785e6177604d3f54e5ac94a0cd9b13596ba9dca4b74d"
+      "sha256": "1c781507c0ef8d762d37b1cd30a3bcd3106add59d9cd23f5cf7b485e6ae47ce4"
     },
     {
       "name": "engine/src/main/kotlin/app/spektralab/raw/RawImage.kt",
       "mode": 420,
-      "sha256": "246ed8bb1b1997cc7434392e182f5abdb4c1a9775e0014dc484e18f3c8eac3a3"
+      "sha256": "f652629e8ace18f33d2b9104e106c885a4d11d5e88a47b587a731ac2881ca296"
     },
     {
       "name": "engine/src/main/kotlin/app/spektralab/raw/RawLoader.kt",
       "mode": 420,
-      "sha256": "a026fa6972468efad9b464f7a699bba74f682e0d4d2c3f609d331915c307ea3a"
+      "sha256": "9149de2fc3506ab5f96167ddfee306e70b8e0990295d8bcb3eb38e756a6750b2"
     },
     {
       "name": "engine/src/main/kotlin/app/spektralab/raw/RawReader.kt",
@@ -1144,7 +1252,7 @@
     {
       "name": "engine/src/main/kotlin/app/spektralab/raw/RawSource.kt",
       "mode": 420,
-      "sha256": "4b64b72caf2fdda11b3ce2a3ddf1f106cb87197b5ccc9cc76164586a10f9504c"
+      "sha256": "259e50ea8b6537fcd655313be1ac05e2771ffea1b26af283c6816d96e0ef8653"
     },
     {
       "name": "engine/src/main/kotlin/app/spektralab/raw/Rw2.kt",
@@ -1164,7 +1272,7 @@
     {
       "name": "engine/src/main/kotlin/app/spektralab/raw/XTrans.kt",
       "mode": 420,
-      "sha256": "ff148058e421fe9b2c29aac4712659547ff4a65d4c412ad920a5e830e4734f40"
+      "sha256": "24fe071cf2d21e51583dc996f0970d22cb02e2bb4b6a86d5455085285f5bcd60"
     },
     {
       "name": "engine/src/main/resources/silvercam/ENGINE_NOTICE.txt",
@@ -1249,7 +1357,7 @@
     {
       "name": "engine/src/test/kotlin/app/spektralab/raw/DngFormatsTest.kt",
       "mode": 420,
-      "sha256": "d1e30e6d4b40adc8563e626143b29b73ccd130b95e1cd7a7610419a4baa8c52a"
+      "sha256": "a0f54219c73acdcb24997453f3b11d9c07a7728eae87174dc6b6f176811099ca"
     },
     {
       "name": "engine/src/test/kotlin/app/spektralab/raw/DngTest.kt",
@@ -1262,9 +1370,19 @@
       "sha256": "cb93e064ac871372054b9dfbc359d3a42ec9f40e6f46938a96bd62a2ae7aed70"
     },
     {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/LegacyDeveloper.kt",
+      "mode": 420,
+      "sha256": "d9ff73d1b7c1a959e801f050efc4d12aabf20d96c1fb1e940baedb55323f89d2"
+    },
+    {
       "name": "engine/src/test/kotlin/app/spektralab/raw/LinearDngIntegrationTest.kt",
       "mode": 420,
       "sha256": "229c8c22365b60bb02341b178837b9ba9515bdef954650a221ee80c3099d395a"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/LoadBench.kt",
+      "mode": 420,
+      "sha256": "3c47a8173b8d017dd892506dac72a3b980b159e977b4ec475ee3290dcce0f4fc"
     },
     {
       "name": "engine/src/test/kotlin/app/spektralab/raw/LosslessJpegTest.kt",
@@ -1307,6 +1425,11 @@
       "sha256": "9b6aa76332d0b4a4f49392ed8480c1f60bc20ec70e19b87f0fa925ca2600c69e"
     },
     {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/RawDevelopmentCompatibilityTest.kt",
+      "mode": 420,
+      "sha256": "00483abf7836db9557120d632bcedfb5ffa7def81e22c558e48f51e93ff7bb58"
+    },
+    {
       "name": "engine/src/test/kotlin/app/spektralab/raw/RawFixtures.kt",
       "mode": 420,
       "sha256": "e6a3abf74550839b7ff15ebed30d6ac93105f139231c2193f81df070778dcde5"
@@ -1315,6 +1438,11 @@
       "name": "engine/src/test/kotlin/app/spektralab/raw/RawLoaderBudgetTest.kt",
       "mode": 420,
       "sha256": "99330cf9b92ee33ff4d3461b7b43c883e5dd582db516fedfdfbc260f1cd9004e"
+    },
+    {
+      "name": "engine/src/test/kotlin/app/spektralab/raw/RawLoaderTest.kt",
+      "mode": 420,
+      "sha256": "f0710c1a0fcf62eef6e416b7929c73dc3b750d5e8393e76708eb7b44d2eb39df"
     },
     {
       "name": "engine/src/test/kotlin/app/spektralab/raw/RawReaderTest.kt",
@@ -1429,7 +1557,7 @@
     {
       "name": "package.json",
       "mode": 420,
-      "sha256": "23ea2badd98b7bbd58d6086c7ddbae54a187a83d67c671c6826fe2f887b3881f"
+      "sha256": "7828e17eca684aff5c114081cbed4bfdb6c652d0a2688da4e320c8ff2f882f44"
     },
     {
       "name": "prototype/Main.dc.html",
@@ -1469,7 +1597,7 @@
     {
       "name": "public/_headers",
       "mode": 420,
-      "sha256": "0954fee3bbec2c320e22271709203f462d4e054a032ded54423e1685a28df34f"
+      "sha256": "af92b67f152ff81f586b90e802e7dfb2e2a2c919c423b2a7b6171df15ca6e361"
     },
     {
       "name": "public/_redirects",
@@ -1607,9 +1735,19 @@
       "sha256": "62e2f0c80da929e3a7e32229aad98ed516956a86dded403c3ab84f889f23e680"
     },
     {
+      "name": "release/android-notes.json",
+      "mode": 420,
+      "sha256": "f0c1941befa6df944c91a32f8eeb68ed798c73e54ac3d395c952b2c8b3d39796"
+    },
+    {
+      "name": "release/android.properties",
+      "mode": 420,
+      "sha256": "e26264b68f7a8f7c9d283f4de82c130bbb5d0dd67d9be847c1c78bfdecbf65b1"
+    },
+    {
       "name": "scripts/build-android.mjs",
       "mode": 420,
-      "sha256": "276c9799f22c708417f914f5218f4bf70ee2e8d0d43187e865ffcb4732010b57"
+      "sha256": "e2bbcf71d00ccd5de0b1f9bba389dc97d302c34a38f4dab3c7cdced5053f36d1"
     },
     {
       "name": "scripts/build-licenses-data.mjs",
@@ -1617,9 +1755,14 @@
       "sha256": "6ba38c9dfcca2bd0bf0c139db3e65acead12d0191232b7b280527e93396e7213"
     },
     {
+      "name": "scripts/build-native-android.mjs",
+      "mode": 420,
+      "sha256": "4245a6e2e6de437b513318232cb14ce4d8898bf2c497255f51ecb617b25858af"
+    },
+    {
       "name": "scripts/download-archives.mjs",
       "mode": 420,
-      "sha256": "bd25095b9b3333c37a222f2dbfe57dd05416fdd10f2f9630652b30848f7dd602"
+      "sha256": "5f26d48dc03fd126a888bf5e76e0d468d6fb5249576128c4638104f6f776eb84"
     },
     {
       "name": "scripts/generate-film-packages.py",
@@ -1627,9 +1770,24 @@
       "sha256": "b312a853faac0702b10582d462b6b5cfd9ecbb6a8dd211c9eba5b4ed01a17dda"
     },
     {
+      "name": "scripts/native-release.mjs",
+      "mode": 420,
+      "sha256": "4f780b5b618e9c8e6d24a4587c45965b12c38f1c7a61cf099cfe0a59fa925d63"
+    },
+    {
+      "name": "scripts/native-release.test.mjs",
+      "mode": 420,
+      "sha256": "476e0ba1320bc19736f09524ffd344eba7ea35ab690c36446f7c3d72def98a43"
+    },
+    {
       "name": "scripts/package-downloads.mjs",
       "mode": 420,
-      "sha256": "11d9113b12a0c5408fd950fc07e2f729ab6f9e51fa459e042b5d9f37673c2dfe"
+      "sha256": "d8c98928b3ade04d68e47f641d769c007c21a2bf4fdca42da0a93269a8b6d455"
+    },
+    {
+      "name": "scripts/verify-native-release.mjs",
+      "mode": 420,
+      "sha256": "955a895d89e2c4cb917ca9fd74957cd5de2fcafab6afea4acb7e6b28853b5a96"
     },
     {
       "name": "settings.gradle.kts",
@@ -1689,7 +1847,7 @@
     {
       "name": "src/i18n/translations.ts",
       "mode": 420,
-      "sha256": "5b39eabb8d99c1adea31f42fc4cab110ac678800d02d5618891b7e870f97e525"
+      "sha256": "cc4cfe32ba321d1de529315a1a0bbdedc5d60100916b893dd1b8c2569131e2a8"
     },
     {
       "name": "src/main.tsx",
@@ -1719,7 +1877,7 @@
     {
       "name": "src/pages/DownloadPage.tsx",
       "mode": 420,
-      "sha256": "adca0c2908168c2fdf42b92b0d933f5d8d5d73b71645900c02b632d2f655fb60"
+      "sha256": "3d8c0a109f02af34236c1f8f34342a4337c41854d1c40a420e9731739bf67d5c"
     },
     {
       "name": "src/pages/HomePage.tsx",
@@ -1912,6 +2070,21 @@
       "sha256": "0c9023b821a7f9993b5278e209e0d2494f69d87b349f10c179404cc8f48f8973"
     },
     {
+      "name": "tools/raw-performance/README.md",
+      "mode": 420,
+      "sha256": "945f46c2c7fd25d8742d4b01cb4a0f4442a7ef190ba70b79dd2eb06cf802c390"
+    },
+    {
+      "name": "tools/raw-performance/RawStageBench.java",
+      "mode": 420,
+      "sha256": "639da666239e8a8aafba63e1748c74209d5a897df04f9b5f017c4f94be82ad99"
+    },
+    {
+      "name": "tools/raw-performance/run.py",
+      "mode": 420,
+      "sha256": "5b7efc85743c56ec925fd2e2ccb11c4e4cf6e203f60b19f1e2f3a1fbfb20a6c3"
+    },
+    {
       "name": "tools/rawcheck.py",
       "mode": 420,
       "sha256": "dd06b6ad8bbc4b28684d857b8eac6521fa4ef1d747c7dae0567fc6aa69861de5"
@@ -1934,7 +2107,7 @@
     {
       "name": "vite.config.ts",
       "mode": 420,
-      "sha256": "c32cedbf50183f587eb4a137761d0af6b99da3abe967cbce2ee6200334e31ffa"
+      "sha256": "f1160c9946d330d44ac6e2358a14714ae43acf30b3eeb55a9d6dfd2bf816e423"
     }
   ]
 }

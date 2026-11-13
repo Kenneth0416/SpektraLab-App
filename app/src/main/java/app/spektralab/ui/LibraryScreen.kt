@@ -317,7 +317,7 @@ private fun Sprockets(edge: String) {
 
 @Composable
 private fun Frame(state: AppState, item: LibraryItem, selecting: Boolean, order: Int, modifier: Modifier) {
-    val thumb by produceState(state.app.thumbs.cached(item), item.id, item.look) {
+    val thumb by produceState(state.app.thumbs.cached(item), item.id, item.uri, item.look) {
         value = state.app.thumbs.get(item)
     }
     val mediaType = stringResource(if (item.isVideo) R.string.video else R.string.photo)

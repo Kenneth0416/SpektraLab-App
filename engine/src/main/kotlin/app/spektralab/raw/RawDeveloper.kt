@@ -68,7 +68,8 @@ object RawDeveloper {
     /**
      * Java heap [develop] allocates on top of the sensor data already in [img], bytes: per
      * output pixel 6 for the chroma denoise planes (more than Malvar's 4-byte plane, which
-     * is freed before) and, when [outputOnHeap], 8 for the result.
+     * is freed before) and, when [outputOnHeap], 8 for the result. The image-aware
+     * overload also reserves full-crop gain tables; binning does not shrink them.
      */
     fun workingBytes(img: RawImage, maxLongEdge: Int, fast: Boolean, outputOnHeap: Boolean): Long {
         if (!img.linear && !img.cfa.isBayer && XTrans.supports(img.cfa)) {
@@ -81,9 +82,9 @@ object RawDeveloper {
             } else img.cropWidth.toLong() * img.cropHeight
             // Full X-Trans keeps one band of sample and green planes besides the chroma buffers.
             val band = if (binned) 0L else (64 + 12).toLong() * img.cropWidth * 16
-            return px * (6 + if (outputOnHeap) 8 else 0) + band
+            return px * (6 + if (outputOnHeap) 8 else 0) + band + preparedGainBytes(img)
         }
-        return workingBytes(img.cropWidth, img.cropHeight, img.linear, maxLongEdge, fast, outputOnHeap)
+        return workingBytes(img.cropWidth, img.cropHeight, img.linear, maxLongEdge, fast, outputOnHeap) + preparedGainBytes(img)
     }
 
     fun workingBytes(cropWidth: Int, cropHeight: Int, linear: Boolean, maxLongEdge: Int, fast: Boolean, outputOnHeap: Boolean): Long {
@@ -103,8 +104,12 @@ object RawDeveloper {
      * [maxLongEdge] if it fits, else the largest binned size that does.
      */
     fun longEdgeWithin(img: RawImage, maxLongEdge: Int, fast: Boolean, budget: Long, outputOnHeap: Boolean): Int {
+        require(workingBytes(img, 1, fast, outputOnHeap) <= budget) {
+            "RAW development budget is too small even for the minimum rendition"
+        }
         if (img.linear || img.cfa.isBayer) {
-            return longEdgeWithin(img.cropWidth, img.cropHeight, img.linear, maxLongEdge, fast, budget, outputOnHeap)
+            return longEdgeWithin(img.cropWidth, img.cropHeight, img.linear, maxLongEdge, fast,
+                budget - preparedGainBytes(img), outputOnHeap)
         }
         if (workingBytes(img, maxLongEdge, fast, outputOnHeap) <= budget) return maxLongEdge
         val long = maxOf(img.cropWidth, img.cropHeight)
@@ -129,6 +134,26 @@ object RawDeveloper {
         return 1
     }
 
+    // The same selection and cap drive both allocation and the image-aware heap
+    // estimate. Tables span the sensor crop even when output pixels are heavily binned.
+    internal const val GAIN_TABLE_BUDGET = 2L shl 20
+
+    private fun selectedGainMaps(img: RawImage, c: Int): List<GainMap> = when {
+        img.gainMaps.size == 1 -> img.gainMaps
+        img.linear -> img.gainMaps.filter { it.plane == c }
+        else -> (0 until 4).filter {
+            img.cfa.color(img.cropY + it / 2, img.cropX + it % 2) == c
+        }.mapNotNull { pos ->
+            img.gainMaps.firstOrNull { it.covers(img.cropX + pos % 2, img.cropY + pos / 2) }
+        }
+    }
+
+    internal fun preparedGainBytes(img: RawImage): Long {
+        val perMap = PreparedGainMap.axisBytes(img)
+        val count = (0..2).flatMap { selectedGainMaps(img, it) }.distinct().size.toLong()
+        return minOf(count, GAIN_TABLE_BUDGET / perMap) * perMap
+    }
+
     // ------------------------------------------------------------------ shared
     internal class Prep(val img: DngImage, val options: Options) {
         val cfa = IntArray(4) { img.cfa.color(img.cropY + it / 2, img.cropX + it % 2) }
@@ -137,12 +162,18 @@ object RawDeveloper {
         private val wb = img.wb
 
         /** Gain maps per colour (two for green on a Bayer sensor). */
-        private val maps: Array<List<GainMap>> = Array(3) { c ->
-            if (img.gainMaps.size == 1) img.gainMaps
-            else if (img.linear) img.gainMaps.filter { it.plane == c }
-            else (0 until 4).filter { cfa[it] == c }.mapNotNull { pos ->
-                val y = img.cropY + pos / 2; val x = img.cropX + pos % 2
-                img.gainMaps.firstOrNull { it.covers(x, y) }
+        private val maps: Array<Array<PreparedGainMap>> = run {
+            // A map can serve several colours/positions; prepare only maps used below.
+            // Keep pathological aspect ratios / many linear-plane opcodes bounded.
+            val prepared = HashMap<GainMap, PreparedGainMap>()
+            var axisBudget = GAIN_TABLE_BUDGET
+            val axisBytes = PreparedGainMap.axisBytes(img)
+            Array(3) { c ->
+                selectedGainMaps(img, c).map { map -> prepared.getOrPut(map) {
+                    val fits = axisBytes <= axisBudget
+                    if (fits) axisBudget -= axisBytes
+                    PreparedGainMap(map, img, precompute = fits)
+                } }.toTypedArray()
             }
         }
         val hasGain = maps.any { it.isNotEmpty() }
@@ -166,33 +197,36 @@ object RawDeveloper {
                 for (c in 0..2) rgb[c] = min(rgb[c], 1f)
                 return
             }
-            var clippedAny = false
-            val a = FloatArray(3)
-            for (c in 0..2) {
-                // how clipped: 0 below 85% of the clip level, 1 at 97%
-                val t = ((rgb[c] / wb[c] - 0.85f) / 0.12f).coerceIn(0f, 1f)
-                a[c] = t * t * (3 - 2 * t)
-                if (t > 0f) clippedAny = true
-            }
-            if (!clippedAny) return
+            // Scalars keep this per-pixel operation allocation-free and safe to use
+            // from separate row workers. Preserve the original arithmetic order.
+            val t0 = ((rgb[0] / wb[0] - 0.85f) / 0.12f).coerceIn(0f, 1f)
+            val t1 = ((rgb[1] / wb[1] - 0.85f) / 0.12f).coerceIn(0f, 1f)
+            val t2 = ((rgb[2] / wb[2] - 0.85f) / 0.12f).coerceIn(0f, 1f)
+            if (!(t0 > 0f || t1 > 0f || t2 > 0f)) return
+            val a0 = t0 * t0 * (3 - 2 * t0)
+            val a1 = t1 * t1 * (3 - 2 * t1)
+            val a2 = t2 * t2 * (3 - 2 * t2)
             // estimate from the channels that still hold detail, weighted by how unclipped they are
             var sum = 0f; var wsum = 0f
-            for (c in 0..2) { val w = 1f - a[c]; sum += w * rgb[c]; wsum += w }
+            val w0 = 1f - a0; sum += w0 * rgb[0]; wsum += w0
+            val w1 = 1f - a1; sum += w1 * rgb[1]; wsum += w1
+            val w2 = 1f - a2; sum += w2 * rgb[2]; wsum += w2
             val ceiling = max(wb[0], max(wb[1], wb[2]))
             val estimate = if (wsum > 1e-3f) sum / wsum else ceiling
             // fade to the common ceiling as the last channel clips, so blown areas are white, not tinted
-            val allClipped = min(a[0], min(a[1], a[2]))
+            val allClipped = min(a0, min(a1, a2))
             val target = estimate + (ceiling - estimate) * allClipped
-            for (c in 0..2) rgb[c] += a[c] * (max(rgb[c], target) - rgb[c])
+            rgb[0] += a0 * (max(rgb[0], target) - rgb[0])
+            rgb[1] += a1 * (max(rgb[1], target) - rgb[1])
+            rgb[2] += a2 * (max(rgb[2], target) - rgb[2])
         }
 
         /** Lens shading correction for colour [c] at crop coordinates (smooth, so applied after demosaic). */
         fun gain(c: Int, cx: Int, cy: Int): Float {
             val list = maps[c]
             if (list.isEmpty()) return 1f
-            val x = img.cropX + cx; val y = img.cropY + cy
             var g = 0f
-            for (m in list) g += m.gain(x, y, img.rawWidth, img.rawHeight)
+            for (i in list.indices) g += list[i].gain(cx, cy)
             return g / list.size
         }
     }

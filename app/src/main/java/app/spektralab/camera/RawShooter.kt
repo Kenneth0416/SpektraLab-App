@@ -22,6 +22,7 @@ import androidx.core.content.ContextCompat
 import androidx.exifinterface.media.ExifInterface
 import app.spektralab.HeavyWork
 import app.spektralab.data.RawMemoryGate
+import app.spektralab.data.RawPreview
 import app.spektralab.gl.BurstGl
 import app.spektralab.raw.BurstMerge
 import app.spektralab.raw.DngReader
@@ -144,10 +145,10 @@ class RawShooter(private val context: Context) {
 
     /** Progress 0..1 of the bursts being merged, null when idle. */
     var onProgress: (Float?) -> Unit = {}
-    /** The first frame of a shot is in the album. Main thread. */
-    var onSaved: (uri: Uri, evBias: Float) -> Unit = { _, _ -> }
-    /** The shot is complete: [merged] replaces [first] when the burst was merged. Main thread. */
-    var onFinished: (first: Uri, merged: Uri?, framesUsed: Float) -> Unit = { _, _, _ -> }
+    /** The first frame and its bounded preview are ready. Main thread. */
+    var onSaved: (uri: Uri, evBias: Float, preview: RawPreview?) -> Unit = { _, _, _ -> }
+    /** The shot is complete: [merged] replaces [first], with a preview of that source. Main thread. */
+    var onFinished: (first: Uri, merged: Uri?, framesUsed: Float, preview: RawPreview?) -> Unit = { _, _, _, _ -> }
 
     private val main = ContextCompat.getMainExecutor(context)
     /** Camera callbacks only. Must not block: it pins metadata and hands the frame to [io]. */
@@ -163,7 +164,7 @@ class RawShooter(private val context: Context) {
 
     /** Stop new shots; queued callbacks still close their ImageProxy and drain safely. */
     fun close() {
-        onProgress = {}; onSaved = { _, _ -> }; onFinished = { _, _, _ -> }
+        onProgress = {}; onSaved = { _, _, _ -> }; onFinished = { _, _, _, _ -> }
         admission.close()
     }
 
@@ -328,12 +329,18 @@ class RawShooter(private val context: Context) {
                 val uri = save("$name.dng") { it.write(dng) }
                 if (uri == null) { dead = true; processingDone(); main.execute { onExposed(false, false) }; return }
                 first = uri
-                main.execute { onSaved(uri, evBias) }
-                if (frames > 1) {
-                    merging.incrementAndGet(); onProgress(0f)
-                    // Already inside the memory lease; the work thread must not lock HeavyWork again.
-                    work.execute {
-                        runCatching { planner = DngReader.read(dng)?.takeIf { !it.linear }?.let { BurstMerge.Planner(it) } }
+                if (frames > 1) { merging.incrementAndGet(); onProgress(0f) }
+                // Parse once, inside this shot's existing memory lease. Publish only a
+                // small development, so import never queues behind our own burst lock.
+                work.execute {
+                    val start = SystemClock.elapsedRealtimeNanos()
+                    val raw = runCatching { DngReader.read(dng) }.getOrNull()
+                    val preview = runCatching { raw?.let(RawPreview::develop) }
+                        .onFailure { Log.w(TAG, "RAW preview failed shot=$name", it) }.getOrNull()
+                    Log.i(TAG, "RAW shot=$name previewReady=${preview != null} previewMs=${(SystemClock.elapsedRealtimeNanos() - start) / 1_000_000}")
+                    main.execute { onSaved(uri, evBias, preview) }
+                    if (frames > 1) {
+                        runCatching { planner = raw?.takeIf { !it.linear }?.let { BurstMerge.Planner(it) } }
                             .onFailure { Log.w(TAG, "RAW planner initialization failed shot=$name", it) }
                         Log.i(TAG, "RAW shot=$name plannerFrames=${planner?.frames ?: 0}")
                     }
@@ -349,15 +356,20 @@ class RawShooter(private val context: Context) {
             if (arrived == frames) {
                 main.execute { onExposed(true, false) }
                 val uri = first!!
-                if (frames > 1) work.execute { finish(uri) } else {
-                    processingDone()
-                    main.execute { onFinished(uri, null, 1f) }
+                // The first-frame preview must be published before completion, even
+                // for a single shot. Serial work also drops full RAW arrays before unlock.
+                work.execute {
+                    if (frames > 1) finish(uri) else {
+                        processingDone()
+                        main.execute { onFinished(uri, null, 1f, null) }
+                    }
                 }
             }
         }
 
         private fun finish(first: Uri) {
             var merged: Uri? = null; var used = 1f
+            var preview: RawPreview? = null
             try {
                 Log.i(TAG, "RAW shot=$name merge planning received=$arrived requested=$frames plannerFrames=${planner?.frames ?: 0}")
                 val p = planner?.takeIf { it.frames >= 2 }?.build()
@@ -370,6 +382,8 @@ class RawShooter(private val context: Context) {
                     val m = BurstMerge.finish(p, rgb)
                     merged = save("${name}_M.dng") { DngWriter.writeLinear(it, m.width, m.height, m.rgb, p.frames[0], m.gainMaps, m.noise) }
                     used = m.framesUsed
+                    if (merged != null) preview = runCatching { RawPreview.merged(m, p.frames[0]) }
+                        .onFailure { Log.w(TAG, "merged RAW preview failed shot=$name", it) }.getOrNull()
                     Log.i(TAG, "RAW shot=$name mergeCompleted dimensions=${m.width}x${m.height} framesUsed=$used saved=${merged != null}")
                 } else Log.w(TAG, "RAW shot=$name merge skipped: fewer than two usable planner frames")
             } catch (t: Throwable) {
@@ -380,7 +394,7 @@ class RawShooter(private val context: Context) {
                 if (merging.decrementAndGet() == 0) onProgress(null)
                 processingDone()
             }
-            main.execute { onFinished(first, merged, used) }
+            main.execute { onFinished(first, merged, used, preview) }
         }
     }
 

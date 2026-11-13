@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>银盐工坊 · 宣传片</title>
+<style>
+@font-face{font-family:'Long Cang';src:url('../../app/src/main/res/font/long_cang.ttf')}
+@font-face{font-family:'Martian Mono';src:url('../../app/src/main/res/font/martian_mono.ttf')}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#000}
+#stage{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden;background:#2A211A;font-family:'PingFang SC','Hiragino Sans GB',sans-serif;color:#1B1A17;-webkit-font-smoothing:antialiased}
+.abs{position:absolute}
+.serif{font-family:'Songti SC','STSong',serif;font-weight:700}
+.mono{font-family:'Martian Mono',monospace}
+.hand{position:absolute;font-family:'Long Cang',cursive;color:#C8241A;white-space:nowrap;line-height:1.1}
+.ph{position:absolute;overflow:hidden;background:#000}
+.ph>img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover}
+.chip{position:absolute;font:500 17px 'Martian Mono',monospace;color:#F3E9DA;background:rgba(20,14,10,.8);padding:6px 12px;white-space:nowrap}
+.scene{position:absolute;left:0;top:0;width:1920px;height:1080px;opacity:0;visibility:hidden}
+.ink{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:visible;pointer-events:none}
+.ink path{fill:none;stroke:#C8241A;stroke-width:6;stroke-linecap:round;stroke-linejoin:round;opacity:.92}
+.title{position:absolute;left:140px;top:214px;font-size:50px;white-space:nowrap}
+.title b{font-family:'Martian Mono',monospace;font-weight:400;font-size:26px;color:#C8241A;margin-right:22px;vertical-align:8px}
+.lbl{position:absolute;font:500 18px 'Martian Mono',monospace;color:#4E4A42;white-space:nowrap}
+.card{position:absolute;background:#FBFAF6;padding:14px 14px 40px;box-shadow:0 14px 34px rgba(60,40,20,.35)}
+.card .ph{position:relative}
+</style></head>
+<body><div id="stage">
+
+<!-- desk + lightbox -->
+<div class="abs" style="inset:0;background:repeating-linear-gradient(91deg,rgba(255,240,220,.018) 0 2px,transparent 2px 11px),repeating-linear-gradient(89deg,rgba(0,0,0,.05) 0 1px,transparent 1px 23px)"></div>
+<div id="lbGlow" class="abs" style="left:80px;top:54px;width:1760px;height:850px;border-radius:6px;box-shadow:0 0 140px 20px rgba(255,236,200,.28)"></div>
+<div id="lb" class="abs" style="left:80px;top:54px;width:1760px;height:850px;border-radius:6px;background:radial-gradient(ellipse at 50% 45%,#FFFDF6 0%,#F8F2E4 60%,#EBE0C8 100%);box-shadow:0 0 0 14px #17110D"></div>
+<div id="lbOff" class="abs" style="left:80px;top:54px;width:1760px;height:850px;border-radius:6px;background:#120B09"></div>
+<div id="dim" class="abs" style="inset:0;background:rgba(6,3,2,.55);opacity:0"></div>
+<div id="safe" class="abs" style="inset:0;background:radial-gradient(ellipse 70% 55% at 50% -8%,rgba(255,59,34,.42),rgba(255,59,34,.08) 55%,transparent 75%);opacity:0"></div>
+<div class="abs" style="inset:0;background:radial-gradient(ellipse at 50% 50%,transparent 55%,rgba(0,0,0,.45) 100%)"></div>
+
+<!-- hero: film strip -->
+<div id="strip" class="abs" style="left:80px;top:62px;width:1760px;height:140px;overflow:hidden;opacity:0">
+ <div id="stripIn" class="abs" style="left:0;top:0;height:140px;width:3400px;background:#221A14;box-shadow:0 10px 26px rgba(60,40,20,.35)">
+  <div class="abs" style="left:0;right:0;top:7px;height:11px;background:repeating-linear-gradient(90deg,transparent 0 9px,#FFFBEF 9px 21px,transparent 21px 30px)"></div>
+  <div class="abs" style="left:0;right:0;bottom:7px;height:11px;background:repeating-linear-gradient(90deg,transparent 0 9px,#FFFBEF 9px 21px,transparent 21px 30px)"></div>
+ </div>
+</div>
+<svg id="stripInk" class="ink"></svg>
+
+<!-- S1 -->
+<div id="s1" class="scene">
+ <div id="s1photo" class="ph" style="left:230px;top:92px;width:560px;height:770px;box-shadow:0 18px 40px rgba(60,40,20,.35)">
+  <img src="../../public/assets/scenes/guangzhou-night.jpg">
+  <img id="s1lut" src="../../public/assets/scenes/guangzhou-night.jpg" style="filter:sepia(.4) saturate(1.7) contrast(1.15) hue-rotate(-14deg) brightness(1.04)">
+  <div id="s1gel" class="abs" style="top:0;height:770px;width:600px;background:linear-gradient(160deg,rgba(0,160,170,.16),rgba(255,120,40,.2));border-left:3px solid rgba(255,170,90,.9)"></div>
+ </div>
+ <div id="s1tag" class="chip" style="left:230px;top:874px;background:none;color:#4E4A42;padding:0">PHONE JPEG · ISP 锐化 + 降噪 + 色调映射</div>
+ <div id="s1lutTag" class="chip" style="left:602px;top:112px;background:#E07A2E;color:#fff">+ FILM LUT</div>
+ <div id="s1t1" class="abs serif" style="left:900px;top:250px;font-size:72px">套滤镜，</div>
+ <div id="s1t2" class="abs serif" style="left:900px;top:350px;font-size:72px">不等于换了一卷胶片。</div>
+ <div id="s1n1" class="hand" style="left:930px;top:560px;font-size:58px">灯边一刀切，没有晕</div>
+ <div id="s1n2" class="hand" style="left:930px;top:660px;font-size:58px;color:#4E4A42">暗部一片涂抹</div>
+ <svg class="ink" id="ink-s1"></svg>
+</div>
+
+<!-- S2 -->
+<div id="s2" class="scene">
+ <div id="s2title" class="title serif"><b>01</b>先曝光，再显影</div>
+ <div id="s2img" class="ph" style="left:140px;top:312px;width:800px;height:369px">
+  <img src="../../public/assets/scenes/woods-cow.jpg">
+  <img id="s2neg" src="../../public/assets/scenes/woods-cow.jpg" style="filter:invert(1) sepia(.55) saturate(2.4) hue-rotate(-20deg) brightness(.9)">
+  <img id="s2pos" src="../samples/cow_gold200_premier.jpg">
+  <div id="s2edge" class="abs" style="top:0;width:3px;height:369px;background:#C8241A"></div>
+ </div>
+ <div id="s2l0" class="lbl" style="left:140px;top:694px">原片 · 数码 JPEG</div>
+ <div id="s2l1" class="lbl" style="left:140px;top:694px">负片（示意）· 曝光在 KODAK GOLD 200 上</div>
+ <div id="s2l2" class="lbl" style="left:140px;top:694px;color:#C8241A">冲印 · GOLD 200 × ENDURA PREMIER</div>
+ <div id="s2spec" class="abs" style="left:140px;top:752px;width:800px;height:28px;background:linear-gradient(90deg,#4b2a8c,#2747c8 14%,#1f9bd6 28%,#27b36a 42%,#c9d32a 56%,#f2a223 68%,#e8441f 82%,#7d1712)"></div>
+ <div id="s2specL" class="lbl" style="left:140px;top:790px;font-size:16px">380 nm　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　 730 nm</div>
+ <div id="s2specH" class="hand" style="left:400px;top:796px;font-size:44px;color:#4E4A42">像素 → 光谱</div>
+ <svg id="s2chart" class="abs" style="left:1000px;top:300px" width="760" height="560" viewBox="0 0 760 560"></svg>
+ <div id="s2chartT" class="lbl" style="left:1060px;top:300px">KODAK GOLD 200 · 特性曲线（引擎数据）</div>
+ <div id="s2n1" class="hand" style="left:1420px;top:440px;font-size:46px">肩部：高光慢慢收</div>
+ <div id="s2n2" class="hand" style="left:1260px;top:700px;font-size:46px">趾部：暗部有厚度</div>
+ <svg class="ink" id="ink-s2"></svg>
+</div>
+
+<!-- S3 -->
+<div id="s3" class="scene">
+ <div id="s3title" class="title serif"><b>02</b>光晕：最先染红的是红敏层</div>
+ <div id="s3img" class="ph" style="left:140px;top:304px;width:580px;height:580px">
+  <img src="../samples/night_vision500t_nohalo.jpg" style="width:892px;height:auto;left:-312px;top:-435px;object-fit:fill">
+  <div id="s3halo" class="abs" style="inset:0;overflow:hidden"><img src="../samples/night_vision500t_2383_halo.jpg" style="position:absolute;width:892px;left:-312px;top:-435px"></div>
+  <div id="s3edge" class="abs" style="top:0;width:3px;height:580px;background:#FFF4DC;box-shadow:0 0 10px rgba(255,255,255,.6)"></div>
+  <div id="s3c0" class="chip" style="left:12px;top:12px">光晕 关</div>
+  <div id="s3c1" class="chip" style="right:12px;top:12px;background:#C8241A">光晕 开 · VISION3 500T</div>
+ </div>
+ <svg id="s3x" class="abs" style="left:820px;top:290px" width="940" height="600" viewBox="0 0 940 600">
+  <rect x="40" y="70" width="640" height="66" fill="#3B5FB0" fill-opacity=".16" stroke="#3B5FB0" stroke-width="2"/>
+  <rect x="40" y="146" width="640" height="66" fill="#3E8E5A" fill-opacity=".16" stroke="#3E8E5A" stroke-width="2"/>
+  <rect id="s3red" x="40" y="222" width="640" height="66" fill="#C8402E" fill-opacity=".16" stroke="#C8402E" stroke-width="2"/>
+  <rect x="40" y="298" width="640" height="130" fill="#8C7B62" fill-opacity=".1" stroke="#6B5E4C" stroke-width="2" stroke-dasharray="2 0"/>
+  <text x="700" y="112" font-size="26" fill="#3B5FB0" font-family="PingFang SC">蓝敏层</text>
+  <text x="700" y="188" font-size="26" fill="#3E8E5A" font-family="PingFang SC">绿敏层</text>
+  <text x="700" y="264" font-size="26" fill="#C8402E" font-family="PingFang SC">红敏层</text>
+  <text x="700" y="372" font-size="26" fill="#6B5E4C" font-family="PingFang SC">片基</text>
+  <ellipse id="s3glow" cx="350" cy="255" rx="150" ry="24" fill="#E2321E" opacity="0"/>
+  <path id="s3ray" d="M300 -10 L350 428" stroke="#E9A65A" stroke-width="8" fill="none" pathLength="1" stroke-dasharray="1 1" stroke-dashoffset="1"/>
+  <path id="s3b1" d="M350 428 L440 255" stroke="#D4281C" stroke-width="5" fill="none" pathLength="1" stroke-dasharray="1 1" stroke-dashoffset="1"/>
+  <path id="s3b2" d="M350 428 L260 255" stroke="#D4281C" stroke-width="5" fill="none" pathLength="1" stroke-dasharray="1 1" stroke-dashoffset="1"/>
+  <text id="s3xl" x="40" y="480" font-size="20" fill="#4E4A42" font-family="Martian Mono" opacity="0">强光 → 穿透三层乳剂 → 片基背面反射</text>
+ </svg>
+ <div id="s3n1" class="hand" style="left:860px;top:800px;font-size:50px">反射光，先打在红敏层</div>
+ <div id="s3n2" class="hand" style="left:300px;top:800px;font-size:40px;color:#FFE7CF;text-shadow:0 2px 8px rgba(0,0,0,.7)"></div>
+ <svg class="ink" id="ink-s3"></svg>
+</div>
+
+<!-- S4 -->
+<div id="s4" class="scene">
+ <div id="s4title" class="title serif"><b>03</b>DIR 耦合剂：三层乳剂互相抑制</div>
+ <div id="s4a" class="ph" style="left:140px;top:312px;width:430px;height:430px"><img src="../samples/bus_portra400_endura_nodir.jpg" style="width:826px;height:auto;top:-67px;object-fit:fill"></div>
+ <div id="s4b" class="ph" style="left:600px;top:312px;width:430px;height:430px"><img src="../samples/bus_portra400_endura.jpg" style="width:826px;height:auto;top:-67px;object-fit:fill"></div>
+ <div id="s4la" class="lbl" style="left:140px;top:756px">耦合剂 关</div>
+ <div id="s4lb" class="lbl" style="left:600px;top:756px;color:#C8241A">耦合剂 开 · PORTRA 400</div>
+ <div id="s4n0" class="hand" style="left:600px;top:792px;font-size:50px">颜色更纯，边缘更利</div>
+ <svg id="s4x" class="abs" style="left:1090px;top:300px" width="700" height="420" viewBox="0 0 700 420">
+  <defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#C8241A"/></marker></defs>
+  <rect x="40" y="40" width="440" height="64" fill="#3B5FB0" fill-opacity=".16" stroke="#3B5FB0" stroke-width="2"/>
+  <rect x="40" y="170" width="440" height="64" fill="#3E8E5A" fill-opacity=".16" stroke="#3E8E5A" stroke-width="2"/>
+  <rect x="40" y="300" width="440" height="64" fill="#C8402E" fill-opacity=".16" stroke="#C8402E" stroke-width="2"/>
+  <text x="60" y="82" font-size="24" fill="#3B5FB0" font-family="PingFang SC">蓝敏层</text>
+  <text x="60" y="212" font-size="24" fill="#3E8E5A" font-family="PingFang SC">绿敏层</text>
+  <text x="60" y="342" font-size="24" fill="#C8402E" font-family="PingFang SC">红敏层</text>
+  <path class="arr" d="M300 296 C330 260 330 214 300 238" pathLength="1"/>
+  <path class="arr" d="M400 296 C470 220 470 120 400 108" pathLength="1"/>
+  <path class="arr" d="M250 166 C220 140 220 120 250 108" pathLength="1"/>
+  <path class="arr" d="M200 108 C150 160 150 260 200 296" pathLength="1"/>
+  <path class="arr" d="M520 72 C560 72 560 72 600 72 M520 202 C560 202 560 202 600 202 M520 332 C560 332 560 332 600 332" pathLength="1" style="stroke:#4E4A42;stroke-width:3"/>
+  <text id="s4same" x="612" y="80" font-size="20" fill="#4E4A42" font-family="PingFang SC" opacity="0">同层</text>
+ </svg>
+ <div id="s4m" class="lbl" style="left:1130px;top:690px">显影抑制剂在药水里扩散 20–200 µm</div>
+ <div id="s4n1" class="hand" style="left:1130px;top:740px;font-size:46px">互相压一下，色就分开了</div>
+ <svg class="ink" id="ink-s4"></svg>
+</div>
+
+<!-- S5 -->
+<div id="s5" class="scene">
+ <div id="s5title" class="title serif"><b>04</b>颗粒长在密度里</div>
+ <div id="s5img" class="ph" style="left:140px;top:304px;width:860px;height:397px"><img src="../samples/cow_gold200_grain3.jpg"></div>
+ <div id="loupe" class="abs" style="width:400px;height:400px;border-radius:50%;overflow:hidden;box-shadow:0 0 0 20px #1B1A17,0 0 0 24px #4a4036,0 30px 70px rgba(0,0,0,.5)">
+  <img id="lpB" class="abs" src="../samples/cow_gold200_grain3.jpg">
+  <div class="abs" style="left:0;top:0;width:200px;height:400px;overflow:hidden"><img id="lpA" class="abs" src="../../public/assets/scenes/woods-cow.jpg"></div>
+  <div class="abs" style="left:198px;top:0;width:4px;height:400px;background:#FFFDF6"></div>
+ </div>
+ <div id="s5h1" class="hand" style="left:250px;top:740px;font-size:46px;color:#4E4A42">手机：涂抹 →</div>
+ <div id="s5h2" class="hand" style="left:964px;top:740px;font-size:46px">← 银盐：颗颗分明</div>
+ <div id="s5rows" class="abs" style="left:1080px;top:300px;width:700px;height:420px"></div>
+ <div id="s5m" class="lbl" style="left:1080px;top:668px">按每平方微米的银盐数量随机显影</div>
+ <div id="s5n" class="hand" style="left:1300px;top:800px;font-size:48px">密度越高，颗粒越密</div>
+ <svg class="ink" id="ink-s5"></svg>
+</div>
+
+<!-- S6 -->
+<div id="s6" class="scene">
+ <div id="s6title" class="title serif"><b>05</b>放大机 × 相纸</div>
+ <svg id="s6enl" class="abs" style="left:140px;top:300px" width="400" height="590" viewBox="0 0 400 590">
+  <defs><linearGradient id="cone" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE7A8" stop-opacity=".95"/><stop offset="1" stop-color="#FFD27A" stop-opacity=".25"/></linearGradient></defs>
+  <rect x="330" y="0" width="14" height="560" fill="#3B342C"/>
+  <rect x="70" y="30" width="240" height="130" rx="10" fill="#2B2520"/>
+  <rect x="260" y="60" width="84" height="20" fill="#3B342C"/>
+  <text x="92" y="64" font-size="16" fill="#E9A65A" font-family="Martian Mono">ENLARGER</text>
+  <circle cx="130" cy="112" r="26" fill="#FFCD28"/><circle cx="210" cy="112" r="26" fill="#E632B4"/>
+  <text x="130" y="119" font-size="20" fill="#1B1A17" text-anchor="middle" font-family="Martian Mono">Y</text>
+  <text x="210" y="119" font-size="20" fill="#fff" text-anchor="middle" font-family="Martian Mono">M</text>
+  <line id="dialY" x1="130" y1="112" x2="130" y2="90" stroke="#1B1A17" stroke-width="3"/>
+  <rect x="150" y="160" width="80" height="34" fill="#2B2520"/>
+  <polygon id="s6cone" points="158,194 222,194 330,520 50,520" fill="url(#cone)" opacity="0"/>
+  <rect x="30" y="520" width="320" height="20" fill="#FBFAF6" stroke="#3B342C" stroke-width="3"/>
+ </svg>
+ <div id="s6cc" class="lbl" style="left:140px;top:262px;font-size:20px">CC 滤色　Y +00　M +00</div>
+ <div id="negc" class="abs" style="left:780px;top:330px;width:800px;height:440px;background:#221A14;padding:28px 30px;box-shadow:0 18px 40px rgba(60,40,20,.35)"><div class="ph" style="position:relative;width:740px;height:342px"><img src="../../public/assets/scenes/woods-cow.jpg" style="filter:invert(1) sepia(.55) saturate(2.4) hue-rotate(-20deg) brightness(.9)"></div><div class="abs mono" style="left:30px;bottom:14px;font-size:15px;color:#E9A65A">KODAK GOLD 200 · 负片（示意）</div></div>
+ <div id="s6neg" class="lbl" style="left:590px;top:300px">同一张 KODAK GOLD 200 负片 → 三种相纸</div>
+ <div id="pr0" class="card" style="left:590px;top:360px"><div class="ph" style="width:342px;height:158px"><img src="../samples/cow_gold200_premier.jpg"></div></div>
+ <div id="pr1" class="card" style="left:988px;top:360px"><div class="ph" style="width:342px;height:158px"><img src="../samples/cow_gold200_2383.jpg"></div></div>
+ <div id="pr2" class="card" style="left:1386px;top:360px"><div class="ph" style="width:342px;height:158px"><img src="../samples/cow_gold200_crystal.jpg"></div></div>
+ <div id="pl0" class="lbl" style="left:590px;top:600px;font-size:16px">KODAK ENDURA PREMIER</div>
+ <div id="pl1" class="lbl" style="left:988px;top:600px;font-size:16px">KODAK VISION 2383</div>
+ <div id="pl2" class="lbl" style="left:1386px;top:600px;font-size:16px">FUJIFILM CRYSTAL ARCHIVE</div>
+ <div id="pn0" class="hand" style="left:640px;top:650px;font-size:58px">偏暖</div>
+ <div id="pn1" class="hand" style="left:1030px;top:650px;font-size:58px">反差更硬</div>
+ <div id="pn2" class="hand" style="left:1440px;top:650px;font-size:58px">更清透</div>
+ <svg class="ink" id="ink-s6"></svg>
+</div>
+
+<!-- S7 gallery -->
+<div id="s7" class="scene">
+ <div id="gal" class="abs" style="left:140px;top:232px;width:1640px;height:640px;overflow:hidden;background:#000;box-shadow:0 18px 40px rgba(60,40,20,.35)"></div>
+ <div id="galNote" class="chip" style="left:156px;top:248px">全部样片由本引擎实际冲印</div>
+</div>
+
+<!-- S8 / S9 darkroom -->
+<div id="s8" class="scene">
+ <div id="s8title" class="abs serif" style="left:170px;top:190px;font-size:60px;color:#F5DDD2">把暗房装进取景器</div>
+ <div id="s8sub" class="lbl" style="left:172px;top:290px;color:#C9A99A;font-size:19px">CameraX 预览流 → OpenGL ES 3.0 胶片×相纸管线 → 实时上屏</div>
+ <div id="chips" class="abs" style="left:170px;top:350px;width:680px;height:460px"></div>
+ <svg class="ink" id="ink-s8"><path id="s8line" d="M860 600 C960 600 1040 520 1180 520" pathLength="1" style="stroke:#FF3B22;stroke-width:3;stroke-dasharray:1 1;stroke-dashoffset:1"/></svg>
+</div>
+<div id="s9" class="scene">
+ <div id="s9title" class="abs serif" style="left:170px;top:190px;font-size:60px;color:#F5DDD2">绕过 ISP，直读 RAW</div>
+ <div id="isp" class="abs" style="left:172px;top:320px"></div>
+ <div id="bayer" class="abs" style="left:170px;top:520px;width:700px;height:300px"></div>
+ <div id="rawL" class="lbl" style="left:560px;top:600px;color:#F5DDD2;font-size:22px;line-height:1.7">RAW×3 对齐合成<br><span style="color:#C9A99A;font-size:17px">亚像素对齐 · 防鬼影 · 线性 DNG</span></div>
+ <div id="cd0" class="card" style="left:170px;top:330px;background:#1E1412;padding:12px 12px 64px"><div class="ph" style="width:300px;height:412px"><img src="../../public/assets/scenes/guangzhou-night.jpg"></div><div class="abs mono" style="left:14px;bottom:12px;font-size:15px;color:#F5DDD2;line-height:1.5">DNG · 数字底片<br><span style="color:#9C7F74;font-size:13px">DCIM/Silvercam</span></div></div>
+ <div id="cd1" class="card" style="left:530px;top:330px;padding:12px 12px 64px"><div class="ph" style="width:300px;height:412px"><img src="../samples/night_vision500t_2383.jpg"></div><div class="abs mono" style="left:14px;bottom:12px;font-size:15px;color:#1B1A17;line-height:1.5">JPEG · 冲好的照片<br><span style="color:#6B675E;font-size:13px">长边最高 12000 px · 保留 EXIF</span></div></div>
+ <svg class="ink" id="ink-s9"></svg>
+</div>
+
+<!-- phone (hero of act IV) -->
+<div id="phone" class="abs" style="left:1180px;top:64px;width:390px;height:850px;border-radius:50px;background:#120a08;border:9px solid #050303;box-shadow:0 0 0 2px #3a2520,0 40px 90px rgba(0,0,0,.65);overflow:hidden;opacity:0;font-family:'PingFang SC',sans-serif">
+ <div class="abs mono" style="left:30px;top:14px;font-size:12px;color:#d9c3b8">9:41</div>
+ <div class="abs" style="left:18px;top:50px;font-size:17px;color:#E9D3C8">‹ 灯箱</div>
+ <div class="abs mono" style="left:92px;top:49px;font-size:11px;color:#C9A99A;border:1px solid #5a3a30;padding:4px 7px">RAW×3</div>
+ <div class="abs" style="left:222px;top:52px;font-size:15px;color:#C9A99A">配方</div>
+ <div class="abs" style="left:270px;top:43px;font-size:15px;color:#F2DCC8;border:2px solid #E9C9A0;border-radius:18px;padding:5px 14px">调整</div>
+ <div class="abs" style="left:350px;top:88px;width:8px;height:8px;border-radius:50%;background:#FF3B22"></div>
+ <div id="vf" class="abs" style="left:13px;top:104px;width:346px;height:519px;overflow:hidden;background:#000">
+  <img class="abs" src="../../public/assets/scenes/guangzhou-night.jpg" style="width:100%;height:100%;object-fit:cover">
+  <div id="vfP" class="abs" style="inset:0;overflow:hidden"><img class="abs" src="../samples/night_vision500t_2383.jpg" style="width:346px;height:519px;object-fit:cover"></div>
+  <div id="vfScan" class="abs" style="left:0;width:346px;height:3px;background:#FF3B22;box-shadow:0 0 14px #FF3B22"></div>
+  <div id="vfChip" class="abs mono" style="left:10px;top:10px;font-size:10px;color:#F5DDD2;background:rgba(10,6,5,.7);padding:5px 7px">VISION3 500T × 2383</div>
+  <div class="abs" style="left:4px;top:4px;width:22px;height:22px;border-left:3px solid #E4553F;border-top:3px solid #E4553F"></div>
+  <div class="abs" style="right:4px;top:4px;width:22px;height:22px;border-right:3px solid #E4553F;border-top:3px solid #E4553F"></div>
+  <div class="abs" style="left:4px;bottom:4px;width:22px;height:22px;border-left:3px solid #E4553F;border-bottom:3px solid #E4553F"></div>
+  <div class="abs" style="right:4px;bottom:4px;width:22px;height:22px;border-right:3px solid #E4553F;border-bottom:3px solid #E4553F"></div>
+  <div class="abs" style="left:103px;bottom:20px;width:140px;height:34px;border-radius:17px;background:rgba(20,12,10,.75);font:13px 'Martian Mono',monospace;color:#E9D3C8;display:flex;align-items:center;justify-content:space-around"><span>.6</span><span style="background:#E9B34E;color:#1B1A17;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center">1×</span><span>2</span><span>5</span></div>
+  <div id="gg" class="abs" style="inset:0;background:rgba(28,18,14,.62);backdrop-filter:blur(9px);opacity:0"></div>
+  <div id="flash" class="abs" style="inset:0;background:#fff;opacity:0"></div>
+ </div>
+ <div class="abs" style="left:18px;top:650px;width:42px;height:42px;border:1px solid #6a4a40;display:flex;align-items:center;justify-content:center"><span id="cnt" class="mono" style="font-size:20px;color:#F5DDD2">8</span></div>
+ <div class="abs mono" style="left:22px;top:698px;font-size:11px;color:#9C7F74">/ 36</div>
+ <div class="abs" style="left:72px;top:662px;font-size:13px;color:#E9A65A">自动过片 关</div>
+ <div class="abs" style="left:236px;top:668px;width:110px;height:4px;background:#C9B8B0;border-radius:2px"></div>
+ <div class="abs" style="left:226px;top:660px;width:20px;height:20px;border-radius:50%;border:2px solid #C9B8B0;background:#120a08"></div>
+ <div id="lever" class="abs" style="left:236px;top:657px;width:26px;height:26px;border-radius:50%;background:#2a1a16;border:2px solid #F2DCD2;display:flex;align-items:center;justify-content:center"><div style="width:9px;height:9px;border-radius:50%;background:#FF3B22"></div></div>
+ <div id="finger" class="abs" style="width:46px;height:46px;border-radius:50%;background:rgba(255,240,230,.28);border:2px solid rgba(255,240,230,.6);opacity:0"></div>
+ <div class="abs" style="left:24px;top:742px;width:54px;height:54px;overflow:hidden;border-radius:4px"><img src="../samples/night_vision500t_2383.jpg" style="width:100%;height:100%;object-fit:cover"></div>
+ <div id="shut" class="abs" style="left:143px;top:726px;width:86px;height:86px;border-radius:50%;border:3px solid #F2DCD2;display:flex;align-items:center;justify-content:center"><div style="width:70px;height:70px;border-radius:50%;background:#F2DCD2"></div></div>
+ <div class="abs" style="left:292px;top:742px;width:54px;height:54px;border-radius:50%;border:2px solid #6a4a40"></div>
+</div>
+
+<!-- S10 -->
+<div id="s10" class="scene">
+ <svg id="logo" class="abs" style="left:885px;top:228px" width="150" height="150" viewBox="0 0 40 40">
+  <rect x="1" y="1" width="38" height="38" rx="8" fill="#131315"/>
+  <polygon points="11.04,8.12 16.62,8.12 8.04,22.99 5.25,18.16" fill="#f0c542"/>
+  <polygon points="17.73,8.12 28.95,8.12 34.75,18.17 31.94,23.03 26.22,13.13 14.84,13.13" fill="#cb3272"/>
+  <polygon points="8.16,23.21 25.11,23.21 22.09,28.44 11.18,28.44" fill="#29a1c3"/>
+  <polygon points="28.58,19.02 31.4,23.9 26.22,32.88 20.57,32.88" fill="#29a1c3"/>
+  <rect x="14.29" y="14.04" width="11.44" height="8.28" fill="#ecf1f4"/>
+ </svg>
+ <div id="bn" class="abs serif" style="left:0;width:1920px;top:420px;text-align:center;font-size:120px;color:#F5DDD2;letter-spacing:.12em">银盐工坊</div>
+ <div id="bs" class="abs mono" style="left:0;width:1920px;top:585px;text-align:center;font-size:24px;color:#C9A99A;letter-spacing:.42em">SILVERCAM · 数字暗房</div>
+ <div id="bt" class="abs serif" style="left:0;width:1920px;top:668px;text-align:center;font-size:46px;color:#F5DDD2;font-weight:400">每一次快门，都是一卷胶片。</div>
+ <div id="cr" class="abs" style="left:0;width:1920px;top:930px;text-align:center;font-size:17px;line-height:1.8;color:#9C7F74">引擎移植自开源项目 spektrafilm（Andrea Volpato），参考 SpektraLab（James Qiu）· 非官方下游开源项目<br>样片原图：影视飓风素材库 · Kodak、Fujifilm 等胶片与相纸名称仅作描述性参考</div>
+ <svg class="ink" id="ink-s10"></svg>
+</div>
+
+<!-- subtitles -->
+<div id="sub" class="abs" style="left:0;width:1920px;top:944px;text-align:center;font-size:36px;color:#F3E9DA;letter-spacing:.02em;text-shadow:0 2px 10px rgba(0,0,0,.6)"></div>
+</div>
+
+<script src="data.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const lin=(t,a,b)=>cl((t-a)/(b-a));
+const eo=p=>1-Math.pow(1-p,3);
+const eio=p=>p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2;
+const K=(t,a,b,f=eo)=>f(lin(t,a,b));
+const NS='http://www.w3.org/2000/svg';
+function rng(seed){return()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function show(el,t,a,dur=.5,dy=14,out=null,od=.4){const p=K(t,a,a+dur);let o=p;if(out!=null)o*=1-K(t,out,out+od);el.style.opacity=o;el.style.transform=`translateY(${((1-p)*dy).toFixed(2)}px)`}
+function write(el,t,a,dur=.8){const p=lin(t,a,a+dur);el.style.clipPath=`inset(-30% ${((1-p)*100).toFixed(2)}% -30% -5%)`;el.style.opacity=p>0?1:0}
+function scene(el,t,a,b,f=.4){const o=K(t,a,a+f)*(1-K(t,b-f,b));el.style.opacity=o;el.style.visibility=o>0.001?'visible':'hidden'}
+function handEllipse(cx,cy,rx,ry,seed){const r=rng(seed);const N=72,st=-2.3+r()*.6;let s='';for(let i=0;i<=N;i++){const a=st+i/N*Math.PI*2*1.13;const j=1+(r()-.5)*.035+i/N*.07;s+=(i?' L':'M')+(cx+Math.cos(a)*rx*j).toFixed(1)+' '+(cy+Math.sin(a)*ry*j).toFixed(1)}return s}
+function handLine(x0,y0,x1,y1,seed){const r=rng(seed);let s='';const N=16;for(let i=0;i<=N;i++){const p=i/N;s+=(i?' L':'M')+(x0+(x1-x0)*p+(r()-.5)*3).toFixed(1)+' '+(y0+(y1-y0)*p+(r()-.5)*4).toFixed(1)}return s}
+const marks=[];
+function mark(svgId,d,a,b,style){const p=document.createElementNS(NS,'path');p.setAttribute('d',d);p.setAttribute('pathLength','1');p.style.strokeDasharray='1 1';p.style.strokeDashoffset='1';if(style)Object.assign(p.style,style);$(svgId).appendChild(p);marks.push({p,a,b});return p}
+
+/* ---------- build ---------- */
+// strip frames
+const FR=['cow_gold200_premier','night_vision500t_2383_halo','bus_portra400_endura','cow_gold200_grain3','cow_gold200_2383','pines_velvia100','peak_kodachrome64','otter_portra800_push1','falls_pro400h_crystal','atrium_ektar_2383','night_vision500t_2383','falls_pro400h_crystal','bus_portra400_endura','peak_kodachrome64','cow_gold200_crystal','pines_velvia100','otter_portra800_push1','atrium_ektar_2383','cow_gold200_premier','night_vision500t_2383_halo','bus_portra400_endura','falls_pro400h_crystal'];
+const FW=150,SLOT=150;
+FR.forEach((f,i)=>{const d=document.createElement('div');d.className='ph';Object.assign(d.style,{left:(i*FW+12)+'px',top:'26px',width:'129px',height:'88px'});d.innerHTML=`<img src="../samples/${f}.jpg">`;$('stripIn').appendChild(d);
+ const n=document.createElement('div');n.className='abs mono';Object.assign(n.style,{left:(i*FW+14)+'px',top:'114px',fontSize:'9px',color:'#E9A65A'});n.textContent='▸ '+(14+i)+(i%4==0?'  KODAK GOLD 200':'');$('stripIn').appendChild(n)});
+mark('stripInk','M'+[[80+SLOT+2,74],[80+SLOT+150,72],[80+SLOT+152,190],[80+SLOT+3,192],[80+SLOT+1,78]].map(p=>p.join(' ')).join(' L'),12.6,13.2,{strokeWidth:5});
+
+// S1
+mark('ink-s1',handEllipse(694,612,46,40,3),8.0,8.7);
+mark('ink-s1',handLine(744,604,918,592,4),8.6,8.9,{strokeWidth:4});
+// S2 chart
+(function(){const s=$('s2chart');const X=v=>60+(v+2.6)/5*680,Y=d=>500-d/1.8*460;
+ let g=`<line x1="60" y1="500" x2="740" y2="500" stroke="#4E4A42" stroke-width="2"/><line x1="60" y1="40" x2="60" y2="500" stroke="#4E4A42" stroke-width="2"/>`;
+ for(let d=.5;d<=1.6;d+=.5)g+=`<line x1="60" y1="${Y(d)}" x2="740" y2="${Y(d)}" stroke="#4E4A42" stroke-opacity=".15"/><text x="48" y="${Y(d)+6}" font-size="16" fill="#6B675E" text-anchor="end" font-family="Martian Mono">${d.toFixed(1)}</text>`;
+ g+=`<text x="740" y="540" font-size="18" fill="#4E4A42" text-anchor="end" font-family="PingFang SC">曝光量 log E →</text><text x="70" y="30" font-size="18" fill="#4E4A42" font-family="PingFang SC">密度 D</text>`;
+ const C=window.CURVE,n=C.r.length;const col={r:'#C8402E',g:'#3E8E5A',b:'#3B5FB0'};
+ for(const k of ['b','g','r']){let p='';for(let i=0;i<n;i++){const x=C.x0+i*(C.x1-C.x0)/(n-1);if(x<-2.6||x>2.4)continue;p+=(p?' L':'M')+X(x).toFixed(1)+' '+Y(C[k][i]).toFixed(1)}g+=`<path class="cv" d="${p}" fill="none" stroke="${col[k]}" stroke-width="4" pathLength="1" stroke-dasharray="1 1" stroke-dashoffset="1"/>`}
+ s.innerHTML=g})();
+mark('ink-s2',handEllipse(1000+560,300+104,90,46,7),21.9,22.6);
+mark('ink-s2',handEllipse(1000+215,300+478,80,34,8),23.3,24.0);
+// S3
+mark('ink-s3',handEllipse(140+427,304+392,62,52,11),35.0,35.6,{stroke:'#FFDCC0'});
+// S4
+mark('ink-s4',handEllipse(970,420,120,84,13),43.0,43.7);
+// S5 rows
+(function(){const R=$('s5rows');const rows=[['快','大颗粒 · 先感光',6.5,2.2,70],['中','中颗粒',3.8,1.4,130],['慢','细颗粒 · 后感光',2.2,.8,220]];
+ const r=rng(5);let h='';window.DOTS=[];
+ rows.forEach((row,ri)=>{const y=ri*120;h+=`<div class="abs serif" style="left:0;top:${y+12}px;font-size:40px">${row[0]}</div><div class="abs mono" style="left:0;top:${y+66}px;font-size:13px;color:#6B675E;white-space:nowrap">${row[1]}</div><div class="abs" style="left:150px;top:${y}px;width:540px;height:96px;background:linear-gradient(90deg,#FBF6EA,#D9CDB4);border:1px solid #CFC3AA"></div>`;
+  for(let i=0;i<row[4];i++){const u=Math.sqrt(r());const x=150+8+u*524,yy=y+6+r()*84,rad=row[2]+r()*row[3];DOTS.push({x,y:yy,rad,at:52.4+ri*.7+u*2.4+r()*1.2});}});
+ R.innerHTML=h;const svg=document.createElementNS(NS,'svg');svg.setAttribute('width','700');svg.setAttribute('height','420');svg.style.position='absolute';svg.style.left='0';svg.style.top='0';
+ DOTS.forEach(d=>{const c=document.createElementNS(NS,'circle');c.setAttribute('cx',d.x.toFixed(1));c.setAttribute('cy',d.y.toFixed(1));c.setAttribute('r',d.rad.toFixed(1));c.setAttribute('fill','#2A1F18');c.style.opacity=0;svg.appendChild(c);d.el=c});R.appendChild(svg)})();
+// S6
+mark('ink-s6',handEllipse(988+185,360+107,215,140,17),72.6,73.3);
+// S7 gallery
+const GAL=[['snow-pines','pines_velvia100','FUJIFILM VELVIA 100'],['alaska-peak','peak_kodachrome64','KODAK KODACHROME 64'],['alaska-otter','otter_portra800_push1','KODAK PORTRA 800 · 增感 1 档 × ENDURA'],['alaska-falls','falls_pro400h_crystal','FUJIFILM PRO 400H × CRYSTAL ARCHIVE'],['spiral-atrium','atrium_ektar_2383','KODAK EKTAR 100 × VISION 2383']];
+const G0=76.6,GD=2.36;
+GAL.forEach((g,i)=>{const d=document.createElement('div');d.className='abs';d.style.inset='0';d.style.opacity=0;
+ d.innerHTML=`<div class="ph" style="inset:0;width:1640px;height:640px"><img src="../../public/assets/scenes/${g[0]}.jpg"></div><div class="ph pr" style="left:0;top:0;width:1640px;height:640px"><img src="../samples/${g[1]}.jpg"></div><div class="abs ed" style="top:0;width:4px;height:640px;background:#FFF4DC;box-shadow:0 0 12px rgba(0,0,0,.5)"></div><div class="chip" style="left:16px;bottom:16px">原片</div><div class="chip" style="right:16px;bottom:16px;background:#C8241A">${g[2]}</div>`;
+ $('gal').appendChild(d);g.el=d;g.pr=d.querySelector('.pr');g.ed=d.querySelector('.ed')});
+// S8 chips
+const CH=['光谱曝光 · 特性曲线','光晕 · 柔焦镜','DIR 耦合剂','三子层银盐颗粒','放大机 × 相纸'];
+CH.forEach((c,i)=>{const d=document.createElement('div');d.className='abs';Object.assign(d.style,{left:'0',top:(i*88)+'px',width:'680px',height:'68px',border:'1px solid #4a2a22',background:'rgba(30,16,13,.6)',color:'#7a5a50',fontSize:'28px',display:'flex',alignItems:'center',paddingLeft:'64px'});d.innerHTML=`<span class="abs mono" style="left:18px;font-size:15px">0${i+1}</span>${c}<span class="abs led" style="right:22px;width:12px;height:12px;border-radius:50%;background:#3a1e18"></span>`;$('chips').appendChild(d)});
+// S9 ISP list + bayer
+const ISP=['锐化','涂抹降噪','局部色调映射','AI 补细节'];
+let ix=0;ISP.forEach((s,i)=>{const d=document.createElement('div');d.className='abs';Object.assign(d.style,{left:ix+'px',top:'0',fontSize:'34px',color:'#C9A99A',whiteSpace:'nowrap'});d.textContent=s;$('isp').appendChild(d);const w=s.length*34+(s.includes('AI')?-14:0);mark('ink-s9',handLine(172+ix-6,320+24,172+ix+w+6,320+20,30+i),99.7+i*.55,100.1+i*.55,{stroke:'#FF3B22'});ix+=w+48});
+(function(){const c=document.createElement('canvas');c.width=2;c.height=2;const x=c.getContext('2d');x.fillStyle='#b8473a';x.fillRect(0,0,1,1);x.fillStyle='#4e8a52';x.fillRect(1,0,1,1);x.fillRect(0,1,1,1);x.fillStyle='#3f5fa0';x.fillRect(1,1,1,1);const u=c.toDataURL();
+ for(let i=0;i<3;i++){const d=document.createElement('div');d.className='abs bt';Object.assign(d.style,{width:'170px',height:'170px',top:'20px',backgroundImage:`url(${u})`,backgroundSize:'16px 16px',imageRendering:'pixelated',border:'2px solid #F5DDD2',opacity:0,boxShadow:'0 10px 24px rgba(0,0,0,.5)'});d.innerHTML=`<div class="abs mono" style="left:0;top:178px;font-size:13px;color:#C9A99A;white-space:nowrap">帧 ${i+1}</div>`;$('bayer').appendChild(d)}})();
+// S10
+mark('ink-s10',handLine(700,566,1220,560,41),114.2,114.8,{strokeWidth:7});
+
+/* ---------- render(t) ---------- */
+function render(t){
+ // lightbox power
+ let off;
+ if(t<.3)off=1;else if(t<.36)off=.15;else if(t<.5)off=1;else if(t<.56)off=.05;else if(t<.7)off=.6;else if(t<89.7)off=1-K(t,.7,.95);
+ else if(t<89.76)off=.45;else if(t<89.82)off=.15;else off=K(t,89.82,89.9);
+ $('lbOff').style.opacity=off;$('lbGlow').style.opacity=1-off;
+ $('dim').style.opacity=K(t,89.7,90.1);$('safe').style.opacity=K(t,90.0,91.2)*(.85+.15*Math.sin(t*2.1));
+ // strip
+ const sIdx=t<25.4?0:t<37.4?1:t<47.6?2:t<60.3?3:t<76.4?4:Math.min(9,5+Math.floor((t-G0)/GD));
+ const stepAt=[25.4,37.4,47.6,60.3,76.4].concat([1,2,3,4].map(i=>G0+i*GD));
+ let pos=0;stepAt.forEach(a=>{pos+=K(t,a-.05,a+.55,eio)});
+ const enter=K(t,11.4,12.5,eio);
+ $('stripIn').style.transform=`translateX(${(SLOT-pos*FW+(1-enter)*1900).toFixed(1)}px)`;
+ $('strip').style.opacity=t<11.4?0:1-K(t,89.7,90.2);
+ $('stripInk').style.opacity=1-K(t,89.7,90.2);
+ // marks
+ marks.forEach(m=>{m.p.style.strokeDashoffset=(1-K(t,m.a,m.b,x=>x)).toFixed(4)});
+
+ // S1 0-11.4
+ scene($('s1'),t,0,11.3,.3);
+ {const p=K(t,1.1,1.7);const e=$('s1photo');e.style.opacity=p;e.style.transform=`translateY(${(1-p)*-30}px) scale(${1+(1-p)*.04})`;
+  const g=K(t,3.7,4.9,eio);const x=560*(1-g);$('s1lut').style.clipPath=`inset(0 0 0 ${x}px)`;$('s1gel').style.left=x+'px';$('s1gel').style.opacity=g>0&&g<1?1:g>=1?1-K(t,5.2,5.8):0;
+  show($('s1tag'),t,2.0,.5,8);show($('s1lutTag'),t,4.9,.4,8);
+  show($('s1t1'),t,6.8,.6,16);show($('s1t2'),t,7.4,.6,16);write($('s1n1'),t,8.8,.9);write($('s1n2'),t,9.6,.7)}
+
+ // S2 11.4-25.4
+ scene($('s2'),t,11.6,25.3,.4);
+ {show($('s2title'),t,11.9,.6,12);
+  const n=K(t,13.8,14.9,eio),q=K(t,20.4,21.5,eio);
+  $('s2neg').style.clipPath=`inset(0 ${(1-n)*100}% 0 0)`;$('s2pos').style.clipPath=`inset(0 ${(1-q)*100}% 0 0)`;
+  const ex=(n>0&&n<1)?n:(q>0&&q<1)?q:-1;$('s2edge').style.left=(ex*800-1)+'px';$('s2edge').style.opacity=ex<0?0:1;
+  $('s2l0').style.opacity=1-K(t,13.8,14.2);$('s2l1').style.opacity=K(t,14.6,15.0)*(1-K(t,20.4,20.8));$('s2l2').style.opacity=K(t,21.2,21.6);
+  const sp=K(t,16.4,17.4,x=>x);$('s2spec').style.clipPath=`inset(0 ${(1-sp)*100}% 0 0)`;show($('s2specL'),t,17.0,.4,6);write($('s2specH'),t,17.3,.7);
+  show($('s2chartT'),t,17.6,.4,6);
+  $('s2chart').querySelectorAll('.cv').forEach((c,i)=>c.style.strokeDashoffset=(1-K(t,18.0+i*.25,20.6+i*.25,eio)).toFixed(4));
+  write($('s2n1'),t,22.4,.8);write($('s2n2'),t,23.9,.8)}
+
+ // S3 25.4-37.4
+ scene($('s3'),t,25.5,37.3,.4);
+ {show($('s3title'),t,25.8,.6,12);show($('s3img'),t,26.1,.6,10);
+  const h=K(t,32.4,33.4,eio),f=K(t,34.3,35.5,eio);const cut=580*(1-.5*h-.5*f);
+  $('s3halo').style.clipPath=`inset(0 0 0 ${cut}px)`;$('s3edge').style.left=(cut-1)+'px';$('s3edge').style.opacity=(h>0&&f<1)?1:0;
+  $('s3c1').style.opacity=K(t,32.6,33.0);$('s3c0').style.opacity=1-K(t,34.8,35.2);
+  $('s3ray').style.strokeDashoffset=(1-K(t,28.0,29.4,x=>x)).toFixed(4);
+  $('s3b1').style.strokeDashoffset=(1-K(t,29.9,30.9,x=>x)).toFixed(4);$('s3b2').style.strokeDashoffset=(1-K(t,30.0,31.0,x=>x)).toFixed(4);
+  const gl=K(t,31.9,32.8);$('s3glow').setAttribute('opacity',(gl*(.55+.12*Math.sin(t*5))).toFixed(3));$('s3red').setAttribute('fill-opacity',(.16+gl*.3).toFixed(3));
+  $('s3xl').setAttribute('opacity',K(t,28.6,29.2).toFixed(3));write($('s3n1'),t,32.9,1.0);
+  const n2=$('s3n2');n2.textContent='红晕跟着亮度走';write(n2,t,35.4,.8)}
+
+ // S4 37.4-47.6
+ scene($('s4'),t,37.5,47.5,.4);
+ {show($('s4title'),t,37.8,.6,12);show($('s4a'),t,38.3,.5,10);show($('s4la'),t,38.5,.4,6);show($('s4b'),t,42.3,.5,10);show($('s4lb'),t,42.5,.4,6);
+  $('s4x').querySelectorAll('.arr').forEach((a,i)=>{a.style.fill='none';if(!a.style.stroke)a.style.stroke='#C8241A';a.style.strokeWidth=a.style.strokeWidth||'4';a.style.strokeDasharray='1 1';if(i<4)a.setAttribute('marker-end','url(#ah)');a.style.strokeDashoffset=(1-K(t,39.2+i*.55,39.9+i*.55,x=>x)).toFixed(4);a.style.opacity=K(t,39.2+i*.55,39.3+i*.55)});
+  $('s4same').setAttribute('opacity',K(t,41.8,42.2).toFixed(3));
+  show($('s4m'),t,41.0,.4,6);write($('s4n0'),t,43.8,.8);write($('s4n1'),t,45.0,.9)}
+
+ // S5 47.6-60.3
+ scene($('s5'),t,47.7,60.2,.4);
+ {show($('s5title'),t,47.9,.6,12);show($('s5img'),t,48.1,.5,10);
+  const l=K(t,48.6,49.8,eio);const cx=760+(1-l)*-900,cy=600;const L=$('loupe');L.style.left=(cx-200)+'px';L.style.top=(cy-200)+'px';
+  const m=2.1,P=[880,290];[$('lpA'),$('lpB')].forEach(im=>{im.style.width=(1800*m)+'px';im.style.left=(200-P[0]*m)+'px';im.style.top=(200-P[1]*m)+'px'});
+  write($('s5h1'),t,50.0,.6);write($('s5h2'),t,50.6,.7);
+  show($('s5rows'),t,50.3,.5,8);DOTS.forEach(d=>{d.el.style.opacity=K(t,d.at,d.at+.25).toFixed(3)});
+  show($('s5m'),t,56.4,.4,6);write($('s5n'),t,57.2,.9)}
+
+ // S6 60.3-76.4
+ scene($('s6'),t,60.4,76.3,.4);
+ {show($('s6title'),t,60.6,.6,12);show($('s6enl'),t,61.0,.6,10);show($('s6cc'),t,61.4,.4,6);
+  const y=Math.round(K(t,63.0,64.6,x=>x)*6);$('s6cc').textContent=`CC 滤色　Y +${String(y).padStart(2,'0')}　M +00`;
+  const ang=K(t,63.0,64.6)*120;$('dialY').setAttribute('transform',`rotate(${ang.toFixed(1)} 130 112)`);
+  $('s6cone').setAttribute('opacity',(K(t,65.3,66.1)*(.92+.08*Math.sin(t*9))).toFixed(3));
+  {const p=K(t,61.6,62.3),o=1-K(t,67.0,67.6);const e=$('negc');e.style.opacity=p*o;e.style.transform=`translateY(${((1-p)*24).toFixed(1)}px) scale(${(1-.06*K(t,67.0,67.6)).toFixed(3)})`;}
+  show($('s6neg'),t,67.4,.4,6);
+  [[68.4,69.6],[71.1,72.2],[73.5,74.6]].forEach((a,i)=>{const p=K(t,a[0],a[0]+.5);const e=$('pr'+i);e.style.opacity=p;e.style.transform=`translateY(${(1-p)*-40}px) rotate(${(i-1)*1.2+(1-p)*3}deg)`;show($('pl'+i),t,a[0]+.3,.4,6);write($('pn'+i),t,a[1],.6)})}
+
+ // S7 gallery 76.4-88.6
+ scene($('s7'),t,76.45,88.6,.35);
+ {GAL.forEach((g,i)=>{const a=G0+i*GD,b=a+GD;const o=K(t,a-.05,a+.25)*(i==GAL.length-1?1:1-K(t,b-.05,b+.2));g.el.style.opacity=o;
+   const w=K(t,a+.35,a+1.1,eio);const cut=1640*(1-.5*w);g.pr.style.clipPath=`inset(0 0 0 ${cut}px)`;g.ed.style.left=(cut-2)+'px';g.ed.style.opacity=w>0?1:0});
+  show($('galNote'),t,76.9,.4,6)}
+
+ // S8 darkroom 88.6-98.8
+ const ph=$('phone');
+ {const r=K(t,90.3,91.5);const out=K(t,111.9,112.6);ph.style.opacity=Math.min(r*1.4,1)*(1-out);ph.style.transform=`translateY(${((1-r)*1000+out*40).toFixed(1)}px)`}
+ scene($('s8'),t,90.4,99.1,.4);
+ {show($('s8title'),t,91.6,.6,12);show($('s8sub'),t,92.2,.5,8);
+  [...$('chips').children].forEach((c,i)=>{const a=92.6+i*.55;const p=K(t,a,a+.3);c.style.opacity=K(t,92.3+i*.1,92.6+i*.1);c.style.borderColor=p>.5?'#FF3B22':'#4a2a22';c.style.color=p>.5?'#F5DDD2':'#7a5a50';c.querySelector('.led').style.background=p>.5?'#FF3B22':'#3a1e18';c.querySelector('.led').style.boxShadow=p>.5?'0 0 12px #FF3B22':'none'});
+  $('s8line').style.strokeDashoffset=(1-K(t,95.2,95.8,x=>x)).toFixed(4)}
+ {const w=K(t,95.6,97.4,eio);$('vfP').style.clipPath=`inset(0 0 ${((1-w)*100).toFixed(2)}% 0)`;$('vfScan').style.top=(w*519-2)+'px';$('vfScan').style.opacity=(w>0&&w<1)?1:0}
+
+ // S9 98.8-112.4
+ scene($('s9'),t,98.9,112.5,.4);
+ {show($('s9title'),t,99.0,.6,12);const ispOut=1-K(t,107.2,107.7);
+  $('isp').style.opacity=K(t,99.1,99.5)*ispOut;$('ink-s9').style.opacity=ispOut;
+  [...$('bayer').querySelectorAll('.bt')].forEach((b,i)=>{const p=K(t,101.9+i*.25,102.3+i*.25);const c=K(t,103.0,104.0,eio);b.style.opacity=p*ispOut;b.style.left=((i*190)*(1-c)+(i*14)*c)+'px';b.style.top=(20+(i*14)*c)+'px'});
+  $('rawL').style.opacity=K(t,104.0,104.4)*ispOut;
+  // shutter, ground glass, lever
+  const press=K(t,105.25,105.35)*(1-K(t,105.45,105.6));$('shut').style.transform=`scale(${1-press*.1})`;
+  $('flash').style.opacity=K(t,105.3,105.33)*(1-K(t,105.33,105.5));
+  $('gg').style.opacity=K(t,105.4,105.6)*(1-K(t,107.0,107.3));
+  const lv=K(t,106.0,106.9,eio)*(1-K(t,107.0,107.25,eo));$('lever').style.left=(236+lv*96)+'px';
+  $('cnt').textContent=t<106.9?'8':'9';
+  const f=$('finger');let fo=0,fx=0,fy=0;
+  if(t<105.9){fo=K(t,104.9,105.1)*(1-K(t,105.6,105.8));fx=163;fy=746}else{fo=K(t,105.9,106.0)*(1-K(t,106.95,107.15));fx=226+K(t,106.0,106.9,eio)*96;fy=648}
+  f.style.opacity=fo;f.style.left=fx+'px';f.style.top=fy+'px';
+  [[107.9,108.7,170,-4],[109.5,110.3,530,3]].forEach((c,i)=>{const p=K(t,c[0],c[1]);const e=$('cd'+i);e.style.opacity=K(t,c[0],c[0]+.2);const sx=1200-c[2],sy=-110;e.style.transform=`translate(${((1-p)*sx).toFixed(1)}px,${((1-p)*sy).toFixed(1)}px) scale(${(.55+.45*p).toFixed(3)}) rotate(${(c[3]*p).toFixed(2)}deg)`;e.style.transformOrigin='0 0'})}
+
+ // S10 112.4-119.5
+ scene($('s10'),t,112.5,130,.3);
+ {const p=K(t,112.7,113.4);$('logo').style.opacity=p;$('logo').style.transform=`scale(${.85+.15*p})`;
+  show($('bn'),t,113.0,.7,18);show($('bs'),t,113.6,.6,10);show($('bt'),t,114.4,.7,10);show($('cr'),t,115.8,.8,6)}
+
+ // subtitles (s10 tagline is on-screen)
+ let txt='',so=0;if(t<112.5){for(const s of TL.subs){if(t>=s.start-.05&&t<s.end){txt=s.text;so=K(t,s.start-.05,s.start+.1)*(1-K(t,s.end-.12,s.end));break}}}
+ const sub=$('sub');if(sub.textContent!==txt)sub.textContent=txt;sub.style.opacity=so;
+}
+
+window.__seek=t=>render(t);
+window.__ready=false;
+(async()=>{await document.fonts.ready;await Promise.all([...document.images].map(async i=>{try{await i.decode()}catch(e){throw new Error('Required image failed: '+i.getAttribute('src'))}}));render(0);window.__ready=true;
+ if(!window.__seekRender&&location.hash!=='#still'){const t0=performance.now()-((+new URLSearchParams(location.search).get('t')||0)*1000);const loop=()=>{render((performance.now()-t0)/1000%TL.duration);requestAnimationFrame(loop)};loop()}
+ else if(location.hash==='#still'){render(+new URLSearchParams(location.search).get('t')||0)}})().catch(e=>{window.__renderError=String(e);console.error(e)});
+</script>
+</body></html>

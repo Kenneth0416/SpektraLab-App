@@ -1,0 +1,26 @@
+# Generated outputs and local working material
+.DS_Store
+__pycache__/
+*.py[cod]
+.venv/
+.cache/
+cache/
+frames/
+scratch/
+build/
+*.mp4
+*.mov
+*.wav
+*.mp3
+# Old alternatives are preserved locally, outside the reproducible v3 source set.
+/design-demos/
+/v2/
+/film/film.html
+/film/data.js
+/film/scenes_v2.html
+/film/script_v2.js
+/film/v2.css
+/v1/align.json
+/v1/narration.json
+/v1/timeline.json
+/v1/导演稿.md

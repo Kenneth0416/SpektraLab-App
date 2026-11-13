@@ -29,6 +29,8 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
@@ -54,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -471,18 +474,23 @@ fun CameraScreen(state: AppState) {
     // The picture is landscape when the phone is held a quarter turn from the fixed screen.
     val pictureLandscape = landscape != (turn == 90 || turn == -90)
     // Like other phone cameras: the screen stays put and the controls turn in place.
-    // Phones lock upright; larger screens keep their current fold, book, or landscape layout.
+    // Phones lock upright; foldables and large screens keep rotating so half-fold postures
+    // (tabletop / book) can be detected instead of being frozen in portrait.
     val activity = remember(context) {
         generateSequence(context) { (it as? android.content.ContextWrapper)?.baseContext }.filterIsInstance<Activity>().firstOrNull()
     }
-    DisposableEffect(activity, config.smallestScreenWidthDp) {
+    val fold = LocalFold.current
+    DisposableEffect(activity, config.smallestScreenWidthDp, config.screenWidthDp, fold.posture) {
         // A locked orientation has no effect in split screen, and unlocking there can fight the system.
         val lock = activity != null && !activity.isInMultiWindowMode
-        if (lock) activity.requestedOrientation = if (config.smallestScreenWidthDp < 600)
-            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT else ActivityInfo.SCREEN_ORIENTATION_LOCKED
+        val unfolded = config.screenWidthDp >= 600 || fold.posture != Posture.NORMAL
+        if (lock) activity.requestedOrientation = when {
+            unfolded -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            config.smallestScreenWidthDp < 600 -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            else -> ActivityInfo.SCREEN_ORIENTATION_LOCKED
+        }
         onDispose { if (lock) activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
     }
-    val fold = LocalFold.current
     var origin by remember { mutableStateOf(Offset.Zero) }
     val hinge = fold.hinge?.translate(-origin)
     val density = androidx.compose.ui.platform.LocalDensity.current
@@ -535,14 +543,25 @@ fun CameraScreen(state: AppState) {
             .border(1.dp, accent, RoundedCornerShape(14.dp)).padding(horizontal = 12.dp, vertical = 5.dp))
     }
 
-    val viewfinderPart: @Composable (Modifier) -> Unit = { modifier ->
-        Box(modifier.padding(horizontal = 10.dp, vertical = 4.dp), contentAlignment = Alignment.Center) {
-            val aspect = if (landscape) 4f / 3f else 3f / 4f
+    val viewfinderPart: @Composable (Modifier, Boolean) -> Unit = { modifier, waistLevel ->
+        val finderPad = if (waistLevel) Modifier.padding(18.dp) else Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+        Box(modifier.then(finderPad), contentAlignment = Alignment.Center) {
+            val aspect = if (waistLevel) {
+                // Ground glass is square for 6×6, otherwise the format's own aspect, kept portrait-friendly.
+                val fmt = Catalog.format(look.format).aspect.toFloat()
+                if (kotlin.math.abs(fmt - 1f) < 0.04f) 1f else fmt.coerceIn(0.7f, 1.4f)
+            } else if (landscape) 4f / 3f else 3f / 4f
             BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 val boxAspect = if (maxHeight.value > 0f) maxWidth.value / maxHeight.value else 1f
                 var focusAt by remember { mutableStateOf<Offset?>(null) }
                 val focusRing = remember { Animatable(0f) }
                 Box(Modifier.aspectRatio(aspect, matchHeightConstraintsFirst = aspect < boxAspect)
+                    .then(if (waistLevel) Modifier
+                        .border(3.dp, Color(0xFF8A7348), RoundedCornerShape(2.dp))
+                        .padding(3.dp)
+                        .border(1.dp, Color(0xFFC4A574).copy(alpha = 0.7f), RoundedCornerShape(1.dp))
+                        .background(Color(0xFF1A140C))
+                    else Modifier)
                     .pointerInput(session) {
                         // tap: focus and meter the sensor there (released after a few seconds);
                         // long press: hold focus until the next tap (AE continues to meter)
@@ -618,6 +637,23 @@ fun CameraScreen(state: AppState) {
                         if (b < size.height) drawRect(mask, Offset(0f, b), Size(size.width, size.height - b))
                         if (l > 0f) drawRect(mask, Offset(0f, t), Size(l, b - t))
                         if (r < size.width) drawRect(mask, Offset(r, t), Size(size.width - r, b - t))
+                        // waist-level ground glass: hairline grid and centre cross, like a TLR focusing screen
+                        if (waistLevel) {
+                            val grid = Color(0xFFC4A574).copy(alpha = 0.38f)
+                            val hair = 0.6.dp.toPx()
+                            val fl = l; val fr = r; val ft = t; val fb = b
+                            val fw = fr - fl; val fh = fb - ft
+                            for (i in 1..2) {
+                                val x = fl + fw * i / 3f
+                                val y = ft + fh * i / 3f
+                                drawLine(grid, Offset(x, ft), Offset(x, fb), hair)
+                                drawLine(grid, Offset(fl, y), Offset(fr, y), hair)
+                            }
+                            val cx = (fl + fr) / 2f; val cy = (ft + fb) / 2f
+                            val arm = 14.dp.toPx()
+                            drawLine(grid, Offset(cx - arm, cy), Offset(cx + arm, cy), hair * 1.4f)
+                            drawLine(grid, Offset(cx, cy - arm), Offset(cx, cy + arm), hair * 1.4f)
+                        }
                         // frame not advanced: film sessions wait for ground glass; RAW dims the direct preview here
                         if (clarity.value < 1f) drawRect(Pal.dark.copy(alpha = (if (session?.raw == true) 0.62f else 0.5f) * (1f - clarity.value)))
                         // RAW exposure cannot pass through the film effect, so the direct preview is shaded to match the gesture.
@@ -664,7 +700,8 @@ fun CameraScreen(state: AppState) {
                         if (session?.raw == true) Text(stringResource(R.string.raw_preview_notice), fontSize = 10.sp, color = Pal.text,
                             modifier = Modifier.padding(top = 4.dp).background(Color(0x99140807)).padding(horizontal = 6.dp, vertical = 2.dp))
                     }
-                    // zoom steps sit on the lower edge of the finder, where thumbs expect them
+                    // zoom chips live on the metal deck in waist-level mode, not over the ground glass
+                    if (!waistLevel) {
                     val stops = lensChoices
                     Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp)
                         .background(Color(0x80140807), CircleShape).padding(3.dp)) {
@@ -690,9 +727,21 @@ fun CameraScreen(state: AppState) {
                                     .padding(horizontal = 9.dp, vertical = 7.dp))
                         }
                     }
+                    }
                 }
             }
             Safelight(Modifier.align(Alignment.TopEnd).padding(2.dp))
+            if (waistLevel) {
+                // subtle focusing-hood vignette around the ground glass
+                Canvas(Modifier.matchParentSize()) {
+                    drawRect(Brush.radialGradient(
+                        0.55f to Color.Transparent,
+                        1f to Color(0xCC100C08),
+                        center = center,
+                        radius = size.minDimension * 0.72f,
+                    ))
+                }
+            }
         }
     }
 
@@ -760,6 +809,32 @@ fun CameraScreen(state: AppState) {
             counter(); Spacer(Modifier.width(10.dp)); motor(); Spacer(Modifier.weight(1f)); lever()
         }
     }
+    val zoomChips: @Composable () -> Unit = {
+        val stops = lensChoices
+        Row(Modifier.background(Color(0x66140807), CircleShape).padding(3.dp)) {
+            val nearest = stops.filter { it.second == null }.minByOrNull { kotlin.math.abs(it.first - zoom) }?.first
+            stops.forEach { (z, other) ->
+                val on = other == null && z == nearest
+                val live = on && kotlin.math.abs(zoom - z) > 0.05f
+                val label = if (baseMm != null) "${Math.round(baseMm * (if (live) zoom else z))}" + if (on) "mm" else ""
+                    else if (live) "%.1f×".format(zoom)
+                    else if (z < 1f) "%.1f".format(z).trimStart('0') else "${z.toInt()}" + if (on) "×" else ""
+                Text(label, fontFamily = Fonts.mono, fontSize = 11.sp,
+                    color = if (on) Pal.dink else Pal.text, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
+                    modifier = Modifier.padding(horizontal = 2.dp).springClick {
+                        if (!busy) {
+                            if (other == null) animateZoom(z) else {
+                                zoomJob?.cancel()
+                                zoom = 1f
+                                focusLocked = false
+                                selectedCameraId = other.id
+                            }
+                        }
+                    }.graphicsLayer { rotationZ = iconTurn }.clip(CircleShape).background(if (on) accent else Color.Transparent)
+                        .padding(horizontal = 9.dp, vertical = 7.dp))
+            }
+        }
+    }
     val toolsPart: @Composable (Modifier) -> Unit = { modifier ->
         Box(modifier.clip(RoundedCornerShape(14.dp)).background(Pal.darkPanel.copy(alpha = 0.96f))) {
             ToolDeck(state, tool, { tool = it }, look, accent, positive, isVideo = false,
@@ -773,32 +848,58 @@ fun CameraScreen(state: AppState) {
         val tabletop = fold.posture == Posture.TABLETOP && hinge != null && hinge.top > 0f
         val book = fold.posture == Posture.BOOK && hinge != null && hinge.left > 0f
         when {
-            tabletop -> Column(Modifier.fillMaxSize()) {
-                // half folded on a table: finder on the upright half, everything else on the flat half
-                Column(Modifier.fillMaxWidth().height(with(density) { hinge!!.top.toDp() })) {
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) { topItems { Spacer(Modifier.weight(1f)) } }
-                    viewfinderPart(Modifier.fillMaxWidth().weight(1f))
-                }
-                Spacer(Modifier.height(with(density) { hinge!!.height.toDp() }))
-                Row(Modifier.fillMaxSize()) {
-                    toolsPart(Modifier.weight(1f).fillMaxHeight().padding(8.dp))
-                    Column(Modifier.fillMaxHeight().padding(end = 12.dp), horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.SpaceEvenly) {
-                        transportPart(true, false); shutterPart(); Row(verticalAlignment = Alignment.CenterVertically) { thumbPart(); Spacer(Modifier.width(14.dp)); flipPart() }
+            tabletop -> Column(Modifier.fillMaxSize().background(Color(0xFF1C1916))) {
+                // Waist-level finder: the upright half (behind the rear lenses) is the metal control deck.
+                // The flat half the photographer looks down into is the ground glass.
+                Column(Modifier.fillMaxWidth().height(with(density) { hinge!!.top.toDp() }).background(
+                    Brush.verticalGradient(listOf(Color(0xFF2A2622), Color(0xFF141210))))) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        topItems { Spacer(Modifier.weight(1f)) }
+                    }
+                    if (toolsOpen) {
+                        toolsPart(Modifier.fillMaxWidth().weight(1f).padding(8.dp))
+                    } else {
+                        Column(Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp, vertical = 6.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceEvenly) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                counter(); Spacer(Modifier.width(16.dp)); motor()
+                            }
+                            transportPart(false, true)
+                            shutterPart()
+                            zoomChips()
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                thumbPart(); Spacer(Modifier.width(22.dp)); flipPart()
+                            }
+                        }
                     }
                 }
+                Spacer(Modifier.height(with(density) { hinge!!.height.toDp() }))
+                Box(Modifier.fillMaxSize().background(Color(0xFF100E0C))) {
+                    viewfinderPart(Modifier.fillMaxSize(), true)
+                }
             }
-            book -> Row(Modifier.fillMaxSize()) {
-                Column(Modifier.fillMaxHeight().width(with(density) { hinge!!.left.toDp() })) {
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) { topItems { Spacer(Modifier.weight(1f)) } }
-                    viewfinderPart(Modifier.fillMaxWidth().weight(1f))
+            book -> Row(Modifier.fillMaxSize().background(Color(0xFF1C1916))) {
+                // Vertical hinge, held sideways: metal controls on the lens half, ground glass on the other.
+                Column(Modifier.fillMaxHeight().width(with(density) { hinge!!.left.toDp() }).background(
+                    Brush.horizontalGradient(listOf(Color(0xFF2A2622), Color(0xFF141210))))) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        topItems { Spacer(Modifier.weight(1f)) }
+                    }
+                    if (toolsOpen) {
+                        toolsPart(Modifier.fillMaxWidth().weight(1f).padding(8.dp))
+                    } else {
+                        Column(Modifier.fillMaxWidth().weight(1f).padding(8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceEvenly) {
+                            transportPart(true, false)
+                            zoomChips()
+                            Row(verticalAlignment = Alignment.CenterVertically) { thumbPart(); Spacer(Modifier.width(14.dp)); flipPart() }
+                            shutterPart()
+                        }
+                    }
                 }
                 Spacer(Modifier.width(with(density) { hinge!!.width.toDp() }))
-                Column(Modifier.fillMaxSize()) {
-                    toolsPart(Modifier.fillMaxWidth().weight(1f).padding(8.dp))
-                    transportPart(false, false)
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 26.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween) { thumbPart(); shutterPart(); flipPart() }
+                Box(Modifier.fillMaxSize().background(Color(0xFF100E0C))) {
+                    viewfinderPart(Modifier.fillMaxSize(), true)
                 }
             }
             landscape -> BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -812,7 +913,7 @@ fun CameraScreen(state: AppState) {
                     if (short) { counter(); motor() }
                 }
                 Box(Modifier.weight(1f).fillMaxHeight()) {
-                    viewfinderPart(Modifier.fillMaxSize())
+                    viewfinderPart(Modifier.fillMaxSize(), false)
                     androidx.compose.animation.AnimatedVisibility(toolsOpen, Modifier.align(Alignment.CenterEnd),
                         enter = slideInHorizontally(Motion.glideOffset) { it } + fadeIn(), exit = slideOutHorizontally(tween(200)) { it } + fadeOut()) {
                         toolsPart(Modifier.width(340.dp).fillMaxHeight().padding(6.dp))
@@ -827,7 +928,7 @@ fun CameraScreen(state: AppState) {
             else -> Column(Modifier.fillMaxSize()) {
                 Row(Modifier.fillMaxWidth().dealIn(0, fromY = -40f).padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) { topItems { Spacer(Modifier.weight(1f)) } }
                 Box(Modifier.fillMaxWidth().weight(1f)) {
-                    viewfinderPart(Modifier.fillMaxSize())
+                    viewfinderPart(Modifier.fillMaxSize(), false)
                     androidx.compose.animation.AnimatedVisibility(toolsOpen, Modifier.align(Alignment.BottomCenter),
                         enter = slideInVertically(Motion.glideOffset) { it } + fadeIn(), exit = slideOutVertically(tween(200)) { it } + fadeOut()) {
                         toolsPart(Modifier.fillMaxWidth().height(300.dp).padding(6.dp))

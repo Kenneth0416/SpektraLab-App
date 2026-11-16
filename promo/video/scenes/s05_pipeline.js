@@ -1,4 +1,5 @@
 import { $, $$, split, glyphs, rise, up, out, cue, B } from '../lib.js';
+import A from '../assets.js';
 
 // The pipeline, drawn fresh (the README's figure is adapted from a textbook, so it is not reused).
 const X0 = 210, DX = 300, Y = 452;
@@ -23,7 +24,12 @@ export default {
       <div class="h3" style="font-size:40px;margin-top:6px">${a}</div>
       <div style="font-size:23px;color:var(--dim);margin-top:6px;white-space:nowrap">${b}</div>
     </div>`).join('')}
-  <div class="abs stages" style="left:0;top:690px;width:1920px;height:300px"></div>
+  ${[[0, A.stageOriginal, '数码原图'], [2, A.stageNegative, '模拟出的负片（带橙色色罩）'], [5, A.stagePrint, '印相、扫描后的成片']].map(([i, src, cap]) => `
+    <div class="abs stg" data-i="${i}" style="left:${X0 + i * DX - 165}px;top:690px;width:330px">
+      <div style="padding:9px;background:#0b0605;box-shadow:0 0 0 1.5px rgba(245,221,210,.22), 0 30px 60px rgba(0,0,0,.6)"><img src="${src}" style="display:block;width:100%;height:208px;object-fit:cover"></div>
+      <div style="text-align:center;font-size:21px;color:var(--text);margin-top:12px;white-space:nowrap">${cap}</div>
+    </div>`).join('')}
+  <div class="abs credit">同一帧，由本应用的引擎渲染</div>
   `,
   build(tl, root, t) {
     split(root);
@@ -40,7 +46,11 @@ export default {
       tl.to(n, { borderColor: '#FF3B22', duration: .2 }, at);
       up(tl, $$(root, '.lbl')[i], at, { y: 18, d: .45 }); cue('pop', at, 1 + i * .1);
     });
-    this.stages?.(tl, root, T0, STEP);
+    $$(root, '.stg').forEach((g) => {
+      const at = T0 + (+g.dataset.i) * STEP + .12;
+      tl.fromTo(g, { autoAlpha: 0, y: 46, scale: .92 }, { autoAlpha: 1, y: 0, scale: 1, duration: .7, ease: 'expo.out' }, at);
+    });
+    up(tl, $(root, '.credit'), T0 + 5 * STEP + .6, { y: 0 });
     tl.to(root, { opacity: 0, duration: .4, ease: 'power2.in' }, t + this.dur - .35);
   },
 };

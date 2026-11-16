@@ -3,9 +3,9 @@ import A from '../assets.js';
 
 // Three physical effects, each shown off -> on with a real render from the app's engine.
 const CARDS = [
-  ['光晕', '片基反射 + 乳剂散射，高光才会泛红', A.halOff, A.halOn],
-  ['颗粒', '逐层的泊松随机模型，随画幅物理缩放', A.grainOff, A.grainOn],
-  ['片边 · 日期', '片边颜色，是片基走完印放链路的真实颜色', A.borderOff, A.borderOn],
+  ['光晕', '片基反射 + 乳剂散射，高光才会泛红（演示：强度 ×3）', A.halOff, A.halOn],
+  ['颗粒', '逐层的泊松随机模型，随画幅缩放（演示：半格 ×1.6）', A.grainOff, A.grainOn],
+  ['片边 · 日期', '片边颜色，是片基走完印放链路的真实颜色', A.borderOff, A.borderOn, 'contain'],
 ];
 const W = 540, H = 560, X = [120, 690, 1260], Y = 300;
 
@@ -15,12 +15,12 @@ export default {
   <div class="fill dark"></div>
   <div class="abs kicker k" style="left:120px;top:110px">03 · 细节 Details</div>
   <div class="abs h2" style="left:114px;top:148px;font-size:86px"><span class="ln hl" data-split>光晕、颗粒、片边，都按物理来</span></div>
-  ${CARDS.map(([a, b, off, on], i) => `
+  ${CARDS.map(([a, b, off, on, fit = 'cover'], i) => `
     <div class="abs card" style="left:${X[i]}px;top:${Y}px;width:${W}px;height:${H}px;overflow:hidden;background:#000;box-shadow:0 40px 90px rgba(0,0,0,.6)">
-      <img class="abs" src="${off}" style="inset:0;width:100%;height:100%;object-fit:cover">
-      <img class="abs on" src="${on}" style="inset:0;width:100%;height:100%;object-fit:cover">
+      <img class="abs" src="${off}" style="inset:0;width:100%;height:100%;object-fit:${fit}">
+      <img class="abs on" src="${on}" style="inset:0;width:100%;height:100%;object-fit:${fit};background:#0d0807">
       <div class="abs bar" style="left:0;top:0;width:4px;height:100%;background:var(--safe);box-shadow:0 0 20px 4px rgba(255,59,34,.8)"></div>
-      <div class="abs st mono" style="left:18px;top:18px;font-size:18px;letter-spacing:.16em;padding:8px 14px;background:rgba(13,8,7,.75);color:#fff"><span class="so">OFF</span></div>
+      <div class="abs st mono" style="left:18px;bottom:18px;font-size:18px;letter-spacing:.16em;padding:8px 14px;background:rgba(13,8,7,.75);color:#fff"><span class="so">OFF</span></div>
     </div>
     <div class="abs cap" style="left:${X[i]}px;top:${Y + H + 28}px;width:${W}px">
       <div class="h3" style="font-size:46px"><span class="mono" style="font-size:20px;color:var(--safe);vertical-align:middle;margin-right:14px">0${i + 1}</span>${a}</div>

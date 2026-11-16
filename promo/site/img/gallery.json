@@ -1,0 +1,42 @@
+{
+ "compare": "Kodak Portra 400",
+ "items": [
+  {
+   "file": "gallery-1.jpg",
+   "film": "Kodak Gold 200"
+  },
+  {
+   "file": "gallery-2.jpg",
+   "film": "Fujifilm Velvia 100"
+  },
+  {
+   "file": "gallery-3.jpg",
+   "film": "Vision3 500T × 2383"
+  },
+  {
+   "file": "gallery-4.jpg",
+   "film": "Kodak Ektar 100"
+  },
+  {
+   "file": "gallery-5.jpg",
+   "film": "Kodak Portra 400"
+  },
+  {
+   "file": "gallery-6.jpg",
+   "film": "Fujifilm C200"
+  },
+  {
+   "file": "gallery-7.jpg",
+   "film": "Fujifilm Pro 400H"
+  },
+  {
+   "file": "gallery-8.jpg",
+   "film": "Kodak Kodachrome 64"
+  },
+  {
+   "file": "gallery-9.jpg",
+   "film": "Vision3 500T × 2383"
+  }
+ ],
+ "credits": "Aabhas Lall（CC BY-SA 4.0）、Kari Shea、Matt Hoffman、Brodie Vissers、Daria Lisovtsova、Erwan Hesry、Kait Herzog、Ashim D’Silva 等，取自 elementary、Ubuntu Budgie、Pop!_OS 的开源壁纸集；人像为 spektrafilm 的测试图。详见仓库 promo/CREDITS.md。"
+}

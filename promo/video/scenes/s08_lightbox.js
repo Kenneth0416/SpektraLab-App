@@ -10,7 +10,7 @@ export default {
   ${phone('ph', 220, 96, 888, A.library, `<img class="sel" src="${A.librarySelect}">`)}
   <div class="abs kicker k" style="left:790px;top:150px">01 · 灯箱 Lightbox</div>
   <div class="abs h2" style="left:784px;top:190px;font-size:104px"><span class="ln hl" data-split>底片，摊在灯箱上</span></div>
-  <div class="abs body p" style="left:790px;top:354px;width:900px">导入照片、RAW 和视频。<b>红蜡笔圈选</b>，批量套配方、批量冲印。</div>
+  <div class="abs body p" style="left:790px;top:354px;width:1060px">导入照片、RAW 和视频。<b>红蜡笔圈选</b>，批量套配方、批量冲印。</div>
   ${PRINTS.map(([x, y, r, i]) => `<div class="abs print" data-r="${r}" style="left:${x}px;top:${y}px;width:420px;padding:16px 16px 18px;background:#fbfaf4;box-shadow:0 26px 50px rgba(60,40,20,.28), 0 4px 10px rgba(60,40,20,.2)">
     <img src="${A.prints[i]}" style="display:block;width:100%;height:270px;object-fit:cover"></div>`).join('')}
   <svg class="abs draw ring" style="left:1206px;top:668px" width="470" height="350" viewBox="0 0 470 350"><ellipse pathLength="1" cx="235" cy="175" rx="222" ry="160" transform="rotate(-6 235 175)"/></svg>

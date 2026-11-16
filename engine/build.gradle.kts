@@ -23,6 +23,7 @@ tasks.test {
     systemProperty("spektra.assets", rootProject.file("app/src/main/assets/spektra").absolutePath)
     systemProperty("spektra.rawdump", System.getProperty("spektra.rawdump") ?: "")
     systemProperty("spektra.gldump", System.getProperty("spektra.gldump") ?: "")
+    systemProperty("spektra.promodump", System.getProperty("spektra.promodump") ?: "")
     systemProperty("spektra.burstbench", System.getProperty("spektra.burstbench") ?: "")
     testLogging { events("passed", "failed"); showStandardStreams = true }
 }

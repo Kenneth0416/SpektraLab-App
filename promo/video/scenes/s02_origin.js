@@ -6,7 +6,7 @@ const GH = `<svg width="34" height="34" viewBox="0 0 16 16" fill="#F5DDD2"><path
 export default {
   id: 's02', chapter: '起点 · SPEKTRAFILM', dur: 10 * B, over: 0.5,
   html: `
-  <div class="fill bgw"><img class="abs bg" src="assets/spektrafilm/banner.jpg" style="left:-742px;top:-190px;width:3404px;height:1230px"></div>
+  <div class="fill bgw"><img class="abs bg" src="assets/spektrafilm/banner.jpg" style="left:-535px;top:-70px;width:2990px;height:1080px"></div>
   <div class="fill shade" style="background:linear-gradient(180deg, rgba(13,8,7,.38) 0%, transparent 26%, transparent 52%, rgba(13,8,7,.94) 96%)"></div>
   <div class="abs kicker k" style="left:120px;top:722px">Open source · GPLv3 · Python 参考实现</div>
   <div class="abs h2" style="left:116px;top:762px;font-size:84px"><span class="ln hl" data-split>一切，始于一个开源项目</span></div>
@@ -19,7 +19,7 @@ export default {
   build(tl, root, t) {
     split(root);
     tl.fromTo(root, { opacity: 0 }, { opacity: 1, duration: .55, ease: 'power2.out' }, t);
-    tl.fromTo($(root, '.bg'), { scale: 1.2, x: 60 }, { scale: 1.0, x: 0, duration: 6.9, ease: 'power2.out' }, t);
+    tl.fromTo($(root, '.bg'), { scale: 1.16, x: 40 }, { scale: 1.07, x: 0, duration: 6.9, ease: 'power2.out' }, t);
     tl.fromTo($(root, '.bg'), { filter: 'blur(26px) brightness(1.5)' }, { filter: 'blur(0px) brightness(1)', duration: 1.1, ease: 'power2.out' }, t);
     up(tl, $(root, '.k'), t + 1.5, { y: 14, d: .5 });
     rise(tl, glyphs(root, '.hl'), t + 1.65, { s: .04 });

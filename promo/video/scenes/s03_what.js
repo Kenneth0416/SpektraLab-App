@@ -16,7 +16,7 @@ export default {
     </div>
     <div class="abs hi" style="left:73.6%;top:43.2%;width:25%;height:7.3%;border:4px solid var(--safe);border-radius:10px;box-shadow:0 0 30px rgba(255,59,34,.5)"></div>
     <svg class="abs draw arrow" style="left:70%;top:-3%" width="200" height="330" viewBox="0 0 200 330"><path pathLength="1" d="M20 10 C 110 60, 150 190, 142 312"/><path pathLength="1" d="M116 284 L142 316 L166 280"/></svg>
-    <div class="abs hand n1" style="left:34%;top:-13%;font-size:66px;transform:rotate(-3deg)">胶片 × 相纸档案</div>
+    <div class="abs hand n1" style="left:34%;top:-9%;font-size:62px;transform:rotate(-3deg)">胶片 × 相纸档案</div>
     <div class="abs hand n2" style="left:4%;top:102%;font-size:62px;transform:rotate(-2deg)">放大 12 倍：每一颗颗粒都是算出来的</div>
   </div>
   <div class="credit">截图：spektrafilm 桌面 GUI（README）</div>

@@ -27,7 +27,7 @@ export default {
   </div>
   <div class="abs foot" style="left:96px;top:912px;width:1728px;display:flex;justify-content:space-between;align-items:center;border-top:2px solid rgba(27,26,23,.16);padding-top:26px">
     <div class="mono" style="font-size:22px;letter-spacing:.02em;color:var(--ink)">Film modeling powered by <b style="font-weight:700">spektrafilm</b> by Andrea Volpato</div>
-    <div class="mono" style="font-size:19px;color:var(--grey)">github.com/andreavolpato/spektrafilm</div>
+    <div style="text-align:right"><div class="mono" style="font-size:19px;color:var(--grey)">github.com/andreavolpato/spektrafilm</div><div style="font-size:17px;color:var(--grey);margin-top:6px">样片原图：Aabhas Lall（CC BY-SA 4.0）等，名单见下载页</div></div>
   </div>
   `,
   build(tl, root, t) {

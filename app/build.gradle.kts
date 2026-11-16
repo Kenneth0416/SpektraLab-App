@@ -39,6 +39,9 @@ android {
         unitTests.all {
             // Robolectric fetches android-all at runtime; use the same Central mirror as the build
             it.systemProperty("robolectric.dependency.repo.url", "https://maven-central.storage-download.googleapis.com/maven2/")
+            // PromoScreenshotTest: directory with engine renders (see tools/promo), empty = skipped
+            it.systemProperty("promo.dir", System.getProperty("promo.dir") ?: "")
+            it.maxHeapSize = "3g"
         }
     }
 }

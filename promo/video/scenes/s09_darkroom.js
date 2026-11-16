@@ -9,7 +9,7 @@ export default {
   id: 's09', chapter: '02 · 暗房', dur: 16 * B, over: 0.35,
   html: `
   <div class="fill dark"></div>
-  ${phone('ph', 150, 96, 888, A.editorFilm, `<img class="s2" src="${A.editorPaper}"><img class="s3" src="${A.editorHalation}">`)}
+  ${phone('ph', 150, 96, 888, A.editorFrame,`<img class="s2" src="${A.editorPaper}"><img class="s3" src="${A.editorHalation}">`)}
   <div class="abs frame" style="left:${F.x}px;top:${F.y}px;width:${F.w}px;height:${F.h}px;overflow:hidden;background:#000">
     <img class="abs orig" src="${A.hero.original}" style="inset:0;width:100%;height:100%;object-fit:cover">
     ${films.map(([, , src], i) => `<img class="abs fm fm${i}" src="${src}" style="inset:0;width:100%;height:100%;object-fit:cover">`).join('')}
@@ -19,11 +19,11 @@ export default {
   <div class="abs tag0 mono" style="left:${F.x + 26}px;top:${F.y + 24}px;font-size:20px;letter-spacing:.14em;padding:10px 16px;background:rgba(13,8,7,.72);color:#fff">原图 · 数码直出</div>
   <div class="abs names" style="left:${F.x}px;top:${F.y + F.h + 44}px;width:${F.w}px;height:150px;overflow:hidden">
     ${films.map(([name, paper], i) => `<div class="abs nm nm${i}" style="left:0;top:0;width:100%">
-      <div style="font-family:var(--mono);font-weight:700;font-size:64px;letter-spacing:-.03em;color:#fff;white-space:nowrap">${name}</div>
+      <div style="font-family:var(--mono);font-weight:700;font-size:54px;letter-spacing:-.04em;color:#fff;white-space:nowrap">${name}</div>
       <div style="font-size:26px;color:var(--dim);margin-top:8px;white-space:nowrap">相纸　<span style="color:var(--text)">${paper}</span></div></div>`).join('')}
   </div>
   <div class="abs cnt mono" style="left:${F.x + F.w - 300}px;top:${F.y + F.h + 58}px;width:300px;text-align:right;font-size:22px;letter-spacing:.14em;color:var(--safe)"><span class="ci">01</span> / 18 款胶片</div>
-  <div class="abs big" style="left:${F.x + F.w - 520}px;top:${F.y + F.h + 100}px;width:520px;text-align:right;font-family:var(--serif);font-weight:900;font-size:50px;white-space:nowrap">18 款胶片 × 8 款相纸</div>
+  <div class="abs big" style="left:${F.x + F.w - 520}px;top:${F.y + F.h + 100}px;width:520px;text-align:right;font-family:var(--serif);font-weight:900;font-size:40px;white-space:nowrap">18 款胶片 × 8 款相纸</div>
   `,
   build(tl, root, t) {
     split(root);

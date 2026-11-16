@@ -35,11 +35,24 @@ for s in SHOTS:
     save(load(f'shots/{s}.png'), f'shot_{s}.jpg', q=93)
 
 # ---- film renders (the app's shaders)
-HERO = 'scooter'
-FILMS = ['portra400', 'gold200', 'ektar100', 'vision500t_2383', 'velvia100', 'kodachrome64']
+# stocks whose renders differ clearly on this frame (Portra 400 / Gold 200 / Ektar 100 come out within 2/255 of each other)
+HERO = 'canyon'
+FILMS = ['portra400', 'c200', 'vision500t_2383', 'velvia100', 'pro400h', 'kodachrome64']
+POINTS = [(0.60, 0.20), (0.27, 0.33), (0.62, 0.50), (0.25, 0.80), (0.80, 0.76)]   # sky, lit rock, mid rock, shadow, floor
 save(load(f'src/{HERO}.jpg'), 'hero_original.jpg', 2000)
+def swatch(im):
+    out = []
+    for x, y in POINTS:
+        cx, cy, r = int(x * im.width), int(y * im.height), max(6, im.width // 60)
+        px = list(im.crop((cx - r, cy - r, cx + r, cy + r)).getdata())
+        out.append('#%02x%02x%02x' % tuple(round(sum(p[c] for p in px) / len(px)) for c in range(3)))
+    return out
+sw = {'points': POINTS, 'original': swatch(load(f'src/{HERO}.jpg')), 'films': []}
 for f in FILMS:
-    save(load(f'png/{HERO}__{f}.png'), f'hero_{f}.jpg', 2000)
+    im = load(f'png/{HERO}__{f}.png')
+    save(im, f'hero_{f}.jpg', 2000)
+    sw['films'].append(swatch(im))
+open(os.path.join(app, '..', 'hero-swatches.js'), 'w').write('// colours sampled from the hero frame and each film render (tools/collect-assets.py)\nexport default ' + json.dumps(sw) + ';\n')
 for name in ['valley__gold200', 'canyon__velvia100', 'bridge__vision500t_2383', 'portrait__portra400', 'pier__ektar100', 'bulbs__portra400',
              'cafe__c200', 'beach__pro400h', 'lantern__vision500t_2383', 'hikers__kodachrome64', 'waterfall__provia100f', 'mandarins__ektar100']:
     save(load(f'png/{name}.png'), f'r_{name}.jpg', 1800)
@@ -70,8 +83,8 @@ for src, dst in [('shot_library', 'shot-library'), ('shot_editor_film_portra400'
                  ('shot_library_select', 'shot-library-select'), ('shot_editor_paper_2383', 'shot-editor-paper'),
                  ('shot_editor_halation', 'shot-editor-halation'), ('shot_editor_export_sheet', 'shot-export')]:
     save(Image.open(os.path.join(app, src + '.jpg')), dst + '.png'.replace('.png', '.jpg'), 1600, q=88, dirs=(site,))
-save(Image.open(os.path.join(app, 'hero_original.jpg')), 'compare-original.jpg', 1800, q=88, dirs=(site,))
-save(Image.open(os.path.join(app, 'hero_portra400.jpg')), 'compare-film.jpg', 1800, q=88, dirs=(site,))
+save(load('src/scooter.jpg'), 'compare-original.jpg', 1800, q=88, dirs=(site,))
+save(load('png/scooter__portra400.png'), 'compare-film.jpg', 1800, q=88, dirs=(site,))
 GALLERY = [('r_valley__gold200', 'Kodak Gold 200'), ('r_canyon__velvia100', 'Fujifilm Velvia 100'), ('r_bridge__vision500t_2383', 'Vision3 500T × 2383'),
            ('r_pier__ektar100', 'Kodak Ektar 100'), ('r_bulbs__portra400', 'Kodak Portra 400'), ('r_cafe__c200', 'Fujifilm C200'),
            ('r_beach__pro400h', 'Fujifilm Pro 400H'), ('r_hikers__kodachrome64', 'Kodak Kodachrome 64'), ('r_lantern__vision500t_2383', 'Vision3 500T × 2383')]

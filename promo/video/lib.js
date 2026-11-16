@@ -56,3 +56,6 @@ export function cue(type, at, gain = 1) { (window.__cues ||= []).push({ type, t:
 
 /** One beat of the soundtrack (90 BPM). Scene lengths are whole beats so cuts land on the music. */
 export const B = 60 / 90;
+
+/** The narration of a scene starts this long after its cut (audio/soundtrack.py uses the same value). */
+export const V = 0.45;

@@ -5,7 +5,7 @@
 cues.json comes from `node render.mjs --cues`: the film's duration, the time of the "drop" (logo reveal)
 and every effect cue the scenes registered. 90 BPM, so one beat is 2/3 s and the scenes cut on beats.
 """
-import json, sys, wave
+import json, os, subprocess, sys, wave
 import numpy as np
 from scipy import signal
 
@@ -333,12 +333,44 @@ tt = np.arange(ir_n) / SR
 ir = butter(rng.standard_normal((2, ir_n)), 4200) * np.exp(-tt * 2.3)
 ir[:, :int(.012 * SR)] = 0
 wet = np.vstack([signal.fftconvolve(wet_src[c], ir[c])[:N] for c in (0, 1)]) * .018
-mix = pad.out() * dk + bass.out() * dk + pluck.out() + drums.out() + fx.out() + hiss.out() + wet
+music = pad.out() * dk + bass.out() * dk + pluck.out() + drums.out() + hiss.out() + wet
+mix = music + fx.out()
+
+# ---------------------------------------------------------------- narration
+# audio/vo/<scene>.mp3 (audio/voiceover.py) starts VO_LEAD seconds after its scene's cut; the music steps back under it.
+VO_LEAD = 0.45
+vo_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'vo')
+voice = np.zeros(N)
+talk = np.zeros(N)
+for m in cues.get('marks', []):
+    p = os.path.join(vo_dir, f"{m['id']}.mp3")
+    if not os.path.exists(p):
+        continue
+    raw = subprocess.run(['ffmpeg', '-v', 'error', '-i', p, '-f', 'f32le', '-ac', '1', '-ar', str(SR), '-'], capture_output=True).stdout
+    x = np.frombuffer(raw, dtype='<f4').astype(np.float64)
+    i = int((m['t'] + VO_LEAD) * SR)
+    n = min(len(x), N - i)
+    voice[i:i + n] += x[:n]
+    talk[max(0, i - int(.25 * SR)):i + n + int(.35 * SR)] = 1
+has_voice = bool(talk.any())
+if has_voice:
+    # a little presence and level for the voice, then duck the bed while it speaks (slow ramps, no pumping)
+    voice = butter(voice, 85, 'high')
+    voice = voice / (np.sqrt(np.mean(voice[talk > 0] ** 2)) + 1e-9) * 0.115
+    voice = np.tanh(voice * 2.2) / 2.2
+    k = int(.5 * SR)
+    smooth = np.convolve(talk, np.hanning(k) / np.hanning(k).sum(), mode='same')
+    bed = 1 - 0.56 * smooth                     # about -7 dB under speech
+    mix = music * bed + fx.out() * (1 - 0.35 * smooth)
 mix = butter(mix, 28, "high")
 fade = np.minimum(t_all / .4, 1) * np.clip((DUR - t_all) / 3.2, 0, 1) ** 1.5
 mix *= fade
 peak = np.max(np.abs(mix))
 mix = np.tanh(mix / peak * 1.7) / np.tanh(1.7) * 10 ** (-1.0 / 20)
+if has_voice:
+    mix = mix * 0.62 + np.vstack([voice, voice]) * 1.9
+    mix = np.tanh(mix * 1.15) / 1.15
+    mix *= 10 ** (-1.0 / 20) / np.max(np.abs(mix))
 rms = np.sqrt(np.mean(mix[:, int(DROP * SR):int(OUTRO * SR)] ** 2))
 print(f"duration {DUR:.2f}s  drop {DROP:.2f}s  outro {OUTRO:.2f}s  beat-section RMS {20 * np.log10(rms):.1f} dBFS")
 pcm = (mix.T * 32767).astype("<i2")

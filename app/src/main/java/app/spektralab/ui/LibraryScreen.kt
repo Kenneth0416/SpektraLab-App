@@ -86,7 +86,7 @@ fun LibraryScreen(state: AppState) {
             // header
             Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 16.dp, top = 14.dp), verticalAlignment = Alignment.Bottom) {
                 Column(Modifier.weight(1f)) {
-                    Text("SPEKTRALAB · CONTACT SHEET", fontFamily = Fonts.mono, fontSize = 9.sp, color = Pal.grey, letterSpacing = 1.5.sp)
+                    Text("SILVERCAM · CONTACT SHEET", fontFamily = Fonts.mono, fontSize = 9.sp, color = Pal.grey, letterSpacing = 1.5.sp)
                     // the printed title is swapped for a handwritten note when circling frames
                     AnimatedContent(selecting, label = "title", transitionSpec = {
                         (slideInVertically(Motion.glideOffset) { if (targetState) it / 2 else -it / 2 } + fadeIn(tween(180))) togetherWith

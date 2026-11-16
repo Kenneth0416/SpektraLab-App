@@ -1,5 +1,5 @@
 (() => {
-  const cfg = window.SPEKTRALAB;
+  const cfg = window.SILVERCAM;
   document.querySelectorAll('[data-apk]').forEach((a) => { a.href = cfg.apk; if (/\.apk$/.test(cfg.apk)) a.setAttribute('download', ''); });
   document.querySelectorAll('[data-source]').forEach((a) => { a.href = cfg.source; });
   document.querySelectorAll('[data-version]').forEach((s) => { s.textContent = cfg.version; });

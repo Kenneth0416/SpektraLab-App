@@ -1,4 +1,4 @@
-import { $, $$, split, glyphs, rise, up, out, cue, B } from '../lib.js';
+import { $, $$, split, glyphs, rise, up, out, cue, B, V } from '../lib.js';
 import A from '../assets.js';
 
 // The pipeline, drawn fresh (the README's figure is adapted from a textbook, so it is not reused).
@@ -9,7 +9,7 @@ const STEPS = [
 ];
 
 export default {
-  id: 's05', chapter: '流程 · PIPELINE', dur: 12 * B, over: 0.4,
+  id: 's05', chapter: '流程 · PIPELINE', dur: 18 * B, over: 0.4,
   html: `
   <div class="fill dark"></div>
   <div class="abs kicker k" style="left:120px;top:150px">The pipeline · 暗房里的每一步</div>
@@ -38,19 +38,21 @@ export default {
     rise(tl, glyphs(root, '.hl'), t + .3, { s: .03 });
     tl.fromTo($(root, '.rail'), { scaleX: 0, transformOrigin: '0 50%' }, { scaleX: 1, duration: .9, ease: 'expo.out' }, t + .7);
     tl.fromTo($$(root, '.node'), { scale: 0 }, { scale: 1, duration: .5, ease: 'back.out(2.2)', stagger: .07 }, t + .8);
-    const T0 = t + 1.4, STEP = B;
-    tl.fromTo($(root, '.beam'), { scaleX: 0 }, { scaleX: 1, duration: STEP * 5, ease: 'none' }, T0);
+    // VO: 所以一张照片，(1.3) 要先变成…负片，(5.2) 再过放大机，印到相纸上，(8.0) 最后，才是你看到的成片。
+    const N = [V + .3, V + 1.3, V + 3.0, V + 5.2, V + 6.5, V + 8.6];   // when the light reaches each step
+    tl.set($(root, '.beam'), { scaleX: 0 }, t);
+    for (let i = 1; i < 6; i++) tl.to($(root, '.beam'), { scaleX: i / 5, duration: N[i] - N[i - 1], ease: 'none' }, t + N[i - 1]);
     $$(root, '.node').forEach((n, i) => {
-      const at = T0 + i * STEP - .05;
+      const at = t + N[i] - .05;
       tl.fromTo(n.querySelector('.core'), { scale: 0 }, { scale: 1, duration: .35, ease: 'back.out(3)' }, at);
       tl.to(n, { borderColor: '#FF3B22', duration: .2 }, at);
       up(tl, $$(root, '.lbl')[i], at, { y: 18, d: .45 }); cue('pop', at, 1 + i * .1);
     });
     $$(root, '.stg').forEach((g) => {
-      const at = T0 + (+g.dataset.i) * STEP + .12;
+      const at = t + N[+g.dataset.i] + .12;
       tl.fromTo(g, { autoAlpha: 0, y: 46, scale: .92 }, { autoAlpha: 1, y: 0, scale: 1, duration: .7, ease: 'expo.out' }, at);
     });
-    up(tl, $(root, '.credit'), T0 + 5 * STEP + .6, { y: 0 });
+    up(tl, $(root, '.credit'), t + N[5] + .6, { y: 0 });
     tl.to(root, { opacity: 0, duration: .4, ease: 'power2.in' }, t + this.dur - .35);
   },
 };

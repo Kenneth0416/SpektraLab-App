@@ -88,7 +88,7 @@ console.log('frames done in', ((Date.now() - t0) / 1000).toFixed(0), 's');
 
 const partial = from > 0 || arg('--to');
 const audio = path.join(OUT, 'soundtrack.wav');
-const target = path.join(OUT, partial ? 'part.mp4' : 'spektralab-promo.mp4');
+const target = path.join(OUT, partial ? 'part.mp4' : 'silvercam-promo.mp4');
 const ff = ['-y', '-v', 'error', '-framerate', String(FPS), '-i', path.join(FRAMES, 'f%05d.jpg')];
 if (!partial && fs.existsSync(audio)) ff.push('-i', audio, '-c:a', 'aac', '-b:a', '256k', '-shortest');
 ff.push('-c:v', 'libx264', '-preset', 'slow', '-crf', arg('--crf') || '17', '-pix_fmt', 'yuv420p',

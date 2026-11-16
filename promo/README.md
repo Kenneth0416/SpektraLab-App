@@ -9,16 +9,18 @@ promo/
 
 ## 宣传片
 
-1920×1080、30 fps、约 91 秒，简体中文。成片：`site/video/spektralab-promo.mp4`。
+1920×1080、30 fps、约 2 分 16 秒，简体中文，普通话男声旁白。成片：`site/video/silvercam-promo.mp4`。
 
 ```bash
 cd promo/video
 npm install
 node tools/make-qr.mjs https://silvercam.convert-md.com   # 片尾与下载页的二维码
 node tools/shoot-site.mjs                                  # 下载页截图 -> 片尾
-node render.mjs --cues                                     # 导出音效时间点
+MINIMAX_API_KEY=... python3 audio/voiceover.py             # 旁白（成品已在 audio/vo/，改了稿子才需要重跑）
+node render.mjs --cues                                     # 导出分镜与音效时间点
 python3 audio/soundtrack.py out/cues.json out/soundtrack.wav   # 需要 numpy、scipy
-node render.mjs                                            # -> out/spektralab-promo.mp4
+node render.mjs                                            # -> out/silvercam-promo.mp4
+python3 tools/make-srt.py out/cues.json ../site/video/silvercam-promo.zh-CN.srt   # 字幕
 ```
 
 - 分镜在 `scenes/`，一场一个文件；时长都是整拍（90 BPM），画面切换落在配乐的拍子上。
@@ -43,5 +45,5 @@ python3 promo/video/tools/collect-assets.py <work>
 
 ## 下载页
 
-`site/index.html` 顶部的 `window.SPEKTRALAB` 是唯一要改的地方：`apk` 指向安装包（默认 `download/SpektraLab-0.1.0.apk`），
+`site/index.html` 顶部的 `window.SILVERCAM` 是唯一要改的地方：`apk` 指向安装包（默认 `download/SilverCam-0.1.0.apk`），
 `source` 指向源码仓库。页面不依赖任何外部资源。

@@ -37,4 +37,5 @@ Aabhas Lall 的两张照片按 CC BY-SA 4.0 使用：由它们渲染出的样片
 ## 字体与音乐
 
 - 思源宋体 / 思源黑体（Noto Serif SC、Noto Sans SC）、Martian Mono、Long Cang：SIL OFL。
+- 旁白由 MiniMax 语音合成（speech-2.8-hd，音色「温润男声」）生成，脚本与成品在 `video/audio/voiceover.py`、`video/audio/vo/`。
 - 配乐与音效由 `video/audio/soundtrack.py` 从零合成，没有使用任何现成音乐或采样。

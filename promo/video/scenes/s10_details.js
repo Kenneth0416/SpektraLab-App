@@ -10,7 +10,7 @@ const CARDS = [
 const W = 540, H = 560, X = [120, 690, 1260], Y = 300;
 
 export default {
-  id: 's10', chapter: '03 · 细节', dur: 10 * B, over: 0.35,
+  id: 's10', chapter: '03 · 细节', dur: 14 * B, over: 0.35,
   html: `
   <div class="fill dark"></div>
   <div class="abs kicker k" style="left:120px;top:110px">03 · 细节 Details</div>
@@ -36,7 +36,7 @@ export default {
     tl.fromTo($$(root, '.card'), { y: 90, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: .9, ease: 'expo.out', stagger: .12 }, t + .5);
     up(tl, $$(root, '.cap'), t + .9, { s: .12, y: 20 });
     $$(root, '.card').forEach((c, i) => {
-      const at = t + (2.5 + i * 2) * B, on = c.querySelector('.on'), bar = c.querySelector('.bar');
+      const at = t + 1.1 + i * 1.0, on = c.querySelector('.on'), bar = c.querySelector('.bar');
       tl.set(on, { clipPath: 'inset(0 100% 0 0)' }, t);
       tl.set(bar, { autoAlpha: 0 }, t);
       tl.set(bar, { autoAlpha: 1 }, at);
@@ -44,7 +44,7 @@ export default {
       tl.fromTo(bar, { left: 0 }, { left: W, duration: .9, ease: 'power3.inOut' }, at);
       tl.set(bar, { autoAlpha: 0 }, at + .9);
       tl.set(c.querySelector('.so'), { textContent: 'ON', color: '#FF3B22' }, at + .45);
-      tl.fromTo(on, { scale: 1.0 }, { scale: 1.06, duration: 4, ease: 'none' }, at);
+      tl.fromTo(on, { scale: 1.0 }, { scale: 1.06, duration: 7.5, ease: 'none' }, at);
       cue('whoosh', at, .7); cue('tick', at + .45);
     });
     tl.to(root, { opacity: 0, duration: .35, ease: 'power2.in' }, t + this.dur - .35);

@@ -1,8 +1,8 @@
-import { $, $$, split, glyphs, rise, up, out, cue, B } from '../lib.js';
+import { $, $$, split, glyphs, rise, up, out, cue, B, V } from '../lib.js';
 
 // The port is checked stage by stage against spektrafilm itself (README, "验证").
 export default {
-  id: 's12', chapter: '05 · 对照', dur: 6 * B, over: 0.35,
+  id: 's12', chapter: '05 · 对照', dur: 10 * B, over: 0.35,
   html: `
   <div class="fill dark"></div>
   <div class="abs kicker k" style="left:0;top:190px;width:1920px;text-align:center">逐级对照 spektrafilm 原版</div>
@@ -16,10 +16,11 @@ export default {
     tl.fromTo(root, { opacity: 0 }, { opacity: 1, duration: .35 }, t);
     up(tl, $(root, '.k'), t + .15, { y: 14, d: .5 });
     tl.fromTo($(root, '.num'), { scale: .86, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: .8, ease: 'expo.out' }, t + .2);
-    tl.to(v, { x: .04, duration: 1.3, ease: 'expo.out', onUpdate: () => { n.textContent = v.x.toFixed(2); } }, t + .3);
-    for (let i = 0; i < 7; i++) cue('tick', t + .3 + i * .09 * (1 + i * .25), .8);
-    tl.fromTo($(root, '.bar'), { scaleX: 0 }, { scaleX: 1, duration: 1.0, ease: 'expo.out' }, t + .8);
-    up(tl, [$(root, '.l1'), $(root, '.l2')], t + 1.1, { s: .25, y: 20 });
+    // VO: 准不准？(1.5) 我们和原版逐级对照过，平均误差，(4.9) 只有万分之四。
+    tl.to(v, { x: .04, duration: 3.0, ease: 'power3.out', onUpdate: () => { n.textContent = v.x.toFixed(2); } }, t + V + 1.5);
+    for (let i = 0; i < 7; i++) cue('tick', t + V + 1.5 + i * .18 * (1 + i * .25), .8);
+    tl.fromTo($(root, '.bar'), { scaleX: 0 }, { scaleX: 1, duration: 1.0, ease: 'expo.out' }, t + V + 3.6);
+    up(tl, [$(root, '.l1'), $(root, '.l2')], t + V + 3.9, { s: 1.0, y: 20 });
     tl.to(root, { opacity: 0, duration: .35, ease: 'power2.in' }, t + this.dur - .35);
   },
 };

@@ -1,4 +1,4 @@
-import { $, $$, split, glyphs, rise, up, out, draw, phone, cue, B } from '../lib.js';
+import { $, $$, split, glyphs, rise, up, out, draw, phone, cue, B, V } from '../lib.js';
 import A from '../assets.js';
 
 const POINTS = [
@@ -9,7 +9,7 @@ const POINTS = [
 ];
 
 export default {
-  id: 's11', chapter: '04 · 相机', dur: 10 * B, over: 0.35,
+  id: 's11', chapter: '04 · 相机', dur: 18 * B, over: 0.35,
   html: `
   <div class="fill dark"></div>
   <div class="abs halo" style="left:900px;top:-100px;width:1300px;height:1300px;border-radius:50%;background:radial-gradient(circle, rgba(255,59,34,.2) 0%, transparent 62%)"></div>
@@ -29,20 +29,21 @@ export default {
     rise(tl, glyphs(root, '.hl'), t + .3, { s: .045 });
     tl.fromTo($(root, '.ph2'), { y: 160, autoAlpha: 0, rotation: 10 }, { y: 0, autoAlpha: 1, rotation: 6, duration: 1.1, ease: 'expo.out' }, t + .35);
     tl.fromTo($(root, '.ph'), { y: 160, autoAlpha: 0, rotation: -6 }, { y: 0, autoAlpha: 1, rotation: -3, duration: 1.1, ease: 'expo.out' }, t + .2);
-    tl.to($(root, '.ph'), { y: -12, rotation: -2, duration: 5, ease: 'sine.inOut' }, t + 1.3);
+    tl.to($(root, '.ph'), { y: -12, rotation: -2, duration: 10, ease: 'sine.inOut' }, t + 1.3);
     $$(root, '.pt').forEach((p, i) => {
-      const at = t + (2 + i * 1.5) * B;
+      // VO: 它还是一台相机。(1.8) 取景看到的…(4.7) 原片存 RAW，(6.6) 暗的地方多帧合成。(8.2) 拍完一张，还得自己扳一下过片扳手。
+      const at = t + V + [1.8, 4.7, 6.6, 9.3][i];
       up(tl, p, at, { y: 22, d: .5 });
       draw(tl, p.querySelector('path'), at + .1, { d: .35 }); cue('pop', at, 1 + i * .08);
     });
     // the shutter fires, the frame is spent, the lever is pulled
-    const S = t + 5 * B;
+    const S = t + V + 8.2;
     tl.set($(root, '.fl'), { autoAlpha: 0 }, t);
     tl.fromTo($(root, '.fl'), { autoAlpha: .85 }, { autoAlpha: 0, duration: .35, ease: 'power2.out' }, S); cue('shutter', S, 1.2);
     tl.fromTo($(root, '.adv'), { autoAlpha: 0 }, { autoAlpha: 1, duration: .15 }, S + .05);
-    cue('advance', S + 1.2);
-    tl.to($(root, '.ph'), { x: 14, duration: .12, yoyo: true, repeat: 5, ease: 'sine.inOut' }, S + 1.2);
-    up(tl, $(root, '.more'), t + 7 * B, { y: 12, d: .5 });
+    cue('advance', S + 1.6);
+    tl.to($(root, '.ph'), { x: 14, duration: .12, yoyo: true, repeat: 5, ease: 'sine.inOut' }, S + 1.6);
+    up(tl, $(root, '.more'), t + 10.9, { y: 12, d: .5 });
     tl.to(root, { opacity: 0, duration: .35, ease: 'power2.in' }, t + this.dur - .35);
   },
 };

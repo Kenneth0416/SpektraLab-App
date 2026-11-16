@@ -1,11 +1,11 @@
-import { $, $$, split, glyphs, rise, up, out, draw, phone, cue, B } from '../lib.js';
+import { $, $$, split, glyphs, rise, up, out, draw, phone, cue, B, V } from '../lib.js';
 import A from '../assets.js';
 
 // The library: prints thrown on a lightbox, the real library screen in the handset.
 const PRINTS = [[1080, 560, -7, 0], [1390, 600, 5, 1], [1230, 690, -2, 2]];
 
 export default {
-  id: 's08', chapter: '01 · 灯箱', dur: 8 * B, over: 0.35, cls: 'lightbox',
+  id: 's08', chapter: '01 · 灯箱', dur: 18 * B, over: 0.35, cls: 'lightbox',
   html: `
   ${phone('ph', 220, 96, 888, A.library, `<img class="sel" src="${A.librarySelect}">`)}
   <div class="abs kicker k" style="left:790px;top:150px">01 · 灯箱 Lightbox</div>
@@ -21,20 +21,21 @@ export default {
     cue('flicker', t);
     tl.fromTo(root, { opacity: 0 }, { keyframes: [{ opacity: .8, duration: .06 }, { opacity: .15, duration: .08 }, { opacity: .9, duration: .06 }, { opacity: .4, duration: .08 }, { opacity: 1, duration: .25 }] }, t);
     tl.fromTo($(root, '.ph'), { y: 140, rotation: -5, autoAlpha: 0 }, { y: 0, rotation: -2, autoAlpha: 1, duration: 1.1, ease: 'expo.out' }, t + .15);
-    tl.to($(root, '.ph'), { rotation: -1, y: -10, duration: 4.4, ease: 'sine.inOut' }, t + 1.25);
+    tl.to($(root, '.ph'), { rotation: -1, y: -10, duration: 10.4, ease: 'sine.inOut' }, t + 1.25);
     up(tl, $(root, '.k'), t + .5, { y: 14, d: .5 });
     rise(tl, glyphs(root, '.hl'), t + .6, { s: .04 });
-    up(tl, $(root, '.p'), t + 1.2);
+    // VO: 打开它，先看到的是灯箱。(3.1) 照片、RAW、视频，都摊在底片条上。(8.0) 拿红蜡笔一圈，(9.3) 就能批量冲印。
+    up(tl, $(root, '.p'), t + V + 3.1);
     // prints are tossed onto the table from the right, alternating spin, and settle
     $$(root, '.print').forEach((p, i) => {
-      const r = +p.dataset.r, at = t + 1.5 + i * .28;
+      const r = +p.dataset.r, at = t + V + 4.9 + i * .32;
       tl.fromTo(p, { x: 900, y: -160 + i * 80, rotation: r + (i % 2 ? -38 : 34), autoAlpha: 0 }, { x: 0, y: 0, rotation: r, autoAlpha: 1, duration: .8, ease: 'power4.out' }, at);
       cue('whoosh_down', at, .5);
     });
     // selection mode: crayon ring, handwritten count
-    tl.fromTo($(root, '.sel'), { autoAlpha: 0 }, { autoAlpha: 1, duration: .3 }, t + 3.0);
-    draw(tl, $(root, '.ring ellipse'), t + 3.1, { d: .55 }); cue('draw', t + 3.1, 1.4);
-    tl.fromTo($(root, '.num'), { scale: 0, rotation: -20 }, { scale: 1, rotation: 6, duration: .4, ease: 'back.out(3)' }, t + 3.6); cue('pop', t + 3.6);
+    tl.fromTo($(root, '.sel'), { autoAlpha: 0 }, { autoAlpha: 1, duration: .3 }, t + V + 8.0);
+    draw(tl, $(root, '.ring ellipse'), t + V + 8.1, { d: .7 }); cue('draw', t + V + 8.1, 1.4);
+    tl.fromTo($(root, '.num'), { scale: 0, rotation: -20 }, { scale: 1, rotation: 6, duration: .4, ease: 'back.out(3)' }, t + V + 8.9); cue('pop', t + V + 8.9);
     tl.to(root, { opacity: 0, duration: .35, ease: 'power2.in' }, t + this.dur - .35);
   },
 };

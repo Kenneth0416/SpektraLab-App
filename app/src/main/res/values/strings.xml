@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">SpektraLab</string>
+    <string name="app_name">SilverCam</string>
     <string name="export_channel">冲印</string>
     <string name="export_running">正在冲印…</string>
     <string name="export_progress">冲印中 %1$d / %2$d</string>

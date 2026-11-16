@@ -1,4 +1,4 @@
-import { $, $$, split, glyphs, rise, up, out, draw, phone, cue, B } from '../lib.js';
+import { $, $$, split, glyphs, rise, up, out, draw, phone, cue, B, V } from '../lib.js';
 import A from '../assets.js';
 import { ICON } from './s07_logo.js';
 import QR from '../assets/qr.js';
@@ -7,7 +7,7 @@ export const URL_TEXT = 'silvercam.convert-md.com';
 
 // Call to action: the download page, the address, a code to scan, and the credit spektrafilm asks for.
 export default {
-  id: 's13', chapter: '下载 · DOWNLOAD', dur: 14 * B, over: 0, cls: 'lightbox',
+  id: 's13', chapter: '下载 · DOWNLOAD', dur: 16 * B, over: 0, cls: 'lightbox',
   html: `
   <div class="abs browser" style="left:96px;top:150px;width:900px;height:700px;border-radius:16px;overflow:hidden;background:#fff;box-shadow:0 50px 110px rgba(60,40,20,.34), 0 0 0 1.5px rgba(27,26,23,.14)">
     <div class="abs" style="left:0;top:0;width:100%;height:52px;background:#e9e5d8;display:flex;align-items:center;gap:9px;padding-left:20px">
@@ -22,7 +22,7 @@ export default {
   <svg class="abs draw ul" style="left:1074px;top:452px" width="760" height="30" viewBox="0 0 760 30"><path pathLength="1" d="M6 16 C 180 4, 420 26, 752 10"/></svg>
   <div class="abs qr" style="left:1080px;top:520px;width:250px;height:250px;padding:16px;background:#fff;box-shadow:0 18px 40px rgba(60,40,20,.2)">${QR}</div>
   <div class="abs side" style="left:1372px;top:528px;width:460px">
-    <div style="display:flex;align-items:center;gap:18px">${ICON(72)}<div style="font-family:var(--mono);font-weight:700;font-size:40px;letter-spacing:-.04em">SpektraLab</div></div>
+    <div style="display:flex;align-items:center;gap:18px">${ICON(72)}<div style="font-family:var(--mono);font-weight:700;font-size:40px;letter-spacing:-.04em">SilverCam</div></div>
     <div class="body" style="font-size:27px;margin-top:22px;line-height:1.75">安卓 10 及以上<br>开源 · GPLv3<br><span class="hand" style="font-size:44px">扫码，或者直接输网址</span></div>
   </div>
   <div class="abs foot" style="left:96px;top:912px;width:1728px;display:flex;justify-content:space-between;align-items:center;border-top:2px solid rgba(27,26,23,.16);padding-top:26px">
@@ -38,13 +38,14 @@ export default {
     tl.fromTo(br, { y: 120, autoAlpha: 0, rotationY: 16, transformPerspective: 2000 }, { y: 0, autoAlpha: 1, rotationY: 5, duration: 1.2, ease: 'expo.out' }, t + .15);
     tl.to(br, { rotationY: 2, duration: 8, ease: 'none' }, t + 1.35);
     // the page scrolls on its own, slowly
-    tl.fromTo($(root, '.pg'), { y: 0 }, { y: () => -Math.max(0, $(root, '.pg').offsetHeight - 648), duration: 6.2, ease: 'sine.inOut' }, t + 2.0);
+    tl.fromTo($(root, '.pg'), { y: 0 }, { y: () => -Math.max(0, $(root, '.pg').offsetHeight - 648), duration: 7.6, ease: 'sine.inOut' }, t + 2.0);
     up(tl, $(root, '.k'), t + .5, { y: 14, d: .5 });
     rise(tl, glyphs(root, '.hl'), t + .6, { s: .05 });
-    rise(tl, glyphs(root, '.u'), t + 1.3, { s: .022, d: .6 });
-    draw(tl, $(root, '.ul path'), t + 2.0, { d: .5 }); cue('draw', t + 2.0, 1.4);
-    tl.fromTo($(root, '.qr'), { scale: .7, autoAlpha: 0, rotation: -8 }, { scale: 1, autoAlpha: 1, rotation: -2, duration: .7, ease: 'back.out(1.8)' }, t + 2.4); cue('pop', t + 2.4);
-    up(tl, $(root, '.side'), t + 2.7, { y: 20 });
-    up(tl, $(root, '.foot'), t + 3.4, { y: 16, d: .7 });
+    // VO: 现在，谁都可以来试试。(2.8) 打开 silvercam.convert-md.com，(7.1) 去冲一卷吧。
+    rise(tl, glyphs(root, '.u'), t + V + 2.8, { s: .022, d: .6 });
+    draw(tl, $(root, '.ul path'), t + V + 4.4, { d: .6 }); cue('draw', t + V + 4.4, 1.4);
+    tl.fromTo($(root, '.qr'), { scale: .7, autoAlpha: 0, rotation: -8 }, { scale: 1, autoAlpha: 1, rotation: -2, duration: .7, ease: 'back.out(1.8)' }, t + V + 5.0); cue('pop', t + V + 5.0);
+    up(tl, $(root, '.side'), t + V + 5.3, { y: 20 });
+    up(tl, $(root, '.foot'), t + V + 6.2, { y: 16, d: .7 });
   },
 };

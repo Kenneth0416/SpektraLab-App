@@ -19,7 +19,7 @@ export default {
   build(tl, root, t) {
     split(root);
     tl.fromTo(root, { opacity: 0 }, { opacity: 1, duration: .55, ease: 'power2.out' }, t);
-    tl.fromTo($(root, '.bg'), { scale: 1.16, x: 40 }, { scale: 1.07, x: 0, duration: 6.9, ease: 'power2.out' }, t);
+    tl.fromTo($(root, '.bg'), { scale: 1.12, x: 30 }, { scale: 1.07, x: 0, duration: 6.9, ease: 'power2.out' }, t);
     tl.fromTo($(root, '.bg'), { filter: 'blur(26px) brightness(1.5)' }, { filter: 'blur(0px) brightness(1)', duration: 1.1, ease: 'power2.out' }, t);
     up(tl, $(root, '.k'), t + 1.5, { y: 14, d: .5 });
     rise(tl, glyphs(root, '.hl'), t + 1.65, { s: .04 });

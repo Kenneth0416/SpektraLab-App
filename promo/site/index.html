@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SpektraLab · 把一整间暗房，装进手机</title>
+<meta name="description" content="SpektraLab：安卓原生的光谱胶片模拟。基于开源项目 spektrafilm 开发，18 款胶片 × 8 款相纸，照片与视频共用一套参数。">
+<meta property="og:title" content="SpektraLab · 把一整间暗房，装进手机">
+<meta property="og:description" content="安卓原生的光谱胶片模拟，基于 spektrafilm 开发。">
+<meta property="og:image" content="img/og.jpg">
+<meta name="theme-color" content="#0D0807">
+<link rel="icon" href="img/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!--
+  下载地址只在这一处配置：把 APK 放到 download/ 下，或把 href 改成发布页地址。
+  The download link is configured here only.
+-->
+<script>window.SPEKTRALAB = { apk: 'download/SpektraLab-0.1.0.apk', version: '0.1.0', source: 'https://github.com/Kenneth0416/SpektraLab-App' };</script>
+
+<header class="nav">
+  <a class="brand" href="#top"><img src="img/icon.svg" alt=""><span>SpektraLab</span></a>
+  <nav>
+    <a href="#origin">spektrafilm</a><a href="#features">功能</a><a href="#films">胶片</a><a href="#video">视频</a>
+    <a class="btn small" data-apk href="#download">下载</a>
+  </nav>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="hero-text">
+      <p class="kicker"><i class="lamp"></i>光谱胶片模拟 · 安卓原生</p>
+      <h1>把一整间暗房，<br>装进手机</h1>
+      <p class="lead">胶片的颜色不是调出来的，是算出来的。SpektraLab 把开源项目 <a href="https://github.com/andreavolpato/spektrafilm" target="_blank" rel="noopener">spektrafilm</a> 的光谱胶片模拟移植到了手机 GPU 上：负片曝光、显影、放大机印相、相纸、扫描，一步不少。</p>
+      <div class="cta" id="download">
+        <a class="btn" data-apk href="#">下载 APK<small>Android 10+ · v<span data-version></span></small></a>
+        <a class="btn ghost" data-source href="#" target="_blank" rel="noopener">查看源码<small>GPLv3 · 开源</small></a>
+      </div>
+      <p class="fine">Film modeling powered by <a href="https://github.com/andreavolpato/spektrafilm" target="_blank" rel="noopener">spektrafilm</a> by Andrea Volpato.</p>
+    </div>
+    <div class="hero-phones">
+      <div class="phone tilt-l"><img src="img/shot-library.png" alt="SpektraLab 灯箱（图库）界面" loading="eager"></div>
+      <div class="phone front"><img src="img/shot-editor.png" alt="SpektraLab 暗房（编辑）界面" loading="eager"></div>
+      <div class="phone tilt-r"><img src="img/shot-camera.png" alt="SpektraLab 相机界面" loading="eager"></div>
+    </div>
+  </section>
+
+  <section class="compare-wrap">
+    <div class="compare" id="compare" style="--p:50%">
+      <img src="img/compare-film.jpg" alt="经 SpektraLab 胶片引擎冲印后的照片">
+      <div class="before"><img src="img/compare-original.jpg" alt="数码原图"></div>
+      <div class="handle"><span></span></div>
+      <b class="tag l">原图</b><b class="tag r" id="compare-name">Kodak Portra 400</b>
+      <input type="range" min="0" max="100" value="50" aria-label="拖动对比原图与胶片成片">
+    </div>
+    <p class="caption">拖动对比 · 右侧为本应用的胶片引擎渲染，未做其他调色</p>
+  </section>
+
+  <section class="origin" id="origin">
+    <div class="banner"><img src="img/spektrafilm-banner.jpg" alt="spektrafilm 项目横幅"></div>
+    <div class="cols">
+      <div>
+        <p class="kicker">起点</p>
+        <h2>基于 spektrafilm 开发</h2>
+      </div>
+      <div class="prose">
+        <p><a href="https://github.com/andreavolpato/spektrafilm" target="_blank" rel="noopener">spektrafilm</a> 是 Andrea Volpato 发起的开源项目：从胶片厂商数据表里的<b>光谱感光度、特性曲线、染料吸收光谱</b>出发，端到端地用物理模型模拟彩色胶片的拍摄、印相与扫描，而不是套一张凭感觉调的 LUT。</p>
+        <p>它是一个桌面上的 Python 参考实现。SpektraLab 把它的运行时移植成 Kotlin + OpenGL ES，并逐级对照原版验证：<b>输出平均误差 0.04%（sRGB）</b>，胶片密度误差小于 0.001。</p>
+        <p class="links"><a href="https://github.com/andreavolpato/spektrafilm" target="_blank" rel="noopener">github.com/andreavolpato/spektrafilm ↗</a></p>
+      </div>
+    </div>
+    <figure class="sheet">
+      <img src="img/spektrafilm-portra400.png" alt="spektrafilm 中 Kodak Portra 400 的数据：光谱感光度、特性曲线、染料吸收光谱">
+      <figcaption>Kodak Portra 400 的数据（图：spektrafilm README）。左：光谱感光度；中：特性曲线；右：染料吸收光谱。</figcaption>
+    </figure>
+  </section>
+
+  <section class="features" id="features">
+    <p class="kicker">功能</p>
+    <h2>灯箱与暗房</h2>
+    <div class="grid">
+      <article><h3>灯箱</h3><p>照片、RAW（DNG）和视频摊在带齿孔的底片条上。红蜡笔圈选，批量粘贴设置、套用配方、冲印。</p></article>
+      <article><h3>暗房</h3><p>实时预览，双指放大到 100% 也走完整管线。按住看原图，撤销 / 重做，刻度尺滑杆。</p></article>
+      <article><h3>光晕 · 颗粒 · 柔焦</h3><p>乳剂散射与片基反射的光晕、逐层的随机颗粒、四种柔焦镜，全部按 spektrafilm 的公式实时计算。</p></article>
+      <article><h3>相机</h3><p>实时胶片取景，原片存 RAW。多帧合成让暗处更干净；还有一支要自己扳的过片扳手。</p></article>
+      <article><h3>视频</h3><p>导入视频，实时预览播放，逐帧重新生成颗粒导出，1080p / 4K，音轨原样保留。</p></article>
+      <article><h3>全尺寸冲印</h3><p>导出 JPEG / PNG，大图分块渲染；成片带上原片的拍摄信息。后台排队，失败可重试。</p></article>
+    </div>
+    <div class="shots">
+      <figure><div class="phone"><img src="img/shot-library-select.png" alt="灯箱：圈选" loading="lazy"></div><figcaption>灯箱 · 红蜡笔圈选</figcaption></figure>
+      <figure><div class="phone"><img src="img/shot-editor-paper.png" alt="暗房：相纸" loading="lazy"></div><figcaption>暗房 · 相纸</figcaption></figure>
+      <figure><div class="phone"><img src="img/shot-editor-halation.png" alt="暗房：光晕" loading="lazy"></div><figcaption>暗房 · 光晕</figcaption></figure>
+      <figure><div class="phone"><img src="img/shot-export.png" alt="冲印" loading="lazy"></div><figcaption>冲印</figcaption></figure>
+    </div>
+    <p class="caption">界面截图由应用自身的界面代码渲染，画面由应用的胶片引擎渲染。</p>
+  </section>
+
+  <section class="films" id="films">
+    <p class="kicker">胶片 × 相纸</p>
+    <h2>18 款胶片，8 款相纸</h2>
+    <div class="gallery" id="gallery"></div>
+    <div class="stocks">
+      <div><h3>负片</h3><p>Portra 160 / 400 / 800 · Ektar 100 · Gold 200 · UltraMax 400 · C200 · Pro 400H · X-TRA 400</p></div>
+      <div><h3>电影卷</h3><p>Vision3 50D / 250D / 200T / 500T · Verita 200D</p></div>
+      <div><h3>反转片</h3><p>Velvia 100 · Provia 100F · Ektachrome 100 · Kodachrome 64</p></div>
+      <div><h3>相纸</h3><p>Portra Endura · Supra Endura · Ultra Endura · Endura Premier · Ektacolor Edge · Crystal Archive · 2383 · 2393</p></div>
+    </div>
+  </section>
+
+  <section class="video" id="video">
+    <p class="kicker">90 秒看完</p>
+    <h2>介绍视频</h2>
+    <video controls preload="metadata" poster="img/video-poster.jpg" src="video/spektralab-promo.mp4"></video>
+  </section>
+
+  <section class="final">
+    <h2>去冲一卷试试</h2>
+    <div class="cta">
+      <a class="btn" data-apk href="#">下载 APK<small>Android 10+ · v<span data-version></span></small></a>
+      <a class="btn ghost" data-source href="#" target="_blank" rel="noopener">查看源码<small>GPLv3 · 开源</small></a>
+    </div>
+    <img class="qr" src="qr.svg" alt="本页二维码" width="132" height="132">
+    <p class="fine">需要 Android 10（API 29）及以上，GPU 支持 OpenGL ES 3.0。<br>安装包不经应用商店分发，安装时系统会提示“允许安装未知来源应用”。</p>
+  </section>
+</main>
+
+<footer>
+  <p>Film modeling powered by <a href="https://github.com/andreavolpato/spektrafilm" target="_blank" rel="noopener">spektrafilm</a> by Andrea Volpato.</p>
+  <p>代码 GPLv3 · 胶片 / 相纸数据 CC BY-SA 4.0（spektrafilm）· 字体 Long Cang、Martian Mono（SIL OFL）</p>
+  <p id="photo-credits"></p>
+  <p>胶片与相纸名称是其各自所有者的商标，仅用于说明所模拟的材料。</p>
+</footer>
+<script src="site.js"></script>
+</body>
+</html>

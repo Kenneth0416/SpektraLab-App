@@ -1,0 +1,17 @@
+{
+  "name": "spektralab-promo-video",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "render": "node render.mjs",
+    "preview": "node render.mjs --stills"
+  },
+  "dependencies": {
+    "@fontsource/long-cang": "^5.0.0",
+    "@fontsource/martian-mono": "^5.0.0",
+    "@fontsource/noto-sans-sc": "^5.0.0",
+    "@fontsource/noto-serif-sc": "^5.0.0",
+    "gsap": "^3.12.5",
+    "qrcode": "^1.5.4"
+  }
+}

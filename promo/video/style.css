@@ -1,0 +1,64 @@
+:root {
+  --red: #D4281C; --safe: #FF3B22; --ink: #1B1A17; --paper: #F5F3EB; --glow: #FFFDF6; --grey: #6B675E;
+  --strip: #221A14; --edge: #E9A65A; --card: #F1E6CC; --text: #F5DDD2; --dim: #B8776A; --line: #3D1A14;
+  --dark: #0D0807; --panel: #170C0A;
+  --serif: 'Noto Serif SC', serif; --sans: 'Noto Sans SC', sans-serif; --mono: 'Martian Mono', monospace; --hand: 'Long Cang', cursive;
+  --spectrum: linear-gradient(90deg, #5a2cff 0%, #2b55ff 14%, #12b4ff 28%, #1fd38a 42%, #b9e62a 56%, #ffd21f 68%, #ff7a1c 82%, #ff2a1c 100%);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: #000; }
+body { font-family: var(--sans); color: var(--text); -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+#stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: var(--dark); }
+.scene { position: absolute; inset: 0; overflow: hidden; visibility: hidden; opacity: 0; }
+.abs { position: absolute; }
+.fill { position: absolute; inset: 0; }
+.dark { background: radial-gradient(1400px 900px at 30% 40%, #1d0e0b 0%, var(--dark) 62%); }
+.lightbox { background: radial-gradient(1500px 900px at 50% 45%, var(--glow) 0%, var(--paper) 55%, #e6e1d2 100%); color: var(--ink); }
+
+/* type */
+.kicker { font-family: var(--mono); font-weight: 500; font-size: 22px; letter-spacing: .22em; text-transform: uppercase; color: var(--safe); white-space: nowrap; }
+.lightbox .kicker { color: var(--red); }
+.h1 { font-family: var(--serif); font-weight: 900; font-size: 148px; line-height: 1.16; letter-spacing: .01em; white-space: nowrap; }
+.h2 { font-family: var(--serif); font-weight: 900; font-size: 96px; line-height: 1.2; letter-spacing: .01em; white-space: nowrap; }
+.h3 { font-family: var(--serif); font-weight: 700; font-size: 44px; line-height: 1.3; white-space: nowrap; }
+.body { font-family: var(--sans); font-weight: 400; font-size: 33px; line-height: 1.7; color: #d9bfb4; }
+.body b { font-weight: 700; color: var(--text); }
+.lightbox .body { color: #4a463e; } .lightbox .body b { color: var(--ink); }
+.mono { font-family: var(--mono); font-weight: 400; letter-spacing: .06em; }
+.hand { font-family: var(--hand); color: var(--safe); white-space: nowrap; }
+.lightbox .hand { color: var(--red); }
+.accent { color: var(--safe); }
+.credit { position: absolute; right: 56px; bottom: 44px; font-family: var(--mono); font-size: 17px; letter-spacing: .08em; color: rgba(245,221,210,.55); white-space: nowrap; }
+.lightbox .credit { color: rgba(27,26,23,.5); }
+
+/* split text */
+.ln { display: block; white-space: nowrap; }
+.c { display: inline-block; overflow: hidden; vertical-align: top; padding: .12em 0 .16em; margin: -.12em 0 -.16em; }
+.c > i { display: inline-block; font-style: normal; will-change: transform; }
+.sp { display: inline-block; width: .3em; }
+
+/* persistent chrome */
+#chrome { position: absolute; inset: 0; pointer-events: none; z-index: 50; font-family: var(--mono); font-size: 16px; letter-spacing: .16em; color: rgba(245,221,210,.5); mix-blend-mode: difference; }
+#chrome .tl { position: absolute; left: 56px; top: 44px; display: flex; align-items: center; gap: 14px; }
+#chrome .tr { position: absolute; right: 56px; top: 44px; }
+#chrome .dot { width: 9px; height: 9px; border-radius: 50%; background: #ff3b22; }
+#chrome .bl { position: absolute; left: 56px; bottom: 44px; }
+#grain { position: absolute; inset: -64px; z-index: 60; pointer-events: none; opacity: .11; mix-blend-mode: overlay; background-size: 512px 512px; }
+#vignette { position: absolute; inset: 0; z-index: 59; pointer-events: none; background: radial-gradient(ellipse at 50% 50%, transparent 58%, rgba(0,0,0,.34) 100%); }
+#flash { position: absolute; inset: 0; z-index: 58; pointer-events: none; background: #000; opacity: 0; }
+
+/* shared pieces */
+.spectrum { background: var(--spectrum); }
+.cropmark { position: absolute; width: 34px; height: 34px; border: 4px solid var(--safe); }
+.cropmark.a { border-right: none; border-bottom: none; } .cropmark.b { border-left: none; border-bottom: none; }
+.cropmark.c { border-right: none; border-top: none; } .cropmark.d { border-left: none; border-top: none; }
+.pill { display: inline-flex; align-items: center; gap: 16px; padding: 14px 26px; border-radius: 999px; border: 1.5px solid rgba(245,221,210,.35); background: rgba(13,8,7,.55); font-family: var(--mono); font-size: 26px; letter-spacing: .02em; white-space: nowrap; }
+.window { position: absolute; border-radius: 14px; overflow: hidden; box-shadow: 0 60px 140px rgba(0,0,0,.7), 0 0 0 1.5px rgba(245,221,210,.14); background: #000; }
+.window img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.phone { position: absolute; border-radius: 58px; background: #0b0b0c; padding: 13px; box-shadow: 0 0 0 2px #2a2a2c, 0 0 0 4px #050505, 0 70px 150px rgba(0,0,0,.6), 0 20px 40px rgba(0,0,0,.4); }
+.phone .screen { position: relative; width: 100%; height: 100%; border-radius: 46px; overflow: hidden; background: #000; }
+.phone .screen img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.phone::after { content: ''; position: absolute; left: 50%; top: 27px; width: 15px; height: 15px; margin-left: -7.5px; border-radius: 50%; background: #050506; box-shadow: 0 0 0 2px #17171a; z-index: 3; }
+.lightbox .phone { box-shadow: 0 0 0 2px #2a2a2c, 0 0 0 4px #050505, 0 60px 110px rgba(60,40,20,.35), 0 18px 34px rgba(60,40,20,.25); }
+svg.draw path, svg.draw line, svg.draw circle, svg.draw ellipse, svg.draw rect { fill: none; stroke: var(--safe); stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
+.lightbox svg.draw path, .lightbox svg.draw ellipse { stroke: var(--red); }

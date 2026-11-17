@@ -114,7 +114,7 @@ private fun logRawCameraCapabilities(cameraInfo: androidx.camera.core.CameraInfo
     }.onFailure { Log.w(CAMERA_LOG_TAG, "Camera2 RAW diagnostics unavailable", it) }
 }
 
-private class CameraSession(val camera: Camera, val capture: ImageCapture, val raw: Boolean,
+private class CameraSession(val camera: Camera, val preview: Preview, val capture: ImageCapture, val raw: Boolean,
                             /** For raw capture into memory; null when the camera would not tell. */
                             val chars: android.hardware.camera2.CameraCharacteristics? = null)
 
@@ -126,6 +126,7 @@ private class CameraSession(val camera: Camera, val capture: ImageCapture, val r
 @Composable
 fun CameraScreen(state: AppState) {
     val context = LocalContext.current
+    val hostView = androidx.compose.ui.platform.LocalView.current
     val owner = LocalLifecycleOwner.current
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
@@ -176,13 +177,11 @@ fun CameraScreen(state: AppState) {
         }
     }
     val lookState = rememberUpdatedState(look)
-    val filmPreview = session?.raw != true
-    LaunchedEffect(filmPreview) {
-        if (!filmPreview) return@LaunchedEffect
+    LaunchedEffect(Unit) {
         snapshotFlow { lookState.value }.distinctUntilChanged().collectLatest { l ->
-            // Building a LookSetup runs the print stage. Skip it while RAW has detached the effect.
+            // RAW shares the renderer's ground glass, while bypassing the film colour pass.
             val setup = withContext(Dispatchers.Default) { runCatching { state.app.looks.get(l) }.getOrNull() }
-            if (setup != null && filmPreview) viewfinder.setLook(setup)
+            if (setup != null) viewfinder.setLook(setup)
         }
     }
 
@@ -221,8 +220,12 @@ fun CameraScreen(state: AppState) {
 
                 fun bind(raw: Boolean): CameraSession {
                     Log.i(CAMERA_LOG_TAG, "Binding preview + image capture: raw=$raw filmEffect=${!raw}")
-                    val preview = Preview.Builder().setResolutionSelector(fourThree).build()
-                        .also { it.surfaceProvider = previewView.surfaceProvider }
+                    val preview = Preview.Builder().setResolutionSelector(fourThree)
+                        .apply { hostView.display?.let { setTargetRotation(it.rotation) } }.build()
+                        .also {
+                            it.surfaceProvider = if (raw) viewfinder.rawSurfaceProvider(previewView.surfaceProvider)
+                            else previewView.surfaceProvider
+                        }
                     val capture = ImageCapture.Builder()
                         .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
                         .apply {
@@ -232,12 +235,12 @@ fun CameraScreen(state: AppState) {
                             if (raw) requestRawMetadata(this, state.shooter.results)
                         }.build()
                     // CameraX rejects RAW together with any CameraEffect, including a preview-only one.
-                    // The saved photo still receives its film look. Exposure feedback is a direct overlay.
+                    // RAW's surface provider processes only preview buffers for ground glass.
                     val group = UseCaseGroup.Builder().addUseCase(preview).addUseCase(capture)
                         .apply { if (!raw) addEffect(viewfinder.effect) }.build()
                     p.unbindAll()
                     val camera = p.bindToLifecycle(owner, selector, group)
-                    return CameraSession(camera, capture, raw, if (raw) cameraCharacteristics(context, camera) else null).also {
+                    return CameraSession(camera, preview, capture, raw, if (raw) cameraCharacteristics(context, camera) else null).also {
                         Log.i(CAMERA_LOG_TAG, "Camera bound: raw=$raw rawCharacteristicsAvailable=${it.chars != null}")
                     }
                 }
@@ -264,6 +267,38 @@ fun CameraScreen(state: AppState) {
             disposed = true
             session = null
             runCatching { provider?.unbindAll() }
+        }
+    }
+    // Activity handles configuration changes without recreation. In particular, the
+    // film effect needs Preview's rotation updated explicitly when a foldable rotates.
+    // Follow the window's display, independently of the physical pose used for captures.
+    DisposableEffect(session, hostView) {
+        val preview = session?.preview
+        val displays = context.getSystemService(android.hardware.display.DisplayManager::class.java)
+        fun syncPreviewRotation() {
+            hostView.display?.let { display -> preview?.targetRotation = display.rotation }
+        }
+        val listener = object : android.hardware.display.DisplayManager.DisplayListener {
+            override fun onDisplayAdded(displayId: Int) = syncPreviewRotation()
+            override fun onDisplayRemoved(displayId: Int) = Unit
+            override fun onDisplayChanged(displayId: Int) {
+                if (hostView.display?.displayId == displayId) syncPreviewRotation()
+            }
+        }
+        val attachListener = object : android.view.View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(v: android.view.View) = syncPreviewRotation()
+            override fun onViewDetachedFromWindow(v: android.view.View) = Unit
+        }
+        if (preview != null) {
+            displays.registerDisplayListener(listener, android.os.Handler(android.os.Looper.getMainLooper()))
+            hostView.addOnAttachStateChangeListener(attachListener)
+            syncPreviewRotation()
+        }
+        onDispose {
+            if (preview != null) {
+                displays.unregisterDisplayListener(listener)
+                hostView.removeOnAttachStateChangeListener(attachListener)
+            }
         }
     }
     DisposableEffect(Unit) { onDispose { viewfinder.release() } }
@@ -361,7 +396,7 @@ fun CameraScreen(state: AppState) {
         if (l.canDetectOrientation()) l.enable()
         onDispose { l.disable() }
     }
-    val displayDeg = when (androidx.compose.ui.platform.LocalView.current.display?.rotation) {
+    val displayDeg = when (hostView.display?.rotation) {
         android.view.Surface.ROTATION_90 -> 90; android.view.Surface.ROTATION_180 -> 180; android.view.Surface.ROTATION_270 -> 270; else -> 0
     }
     val turn = (((-(deviceDeg + displayDeg)) % 360 + 540) % 360 - 180).let { if (it == -180) 180 else it }
@@ -390,9 +425,8 @@ fun CameraScreen(state: AppState) {
             val previousBlur = viewfinder.blurredTimestamp
             clarity.snapTo(0f)
             viewfinder.clarity = 0f
-            // RAW has no processed preview buffers. The Compose dim still marks a spent frame,
-            // so the curtain reopens without waiting for a GL blur that will never arrive.
-            if (s.raw || previewView.awaitBlurredPreview(viewfinder, previousBlur)) {
+            // All formats wait until the same ground-glass pass reaches PreviewView.
+            if (previewView.awaitBlurredPreview(viewfinder, previousBlur)) {
                 blades.animateTo(0f, tween(260, easing = LinearOutSlowInEasing))
             } else {
                 state.say(R.string.viewfinder_stalled)
@@ -654,8 +688,8 @@ fun CameraScreen(state: AppState) {
                             drawLine(grid, Offset(cx - arm, cy), Offset(cx + arm, cy), hair * 1.4f)
                             drawLine(grid, Offset(cx, cy - arm), Offset(cx, cy + arm), hair * 1.4f)
                         }
-                        // frame not advanced: film sessions wait for ground glass; RAW dims the direct preview here
-                        if (clarity.value < 1f) drawRect(Pal.dark.copy(alpha = (if (session?.raw == true) 0.62f else 0.5f) * (1f - clarity.value)))
+                        // Shared spent-frame dim over the GPU ground glass for every capture format.
+                        if (clarity.value < 1f) drawRect(Pal.dark.copy(alpha = 0.5f * (1f - clarity.value)))
                         // RAW exposure cannot pass through the film effect, so the direct preview is shaded to match the gesture.
                         if (session?.raw == true && evBias != 0f) drawRect(if (evBias > 0f) Color.White.copy(alpha = (evBias / 4f).coerceIn(0f, 0.45f))
                             else Color.Black.copy(alpha = (-evBias / 4f).coerceIn(0f, 0.55f)))

@@ -445,7 +445,7 @@ class FilmRenderer {
     }
 
     private fun drawFinal(r: RenderRequest, s: LookSetup, density: Int) {
-        val glass = if (r.original) 0f else r.groundGlass.coerceIn(0f, 1f)
+        val glass = r.groundGlass.coerceIn(0f, 1f)
         val source = if (glass > 0f) {
             val size = GroundGlassSizing.sourceSize(r.outWidth, r.outHeight)
             target("GlassFull", size.width, size.height, GL_RGBA8)
@@ -500,7 +500,7 @@ class FilmRenderer {
      * and composite uses 1 at full diffusion or 2 during the crossfade.
      *
      * The cap also limits the sharp crossfade leg and overlay detail while glass > 0;
-     * zero glass/original still renders FINAL directly. RGBA8 rounds every pass, so
+     * zero glass still renders FINAL directly (including original previews). RGBA8 rounds every pass, so
      * faint impulses can vanish; normalized weights do not guarantee impulse energy.
      * This bounds only glass postprocessing: the viewfinder still runs the full film
      * pipeline at long edge 1280, even fully blurred, rather than the former 22 pixels

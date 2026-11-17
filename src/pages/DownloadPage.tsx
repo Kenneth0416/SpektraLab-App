@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clipboard, Copy, Download, FileArchive, FolderOpen, Github, Image, ShieldCheck, SlidersHorizontal, Smartphone, Terminal } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { consumeAutostart, resolveApk } from '../support/gate';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { consumeAutostart, resolveApk, shouldOfferCoffee } from '../support/gate';
 import { downloadMeta } from '../generated/download-meta';
 import { Reveal } from '../components/Reveal';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -36,9 +36,15 @@ const packagePaths = ['Offline WebView · APK', 'Film · Exposure · Grain · Ha
 export function DownloadPage() {
   const { messages } = useLanguage();
   const m = messages.download;
+  const location = useLocation();
+  const navigate = useNavigate();
+  // A user choice must still work when browser storage is unavailable.
+  const [requestedThisVisit] = useState(location.state?.downloadRequested === true);
+  const autostartHandled = useRef(false);
   const apk = downloadMeta.android;
   const choice = resolveApk(apk?.href);
   const hasApk = choice.available;
+  const offerCoffee = shouldOfferCoffee(choice, requestedThisVisit);
   const [copied, setCopied] = useState<CopyTarget | null>(null);
   const [copyFailed, setCopyFailed] = useState<CopyTarget | null>(null);
   const [downloaded, setDownloaded] = useState(false);
@@ -49,7 +55,13 @@ export function DownloadPage() {
   }, []);
 
   useEffect(() => {
-    if (!choice.href || !consumeAutostart()) return;
+    if (!choice.href || autostartHandled.current) return;
+    const armed = consumeAutostart();
+    if (!requestedThisVisit && !armed) return;
+    autostartHandled.current = true;
+    if (location.state?.downloadRequested) {
+      navigate(`${location.pathname}${location.search}${location.hash}`, { replace: true, state: null });
+    }
     const link = document.createElement('a');
     link.href = choice.href;
     link.download = apk?.filename ?? '';
@@ -57,7 +69,7 @@ export function DownloadPage() {
     link.click();
     link.remove();
     setDownloaded(true);
-  }, [apk, choice.href]);
+  }, [apk, choice.href, requestedThisVisit, navigate, location.pathname, location.search, location.hash, location.state]);
 
   const handleCopy = async (target: CopyTarget, value: string) => {
     if (timer.current) clearTimeout(timer.current);
@@ -110,9 +122,15 @@ export function DownloadPage() {
               <div><span>{m.stats[2]}</span><strong>.APK</strong></div>
             </div>
             {choice.href ? (
-              <a className="ticket-download" href={choice.href} download={apk?.filename} onClick={() => setDownloaded(true)}>
-                <Download size={21} /><span>{m.downloadFull}<small>{apk?.filename}</small></span><ArrowRight size={20} />
-              </a>
+              !offerCoffee ? (
+                <a className="ticket-download" href={choice.href} download={apk?.filename} onClick={() => setDownloaded(true)}>
+                  <Download size={21} /><span>{m.downloadFull}<small>{apk?.filename}</small></span><ArrowRight size={20} />
+                </a>
+              ) : (
+                <Link className="ticket-download" to="/coffee">
+                  <Download size={21} /><span>{m.downloadFull}<small>{apk?.filename}</small></span><ArrowRight size={20} />
+                </Link>
+              )
             ) : (
               <button className="ticket-download" type="button" disabled><Download size={21} /><span>{m.downloadFull}<small>Silvercam-Android.apk</small></span></button>
             )}
@@ -208,7 +226,9 @@ export function DownloadPage() {
           <FolderOpen size={35} strokeWidth={1.4} />
           <h2>{m.bottomTitle}</h2>
           <p>{apk?.size ?? '—'} · {m.bottomMeta}</p>
-          {choice.href && <a className="button button-light" href={choice.href} download={apk?.filename}><Download size={18} /><span className="button-label">{m.downloadPrefix} {apk?.filename}</span></a>}
+          {choice.href && (!offerCoffee
+            ? <a className="button button-light" href={choice.href} download={apk?.filename}><Download size={18} /><span className="button-label">{m.downloadPrefix} {apk?.filename}</span></a>
+            : <Link className="button button-light" to="/coffee"><Download size={18} /><span className="button-label">{m.downloadPrefix} {apk?.filename}</span></Link>)}
           <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '10px' }}>
             <Link to="/">{m.backHome}<ArrowRight size={16} /></Link>
             <Link to="/credits" style={{ color: '#bbb3a6', textDecoration: 'underline' }}>{m.viewCredits}</Link>

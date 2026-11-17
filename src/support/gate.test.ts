@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { armDownload, canDownload, consumeAutostart, readSupport, resolveApk, writeSupport } from './gate.ts';
+import { armDownload, canDownload, consumeAutostart, readSupport, resolveApk, shouldOfferCoffee, writeSupport } from './gate.ts';
 
 class MemoryStorage {
   private readonly values = new Map<string, string>();
@@ -41,6 +41,20 @@ test('blocked storage cannot hide an available APK or trap navigation', () => {
   assert.equal(consumeAutostart(store), false);
   assert.deepEqual(resolveApk(href, store), { href, available: true, remembered: false });
   assert.deepEqual(resolveApk(null, store), { href: null, available: false, remembered: false });
+});
+
+test('coffee is offered once but cannot trap a choice when storage fails', () => {
+  for (const store of [new BlockedStorage(), null]) {
+    assert.equal(armDownload('skipped', store), false);
+    const choice = resolveApk(href, store);
+    assert.equal(shouldOfferCoffee(choice), true);
+    assert.equal(shouldOfferCoffee(choice, true), false);
+    assert.equal(choice.href, href);
+    assert.equal(shouldOfferCoffee(resolveApk(null, store)), false);
+  }
+  const saved = new MemoryStorage();
+  armDownload('returned', saved);
+  assert.equal(shouldOfferCoffee(resolveApk(href, saved)), false);
 });
 
 test('a saved skip or return remembers the choice and autostarts once', () => {

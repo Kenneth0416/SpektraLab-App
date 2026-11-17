@@ -55,6 +55,9 @@ class FilmViewfinder(context: Context, private val onError: (String) -> Unit) : 
     private var autoEv = 0f
     private var frame = 0
     private var failed = false
+    @Volatile private var released = false
+    // Includes bridges still waiting for PreviewView, not just the current EGL output.
+    private val rawOutputs = mutableSetOf<RawPreviewSurface>()
     private val stMatrix = FloatArray(16)
     private val outMatrix = FloatArray(16)
 
@@ -75,7 +78,7 @@ class FilmViewfinder(context: Context, private val onError: (String) -> Unit) : 
     fun setLook(s: LookSetup) = executor.execute { setup = s }
 
     private fun ensureGl(): Boolean {
-        if (failed) return false
+        if (failed || released) return false
         if (renderer != null) return true
         return try {
             val e = EglCore()
@@ -92,8 +95,43 @@ class FilmViewfinder(context: Context, private val onError: (String) -> Unit) : 
         }
     }
 
-    override fun onInputSurface(request: SurfaceRequest) {
-        if (!ensureGl()) { request.willNotProvideSurface(); return }
+    /** Process RAW's preview without registering a CameraEffect on its capture group. */
+    fun rawSurfaceProvider(downstream: androidx.camera.core.Preview.SurfaceProvider): androidx.camera.core.Preview.SurfaceProvider =
+        androidx.camera.core.Preview.SurfaceProvider { request ->
+            if (released) {
+                request.willNotProvideSurface()
+            } else if (!handler.post {
+                if (released) {
+                    request.willNotProvideSurface()
+                } else {
+                    val bridge = RawPreviewSurface(request, executor) { rawOutputs.remove(it) }
+                    rawOutputs.add(bridge)
+                    bridge.connect(
+                        androidx.camera.core.Preview.SurfaceProvider { forwarded ->
+                            androidx.core.content.ContextCompat.getMainExecutor(context).execute {
+                                if (released) forwarded.willNotProvideSurface()
+                                else downstream.onSurfaceRequested(forwarded)
+                            }
+                        }, this,
+                    )
+                }
+            }) {
+                // release() may have stopped the looper after the first check.
+                request.willNotProvideSurface()
+            }
+        }
+
+    internal fun closeRawOutput(surface: RawPreviewSurface) {
+        if (output === surface) releaseOutput()
+    }
+
+    override fun onInputSurface(request: SurfaceRequest) = provideInput(request) {}
+
+    internal fun onRawInputSurface(request: SurfaceRequest, onReleased: () -> Unit) =
+        provideInput(request, onReleased)
+
+    private fun provideInput(request: SurfaceRequest, onReleased: () -> Unit) {
+        if (!ensureGl()) { request.willNotProvideSurface(); onReleased(); return }
         egl!!.makeCurrent(pbuffer!!)
         if (oes == 0) {
             oes = IntArray(1).also { GLES30.glGenTextures(1, it, 0) }[0]
@@ -113,6 +151,7 @@ class FilmViewfinder(context: Context, private val onError: (String) -> Unit) : 
             st.release()
             surface.release()
             if (surfaceTexture === st) { surfaceTexture = null; inputSurface = null }
+            onReleased()
         }
     }
 
@@ -125,7 +164,15 @@ class FilmViewfinder(context: Context, private val onError: (String) -> Unit) : 
         }
         releaseOutput()
         output = surfaceOutput
-        outputEgl = runCatching { egl!!.createWindowSurface(surface) }.getOrNull()
+        outputEgl = try {
+            egl!!.createWindowSurface(surface)
+        } catch (t: Throwable) {
+            output = null
+            surfaceOutput.close()
+            Log.e(TAG, "viewfinder output creation failed", t)
+            if (!failed) { failed = true; onError(context.getString(R.string.viewfinder_render_failed)) }
+            null
+        }
     }
 
     private fun releaseOutput() {
@@ -157,7 +204,8 @@ class FilmViewfinder(context: Context, private val onError: (String) -> Unit) : 
             r.setLook(s)
             val w = out.size.width
             val h = out.size.height
-            if (frame % METER_EVERY == 0) meter(r, input)
+            val rawPreview = out is RawPreviewSurface
+            if (!rawPreview && frame % METER_EVERY == 0) meter(r, input)
             // Keep the film pipeline at a stable size; only the diffusion mix changes with clarity.
             val frameClarity = clarity.coerceIn(0f, 1f)
             val scale = minOf(1f, PROCESS_LONG_EDGE.toFloat() / max(w, h))
@@ -165,7 +213,7 @@ class FilmViewfinder(context: Context, private val onError: (String) -> Unit) : 
                 input = input,
                 imageWidth = (w * scale).roundToInt().coerceAtLeast(2), imageHeight = (h * scale).roundToInt().coerceAtLeast(2),
                 framebuffer = 0, outWidth = w, outHeight = h,
-                groundGlass = 1f - frameClarity,
+                original = rawPreview, groundGlass = 1f - frameClarity,
                 seed = frame * 7919 + 17, autoEv = autoEv + evBias,
             ))
             e.setPresentationTime(outSurface, st.timestamp)
@@ -197,11 +245,14 @@ class FilmViewfinder(context: Context, private val onError: (String) -> Unit) : 
 
     /** Stop the GL thread; call when the camera screen goes away (after unbinding the camera). */
     fun release() {
+        if (released) return
+        released = true
         handler.post {
             runCatching {
                 val out = output
                 releaseOutput()
                 out?.close()
+                rawOutputs.toList().forEach { it.close() }
                 surfaceTexture?.let { it.setOnFrameAvailableListener(null); it.release() }
                 inputSurface?.release()
                 surfaceTexture = null; inputSurface = null

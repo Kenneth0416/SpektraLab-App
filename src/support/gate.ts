@@ -1,9 +1,6 @@
 export const SUPPORT_KEY = 'silvercam-support';
 const AUTOSTART_KEY = 'silvercam-autostart';
 
-export const WECHAT_PAY = 'wxp://f2f1fet-2WiM3dHXoNfvUwH8Rc48iKwE0_bB9vt9hGmRH4hRXFjEM48TYNnzi0D50Tck';
-export const ALIPAY_PAY = 'https://qr.alipay.com/fkx16502aqncntlqz5etm0c';
-
 export type SupportState = 'awaiting' | 'skipped' | 'returned';
 
 interface StorageLike {
@@ -30,7 +27,8 @@ export function readSupport(store: StorageLike | null = storage()): string | nul
 
 export function writeSupport(value: SupportState, store: StorageLike | null = storage()) {
   try {
-    store?.setItem(SUPPORT_KEY, value);
+    if (!store) return false;
+    store.setItem(SUPPORT_KEY, value);
     return true;
   } catch {
     return false;
@@ -68,6 +66,10 @@ export interface ApkChoice {
   available: boolean;
   /** Storage can fail closed; the file link still works without remembering the choice. */
   remembered: boolean;
+}
+
+export function shouldOfferCoffee(choice: ApkChoice, acceptedThisVisit = false): boolean {
+  return choice.available && !choice.remembered && !acceptedThisVisit;
 }
 
 export function resolveApk(href: string | null | undefined, store: StorageLike | null = storage()): ApkChoice {

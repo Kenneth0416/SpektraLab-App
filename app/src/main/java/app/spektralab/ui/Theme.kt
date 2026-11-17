@@ -35,6 +35,7 @@ object Pal {
 val Gray18 = Color(0xFF767676)
 
 object Fonts {
-    val hand = FontFamily(Font(R.font.long_cang))
+    // Unmodified LXGW WenKai v1.530 Regular; preserve system fallback for unsupported text.
+    val hand = FontFamily(Font(R.font.lxgw_wenkai_regular))
     val mono = FontFamily(Font(R.font.martian_mono))
 }

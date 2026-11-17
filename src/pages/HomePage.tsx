@@ -6,6 +6,7 @@ import { FilmLab } from '../components/FilmLab';
 import { FilmStrip } from '../components/FilmStrip';
 import { Reveal } from '../components/Reveal';
 import { useLanguage } from '../i18n/LanguageContext';
+import { handwritingCopy } from '../typography/handwriting';
 
 const workflowMedia = [
   { image: '/assets/scenes/thumbs/snow-pines.jpg', icon: Image },
@@ -17,6 +18,7 @@ const mediaIcons = [Image, Video, Camera];
 export function HomePage() {
   const { messages, locale } = useLanguage();
   const m = messages.home;
+  const hand = handwritingCopy(messages);
   const mainRef = useRef<HTMLElement>(null);
 
   useLayoutEffect(() => {
@@ -55,7 +57,7 @@ export function HomePage() {
             <div className="lab-orbit orbit-one" aria-hidden="true" />
             <div className="lab-orbit orbit-two" aria-hidden="true" />
             <FilmLab />
-            <div className="recipe-note" aria-hidden="true"><span>{messages.lab.recipeTitle}</span><strong>{messages.lab.recipeName}</strong><i>{messages.lab.recipeTime}</i></div>
+            <div className="recipe-note" aria-hidden="true"><span>{hand.recipeTitle}</span><strong>{messages.lab.recipeName}</strong><i>{messages.lab.recipeTime}</i></div>
           </div>
         </div>
         <div className="hero-side-type" aria-hidden="true">35MM · PROCESS ECN-2 · HANDLE WITH CARE</div>
@@ -67,7 +69,7 @@ export function HomePage() {
         <div className="section-inner">
           <Reveal className="craft-heading">
             <div className="section-kicker"><span>{m.craftKicker}</span><i /></div>
-            <h2>{m.craftTitle1}<br />{m.craftTitle2}<span>{m.craftAccent}</span></h2>
+            <h2>{m.craftTitle1}<br />{m.craftTitle2}<span>{hand.craftAccent}</span></h2>
             <p>{m.craftDescription}</p>
           </Reveal>
 
@@ -88,7 +90,7 @@ export function HomePage() {
 
             <Reveal className="craft-card paper-card" delay={90}>
               <div className="card-heading"><div><Layers3 size={21} /><span>FILM × PAPER</span></div><span>{m.paperOverline}</span></div>
-              <div className="paper-equation"><span>FILM</span><b>×</b><span>PAPER</span></div>
+              <div className="paper-equation"><span>FILM</span><b>{hand.multiply}</b><span>PAPER</span></div>
               <h3>{m.paperTitle}</h3>
               <p>{m.paperDescription}</p>
               <div className="paper-swatches" aria-hidden="true"><i /><i /><i /><i /></div>
@@ -108,10 +110,10 @@ export function HomePage() {
               <div className="index-card">
                 <span className="index-tape" aria-hidden="true" />
                 <small>{m.recipeCode}</small>
-                <strong>{m.recipeName}</strong>
+                <strong>{hand.recipeName}</strong>
                 <p>{m.recipeStock}</p>
                 <dl><div><dt>{m.recipeLabels[0]}</dt><dd>1.6</dd></div><div><dt>{m.recipeLabels[1]}</dt><dd>CineBloom</dd></div><div><dt>{m.recipeLabels[2]}</dt><dd>XPan</dd></div></dl>
-                <span className="hand-check">{m.recipeHandnote}</span>
+                <span className="hand-check">{hand.recipeHandnote}</span>
               </div>
               <p className="recipe-caption">{m.recipeCaption}</p>
             </Reveal>
@@ -161,7 +163,7 @@ export function HomePage() {
           <Reveal className="media-visual" delay={100}>
             <div className="media-frame media-photo"><img src="/assets/scenes/thumbs/snow-tree.jpg" alt={m.mediaPhotoAlt} width="480" height="222" decoding="async" loading="lazy" /><span>{m.mediaPhotoLabel}</span></div>
             <div className="media-frame media-video"><img src="/assets/scenes/thumbs/snow-pines.jpg" alt={m.mediaVideoAlt} width="480" height="222" decoding="async" loading="lazy" /><span><i />{m.mediaVideoLabel}</span><div className="video-progress"><i /></div></div>
-            <span className="media-handnote">{m.mediaHandnote}</span>
+            <span className="media-handnote">{hand.mediaHandnote}</span>
           </Reveal>
         </div>
       </section>

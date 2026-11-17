@@ -41,7 +41,7 @@ object BundledLicenses {
         BundledLicenseDoc("ccbysa4", R.string.license_cc_title, R.string.license_cc_subtitle, "spektra/SPEKTRAFILM_LICENSE.txt"),
         BundledLicenseDoc("changelog", R.string.license_changelog_title, R.string.license_changelog_subtitle, "spektra/CHANGELOG.txt"),
         BundledLicenseDoc("notice", R.string.license_notice_title, R.string.license_notice_subtitle, "licenses/NOTICE.txt"),
-        BundledLicenseDoc("ofl_longcang", R.string.license_ofl_longcang_title, R.string.license_ofl_longcang_subtitle, "licenses/OFL-LongCang.txt"),
+        BundledLicenseDoc("ofl_wenkai", R.string.license_ofl_wenkai_title, R.string.license_ofl_wenkai_subtitle, "licenses/OFL-LXGWWenKai.txt"),
         BundledLicenseDoc("ofl_martian", R.string.license_ofl_martian_title, R.string.license_ofl_martian_subtitle, "licenses/OFL-MartianMono.txt"),
         BundledLicenseDoc("apache2", R.string.license_apache_title, R.string.license_apache_subtitle, "licenses/APACHE-2.0.txt"),
     )

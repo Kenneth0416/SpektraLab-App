@@ -79,7 +79,7 @@ fun CoffeePromptDialog(onLater: () -> Unit, onDismissForever: () -> Unit) {
                 .semantics { semanticsTestTag = "coffee_prompt" },
         ) {
             Text(
-                stringResource(R.string.coffee_title), fontSize = 22.sp, fontWeight = FontWeight.Bold,
+                stringResource(R.string.coffee_title), fontSize = 22.sp, fontWeight = FontWeight.Normal,
                 color = Pal.ink, fontFamily = Fonts.hand, textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )

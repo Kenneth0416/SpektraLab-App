@@ -309,8 +309,8 @@
     <string name="license_changelog_subtitle">烘焙與歸屬記錄 · spektra/CHANGELOG.txt</string>
     <string name="license_notice_title">修改聲明、原始碼與第三方依賴摘要</string>
     <string name="license_notice_subtitle">NOTICE · licenses/NOTICE.txt</string>
-    <string name="license_ofl_longcang_title">SIL OFL 1.1 — Long Cang 字型</string>
-    <string name="license_ofl_longcang_subtitle">The LongCang Project Authors · licenses/OFL-LongCang.txt</string>
+    <string name="license_ofl_wenkai_title">SIL OFL 1.1 — 霞鶩文楷字型</string>
+    <string name="license_ofl_wenkai_subtitle">LXGW / The Klee Project Authors · licenses/OFL-LXGWWenKai.txt</string>
     <string name="license_ofl_martian_title">SIL OFL 1.1 — Martian Mono 字型</string>
     <string name="license_ofl_martian_subtitle">The Martian Mono Project Authors · licenses/OFL-MartianMono.txt</string>
     <string name="license_apache_title">Apache License 2.0 完整原文</string>
@@ -325,6 +325,6 @@
     <string name="about_source_title">對應原始碼要求（GPLv3 Section 6）</string>
     <string name="about_source_body">僅提供通用儲存庫首頁連結本身並不足以自動滿足所有發行情境的 GPLv3 對應原始碼（Corresponding Source）義務。任何對外散布的 APK／二進位發行版，必須同步提供或確保可取得與該建置完全一致的精確原始碼版本（精確 Git 提交／標籤、Gradle 建置設定、app/ 與 engine/ 原始碼以及 tools/bake/ 烘焙指令碼與上游檔案）。</string>
     <string name="about_dependencies_title">內建字型與第三方依賴聲明（按建置設定核驗）</string>
-    <string name="about_dependencies_body">• Long Cang（long_cang.ttf，子集）：Copyright 2018 The LongCang Project Authors (https://github.com/googlefonts/longcang) — SIL Open Font License 1.1\n• Martian Mono（martian_mono.ttf / SemiExpanded）：Copyright 2020/2021 The Martian Mono Project Authors / Evil Martians / Roman Shamin (https://github.com/evilmartians/mono) — SIL Open Font License 1.1\n• Kotlin Standard Library (2.1.21)、Kotlinx Coroutines (1.10.2)、Kotlinx Serialization Core (1.7.3)、JetBrains Annotations (23.0.0)、JSpecify (1.0.0)、AutoValue Annotations (1.6.3)、Guava ListenableFuture (1.0) — Apache License 2.0\n• Jetpack / AndroidX（core-ktx 1.16.0、activity-compose 1.10.1、lifecycle 2.9.1、compose-bom 2025.06.00、exifinterface 1.4.2、window 1.3.0、camera-* 1.5.3）— Apache License 2.0（其中 androidx.camera:camera-core:1.5.3 POM 另標明包含 BSD License 的 libyuv）\n• 底片／相紙名稱（如 Kodak、Portra、Vision3、Fujifilm、Velvia 等）僅用於說明上游檔案模擬對象，商標歸各自權利人所有。</string>
+    <string name="about_dependencies_body">• 霞鶩文楷 Regular v1.530（lxgw_wenkai_regular.ttf，未修改完整版）：Copyright 2021-2026 LXGW; Copyright 2020 The Klee Project Authors (https://github.com/lxgw/LxgwWenKai) — SIL Open Font License 1.1\n• Martian Mono（martian_mono.ttf / SemiExpanded）：Copyright 2020/2021 The Martian Mono Project Authors / Evil Martians / Roman Shamin (https://github.com/evilmartians/mono) — SIL Open Font License 1.1\n• Kotlin Standard Library (2.1.21)、Kotlinx Coroutines (1.10.2)、Kotlinx Serialization Core (1.7.3)、JetBrains Annotations (23.0.0)、JSpecify (1.0.0)、AutoValue Annotations (1.6.3)、Guava ListenableFuture (1.0) — Apache License 2.0\n• Jetpack / AndroidX（core-ktx 1.16.0、activity-compose 1.10.1、lifecycle 2.9.1、compose-bom 2025.06.00、exifinterface 1.4.2、window 1.3.0、camera-* 1.5.3）— Apache License 2.0（其中 androidx.camera:camera-core:1.5.3 POM 另標明包含 BSD License 的 libyuv）\n• 底片／相紙名稱（如 Kodak、Portra、Vision3、Fujifilm、Velvia 等）僅用於說明上游檔案模擬對象，商標歸各自權利人所有。</string>
     <string name="about_full_texts">本機內建完整許可文本（點擊查看全文）</string>
 </resources>

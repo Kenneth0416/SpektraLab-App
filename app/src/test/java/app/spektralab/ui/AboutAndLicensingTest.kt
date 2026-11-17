@@ -70,8 +70,12 @@ class AboutAndLicensingTest {
         assertTrue(notice.contains("https://github.com/Kenneth0416/SpektraLab-App"))
         assertTrue(notice.replace('\n', ' ').contains("Corresponding Source"))
 
-        val longCang = BundledLicenses.loadAsset(app, "licenses/OFL-LongCang.txt")
-        assertTrue(longCang.contains("SIL OPEN FONT LICENSE Version 1.1"))
+        val wenkai = BundledLicenses.loadAsset(app, "licenses/OFL-LXGWWenKai.txt")
+        assertTrue(wenkai.contains("SIL OPEN FONT LICENSE Version 1.1"))
+        assertTrue(wenkai.contains("Copyright 2021-2026 LXGW"))
+        assertTrue(wenkai.contains("Copyright 2020 The Klee Project Authors"))
+        assertTrue(wenkai.contains("Reserved Font Name"))
+        assertTrue(wenkai.contains("[ADDITIONAL PERMISSION]"))
         val martian = BundledLicenses.loadAsset(app, "licenses/OFL-MartianMono.txt")
         assertTrue(martian.contains("SIL OPEN FONT LICENSE Version 1.1"))
         val apache = BundledLicenses.loadAsset(app, "licenses/APACHE-2.0.txt")
@@ -112,7 +116,7 @@ class AboutAndLicensingTest {
         val extraDocs = listOf(
             "档案与 LUT 修改记录（CHANGELOG）" to "SPK1 binary files",
             "修改声明、源码与第三方依赖摘要" to "INDEPENDENT FORK / NON-ENDORSEMENT NOTICE",
-            "SIL OFL 1.1 — Long Cang 字体" to "Copyright 2018 The Long Cang Project Authors",
+            "SIL OFL 1.1 — LXGW WenKai 字体" to "Copyright 2021-2026 LXGW",
             "SIL OFL 1.1 — Martian Mono 字体" to "Copyright 2021 The Martian Mono Project Authors",
             "Apache License 2.0 完整原文" to "Version 2.0, January 2004",
         )

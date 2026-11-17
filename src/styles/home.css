@@ -1,3 +1,7 @@
+/* The bundled handwriting face is Regular; never request an unavailable bold. */
+.recipe-note span, .craft-heading h2 span, .paper-equation b,
+.index-card > strong, .hand-check, .media-handnote { font-weight: 400; }
+
 .hero {
   --pointer-x: 70%;
   --pointer-y: 30%;

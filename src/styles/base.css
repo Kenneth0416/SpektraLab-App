@@ -1,5 +1,34 @@
 @charset "UTF-8";
 
+@font-face {
+  font-family: 'Silvercam Hand Web';
+  src: url('/fonts/silvercam-hand-regular.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Martian Mono';
+  src: url('/fonts/martian-mono-400.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Martian Mono';
+  src: url('/fonts/martian-mono-500.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Martian Mono';
+  src: url('/fonts/martian-mono-700.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
 :root {
   --ink: #0c0b0a;
   --ink-soft: #151310;
@@ -10,14 +39,19 @@
   --red-dark: #b93727;
   --line-dark: rgba(244, 239, 226, 0.14);
   --line-light: rgba(22, 20, 17, 0.16);
-  --mono: 'Martian Mono', 'SFMono-Regular', ui-monospace, Consolas, monospace;
-  --sans: system-ui, 'PingFang TC', 'PingFang SC', 'Hiragino Sans CNS', 'Noto Sans CJK TC', 'Microsoft JhengHei', 'Segoe UI', sans-serif;
-  --hand: 'Long Cang', cursive;
+  --cjk: 'PingFang TC', 'Hiragino Sans CNS', 'Noto Sans CJK TC', 'Noto Sans TC', 'Microsoft JhengHei';
+  --mono: 'Martian Mono', 'SFMono-Regular', Consolas, var(--cjk), monospace;
+  --sans: system-ui, var(--cjk), 'Segoe UI', sans-serif;
+  --hand: 'Silvercam Hand Web', var(--cjk), sans-serif;
   color-scheme: dark;
   font-family: var(--sans);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+}
+
+:root:lang(zh-Hans) {
+  --cjk: 'PingFang SC', 'Noto Sans CJK SC', 'Noto Sans SC', 'Microsoft YaHei';
 }
 
 * { box-sizing: border-box; }

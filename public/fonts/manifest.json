@@ -1,0 +1,49 @@
+{
+  "handSourceVersion": "LXGW WenKai 1.530 Regular",
+  "handFamily": "Silvercam Hand Web",
+  "monoSourceVersion": "Martian Mono 1.1.0",
+  "sources": {
+    "wenkai.ttf": {
+      "url": "https://github.com/lxgw/LxgwWenKai/releases/download/v1.530/LXGWWenKai-Regular.ttf",
+      "sha256": "2d73eea94ad808999d90c0000c239a84a33b09d4bc6ab6c5b8bbf1eda8a7fc8b"
+    },
+    "wenkai-ofl.txt": {
+      "url": "https://raw.githubusercontent.com/lxgw/LxgwWenKai/v1.530/OFL.txt",
+      "sha256": "1a25e35da1031c6c3436fde545bb9cb5aca954e9873afe510c834b8b79bd21a0"
+    },
+    "martian.zip": {
+      "url": "https://github.com/evilmartians/mono/releases/download/v1.1.0/martian-mono-1.1.0-woff2.zip",
+      "sha256": "24f4bb3c3c786bc9b285be95c5ca380a37464a6b0becd9670a7249dff8ac301d"
+    },
+    "martian-ofl.txt": {
+      "url": "https://raw.githubusercontent.com/evilmartians/mono/v1.1.0/OFL.txt",
+      "sha256": "ddafd2c3f37ef1d83ef284ca63e159befd3820850c5e9eded14ca52eee92c256"
+    }
+  },
+  "files": {
+    "martian-mono-400.woff2": {
+      "bytes": 41756,
+      "sha256": "5253fe61c5aecbcf8ea63cf4e61fe563c9f6bf0a05eeb311a5bac21617246054"
+    },
+    "martian-mono-500.woff2": {
+      "bytes": 42444,
+      "sha256": "4cbb0f1661249d3d70895971ce3a8d7967e5aa3f43230b5e4672c474ba3b7765"
+    },
+    "martian-mono-700.woff2": {
+      "bytes": 42788,
+      "sha256": "4510942de3a96564d8f7e14de5b7352ae03cb72251d6943bfb71b28eda7df5e0"
+    },
+    "silvercam-hand-regular.woff2": {
+      "bytes": 15728,
+      "sha256": "ce07312ce4bfd32ece3967b13b03b78e8da558aca4f2330d6e5917113f73e290"
+    },
+    "OFL-MartianMono.txt": {
+      "bytes": 4390,
+      "sha256": "ddafd2c3f37ef1d83ef284ca63e159befd3820850c5e9eded14ca52eee92c256"
+    },
+    "OFL-WenKai.txt": {
+      "bytes": 5171,
+      "sha256": "1a25e35da1031c6c3436fde545bb9cb5aca954e9873afe510c834b8b79bd21a0"
+    }
+  }
+}

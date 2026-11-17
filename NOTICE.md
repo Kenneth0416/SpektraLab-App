@@ -72,9 +72,13 @@ Per Section 2 of the upstream spektrafilm CC BY-SA 4.0 preamble and GNU GPLv3 pr
 
 ## 5. Third-Party Fonts & Component Licenses
 
-- **Long Cang (Google Fonts):** Copyright 2018 The LongCang Project Authors. Licensed under SIL Open Font License, Version 1.1.
-- **Martian Mono (Evil Martians):** Copyright 2020/2021 The Martian Mono Project Authors / Evil Martians / Roman Shamin. Licensed under SIL Open Font License, Version 1.1.
-- **Noto Sans (Google Fonts):** Licensed under SIL Open Font License, Version 1.1.
+- **LXGW WenKai Regular v1.530 (current native Android app):** Copyright 2021–2026 LXGW; Copyright 2020 The Klee Project Authors. The complete, unmodified official font is bundled under SIL Open Font License, Version 1.1. See [the complete license](./app/src/main/assets/licenses/OFL-LXGWWenKai.txt) and [source, checksum and coverage documentation](./app/tools/FONTS.md).
+- **Silvercam Hand Web (current website):** An independently renamed and modified WOFF2 subset of LXGW WenKai Regular v1.530, retaining the upstream copyright and SIL OFL 1.1. It is not endorsed by the upstream authors. See [the complete license](./public/fonts/OFL-WenKai.txt), [modification notice](./public/fonts/README.txt), and [source/artifact manifest](./public/fonts/manifest.json).
+- **Martian Mono (Evil Martians):** Bundled under SIL Open Font License, Version 1.1. The website self-hosts unmodified v1.1.0 Regular/Medium/Bold WOFF2 files; the native app retains its existing font. Copyright notices and full terms are preserved in the respective [website](./public/fonts/OFL-MartianMono.txt) and native application license assets.
+- **System Chinese fonts:** Current body text uses platform fonts and locale-aware fallback; no Noto body font is bundled by this change. Installed system fonts retain their own licenses. Naming a font in a CSS fallback list does not distribute that font.
+- **Historical Long Cang attribution:** Copyright 2018 The LongCang Project Authors, SIL OFL 1.1. Earlier releases and historical prototype notices may refer to Long Cang; it has been replaced in the current native app and website. Historical artifacts and their notices are not rewritten by this change.
+
+The bundled fonts retain their SIL OFL 1.1 licenses rather than becoming GPL-covered font assets. OFL permits commercial use, embedding and redistribution subject to its conditions, including preserving copyright and license notices, not selling the fonts by themselves, and respecting Reserved Font Names for modified versions. The website subset uses a new name; the native WenKai font remains byte-identical to the official release. Font use does not impose OFL on application code or generated photographs.
 - **Lucide Icons:** Copyright (c) Lucide Contributors. Licensed under ISC License.
 - **React, React Router, Vite, fflate:** Licensed under MIT License.
 

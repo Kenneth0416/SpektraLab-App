@@ -1,0 +1,3 @@
+# Used to generate and verify the checked-in website WOFF2 artifacts.
+fonttools==4.62.1
+Brotli==1.2.0

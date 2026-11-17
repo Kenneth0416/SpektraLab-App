@@ -84,11 +84,18 @@ upstream profile materials (tools/bake/) needed to regenerate and build the APK.
 4. THIRD-PARTY FONTS & RUNTIME DEPENDENCIES (VERIFIED IN THIS APK)
 ------------------------------------------------------------------
 (A) Bundled Fonts (app/src/main/res/font/)
-  1. Long Cang (long_cang.ttf, subsetted)
-     - Copyright 2018 The LongCang Project Authors
-       (https://github.com/googlefonts/longcang)
+  1. LXGW WenKai Regular v1.530 (lxgw_wenkai_regular.ttf, unmodified)
+     - Copyright 2021-2026 LXGW (https://github.com/lxgw/LxgwWenKai)
+     - Copyright 2020 The Klee Project Authors
+       (https://github.com/fontworks-fonts/Klee)
      - License: SIL Open Font License, Version 1.1
-     - Full text: assets/licenses/OFL-LongCang.txt
+     - Reserved Font Names: '霞鹜', '霞鶩', '落霞孤鹜', '落霞孤鶩', 'LXGW'
+       The original release file is embedded unchanged; no renamed/subset derivative.
+     - Source: https://github.com/lxgw/LxgwWenKai/releases/tag/v1.530
+     - SHA-256: 2d73eea94ad808999d90c0000c239a84a33b09d4bc6ab6c5b8bbf1eda8a7fc8b
+     - Full text (including upstream additional permission): assets/licenses/OFL-LXGWWenKai.txt
+     - Bundled only as a decorative Regular face; no synthetic Bold requested.
+       Unsupported characters retain Android system fallback, not universal coverage.
 
   2. Martian Mono (martian_mono.ttf — Martian Mono SemiExpanded)
      - Copyright 2020/2021 The Martian Mono Project Authors / Evil Martians /

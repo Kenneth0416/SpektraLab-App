@@ -1,5 +1,5 @@
 {
-  "en": "Import photos, videos and RAW files directly from other apps through the Android share sheet, including multiple files. Shared originals are saved locally so they remain available after temporary permissions expire. Improved button wrapping and large-font layouts in the app and website. General documents such as PDF and Word are not supported.",
-  "zh-Hans": "新增系统分享导入：从相册、聊天软件或文件管理器直接分享照片、影片和 RAW 文件到银盐工坊，支持多选。共享原件保存在本地，临时权限失效后仍可使用。优化应用与网站的按钮换行及大字体布局。暂不支持 PDF、Word 等普通文档。",
-  "zh-Hant": "新增系統分享匯入：從相簿、聊天軟體或檔案管理器直接分享照片、影片和 RAW 檔案到銀鹽工坊，支援多選。共享原件儲存在本機，臨時權限失效後仍可使用。改善應用程式與網站的按鈕換行及大字體版面。暫不支援 PDF、Word 等一般文件。"
+  "en": "Improved Simplified and Traditional Chinese handwriting with bundled open-source LXGW WenKai and complete font license notices. RAW viewfinder now supports the ground-glass transition while keeping RAW capture separate from preview processing; improved preview rotation and resource cleanup. The website now self-hosts its fonts and provides a skippable WeChat support page without download loops when browser storage is unavailable.",
+  "zh-Hans": "内置开源霞鹜文楷，补齐当前简繁中文手写文案，并提供完整字体许可。RAW 取景加入毛玻璃过渡，RAW 拍摄与预览处理保持分离，同时改善预览旋转和资源释放。网站改为本地托管字体，微信支持页可跳过，并修复浏览器存储不可用时的下载循环。",
+  "zh-Hant": "內建開源霞鶩文楷，補齊目前簡繁中文手寫文案，並提供完整字體授權。RAW 取景加入毛玻璃過渡，RAW 拍攝與預覽處理保持分離，同時改善預覽旋轉與資源釋放。網站改為自行託管字體，微信支持頁可跳過，並修復瀏覽器儲存不可用時的下載循環。"
 }

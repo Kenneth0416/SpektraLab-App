@@ -1,23 +1,23 @@
 {
   "schema": 1,
-  "builtAt": "2026-11-13T10:33:23.107Z",
+  "builtAt": "2026-11-17T17:02:19.965Z",
   "apk": {
     "applicationId": "app.spektralab",
-    "versionCode": 4,
-    "versionName": "0.1.3",
+    "versionCode": 5,
+    "versionName": "0.1.4",
     "minSdk": 29
   },
   "signerSha256": "4b813e686aab33e66b24d08b7a77e1085cc5070d0ea521a31200bd5d292a7822",
-  "releaseProperties": "# Native Android release. Keep this URL stable once an APK has been distributed.\n# For website hosting, set this to the site's HTTPS origin (without a trailing slash).\nupdateBaseUrl=https://raw.githubusercontent.com/Kenneth0416/SpektraLab-App/main/public\nversionCode=4\nversionName=0.1.3\n",
+  "releaseProperties": "# Native Android release. Keep this URL stable once an APK has been distributed.\n# For website hosting, set this to the site's HTTPS origin (without a trailing slash).\nupdateBaseUrl=https://raw.githubusercontent.com/Kenneth0416/SpektraLab-App/main/public\nversionCode=5\nversionName=0.1.4\n",
   "releaseNotes": {
-    "en": "Import photos, videos and RAW files directly from other apps through the Android share sheet, including multiple files. Shared originals are saved locally so they remain available after temporary permissions expire. Improved button wrapping and large-font layouts in the app and website. General documents such as PDF and Word are not supported.",
-    "zh-Hans": "新增系统分享导入：从相册、聊天软件或文件管理器直接分享照片、影片和 RAW 文件到银盐工坊，支持多选。共享原件保存在本地，临时权限失效后仍可使用。优化应用与网站的按钮换行及大字体布局。暂不支持 PDF、Word 等普通文档。",
-    "zh-Hant": "新增系統分享匯入：從相簿、聊天軟體或檔案管理器直接分享照片、影片和 RAW 檔案到銀鹽工坊，支援多選。共享原件儲存在本機，臨時權限失效後仍可使用。改善應用程式與網站的按鈕換行及大字體版面。暫不支援 PDF、Word 等一般文件。"
+    "en": "Improved Simplified and Traditional Chinese handwriting with bundled open-source LXGW WenKai and complete font license notices. RAW viewfinder now supports the ground-glass transition while keeping RAW capture separate from preview processing; improved preview rotation and resource cleanup. The website now self-hosts its fonts and provides a skippable WeChat support page without download loops when browser storage is unavailable.",
+    "zh-Hans": "内置开源霞鹜文楷，补齐当前简繁中文手写文案，并提供完整字体许可。RAW 取景加入毛玻璃过渡，RAW 拍摄与预览处理保持分离，同时改善预览旋转和资源释放。网站改为本地托管字体，微信支持页可跳过，并修复浏览器存储不可用时的下载循环。",
+    "zh-Hant": "內建開源霞鶩文楷，補齊目前簡繁中文手寫文案，並提供完整字體授權。RAW 取景加入毛玻璃過渡，RAW 拍攝與預覽處理保持分離，同時改善預覽旋轉與資源釋放。網站改為自行託管字體，微信支持頁可跳過，並修復瀏覽器儲存不可用時的下載循環。"
   },
-  "apkSha256": "4392a808befa26f744265b6ebe1b53af671ad7bad21722c712d0b196dba7d14c",
-  "sourceSha256": "f8e703915bd501a556d1e53e3aa05c967268919e54564c42b1f6d90afeaffd99",
-  "sourceDigest": "48c47c883cfa6e540433c1cf4554277bb073b0b447d40dafc894afe68a53099d",
-  "nativeInputDigest": "183f46d0b7e1bc4cfb872677937125219b1c808555c52972f91ff79275252898",
+  "apkSha256": "0680a704d49e6ef6c5585ceabb8ad6733d207d694c30a2a06a0c00e18d405829",
+  "sourceSha256": "d3d2130c8ae4faf92e869a3d9429ac16b81e138ba787995ca4df823392ba98b2",
+  "sourceDigest": "4bd88de378301724522ef1c274ec101499432b28440058f1e49290ee8d43819c",
+  "nativeInputDigest": "3090d0b06d7fb2c48065adb83c6e4e97fc668f28ff971ddec8fd1bf73141dfc0",
   "files": [
     {
       "name": ".gitignore",
@@ -32,7 +32,7 @@
     {
       "name": "NOTICE.md",
       "mode": 420,
-      "sha256": "eebb6b92b27a103c854cc22ed83db0c7d7d9ea554f6b7c2f659193255e5063a9"
+      "sha256": "a6897ba9a66b52bdc7d20b621b8acceb0cda9eb4df9bc152445c86beb48e89ff"
     },
     {
       "name": "README.md",
@@ -362,12 +362,12 @@
     {
       "name": "app/src/main/assets/licenses/NOTICE.txt",
       "mode": 420,
-      "sha256": "188b06e0fd519c7d982ae2eab7fef2f44e2ade02349056766c3869829579a080"
+      "sha256": "8ede7615b03eedbc8580614d57f17dd71a62de0d8ed36302b1620ffe0337cf1e"
     },
     {
-      "name": "app/src/main/assets/licenses/OFL-LongCang.txt",
+      "name": "app/src/main/assets/licenses/OFL-LXGWWenKai.txt",
       "mode": 420,
-      "sha256": "603546b7219a94bb59bf8294458194a5010119486354092b66a09a3fd61aeacc"
+      "sha256": "1a25e35da1031c6c3436fde545bb9cb5aca954e9873afe510c834b8b79bd21a0"
     },
     {
       "name": "app/src/main/assets/licenses/OFL-MartianMono.txt",
@@ -557,12 +557,17 @@
     {
       "name": "app/src/main/java/app/spektralab/camera/FilmViewfinderEffect.kt",
       "mode": 420,
-      "sha256": "539bdaabc0749876f5eb3e4f6747e433a10c1c80774eccac68aa0271b73c80a2"
+      "sha256": "015869ae3a4c6bcf1b81a02d6330748649389d57f8af6e7bdf9b439847adfc05"
     },
     {
       "name": "app/src/main/java/app/spektralab/camera/LensZoomStops.kt",
       "mode": 420,
       "sha256": "45b8fe7584055107064ac8c07163cf19f3ec1a8d2f3efb748370eba5965ddcbb"
+    },
+    {
+      "name": "app/src/main/java/app/spektralab/camera/RawPreviewSurface.kt",
+      "mode": 420,
+      "sha256": "244f8d70eb4937c7600929f2a1c2a38898ded2f05c263b9abd49a6f6f07a46d6"
     },
     {
       "name": "app/src/main/java/app/spektralab/camera/RawShooter.kt",
@@ -637,7 +642,7 @@
     {
       "name": "app/src/main/java/app/spektralab/gl/FilmRenderer.kt",
       "mode": 420,
-      "sha256": "51f410cb00e969c5e833df758a7910a7dfc515d7b7d719f1e8bad4e45a429377"
+      "sha256": "71bb4e39a30167848b2a38baeb5637540cce68752f4e17e80d855a345311d1f3"
     },
     {
       "name": "app/src/main/java/app/spektralab/gl/GlUtil.kt",
@@ -677,7 +682,7 @@
     {
       "name": "app/src/main/java/app/spektralab/ui/AboutSheet.kt",
       "mode": 420,
-      "sha256": "92c15b6b99cf8d4f1afe96b638b64d6708b9c8f1fec1d818f33ea996763a0f57"
+      "sha256": "49b3d10369e0f48232f40f4f564c5ce906972ee140e2e9668980a6e1e32b4260"
     },
     {
       "name": "app/src/main/java/app/spektralab/ui/ActionGroup.kt",
@@ -702,7 +707,7 @@
     {
       "name": "app/src/main/java/app/spektralab/ui/CameraScreen.kt",
       "mode": 420,
-      "sha256": "47a671bae72beb39f85befd18c5c6b534848340ff2ec718b0afa5c7f70960d7f"
+      "sha256": "c25ad123fc7f062db700ae297b97ee72f069ed09d7a5ba70f62d4f4b03b5ebeb"
     },
     {
       "name": "app/src/main/java/app/spektralab/ui/CatalogText.kt",
@@ -717,7 +722,7 @@
     {
       "name": "app/src/main/java/app/spektralab/ui/CoffeePromptDialog.kt",
       "mode": 420,
-      "sha256": "089d1aae1077ec5ee042f5c2807972b9d87e82e2101f766d292b5e43c8267282"
+      "sha256": "4b01dba4a5bf430f94320a865d96dd71b7749b113963234b2fdbe1dc9684a6aa"
     },
     {
       "name": "app/src/main/java/app/spektralab/ui/Controls.kt",
@@ -787,7 +792,7 @@
     {
       "name": "app/src/main/java/app/spektralab/ui/Theme.kt",
       "mode": 420,
-      "sha256": "d79ac5ff188c0be36fb8f74a77634244f657276677582bd7483f99e68b0a03b0"
+      "sha256": "4e8c0bbd6b6f74a3b204f5e86137ef66cd0554823e60ffb695427425db576755"
     },
     {
       "name": "app/src/main/java/app/spektralab/ui/UpdateDialog.kt",
@@ -830,9 +835,9 @@
       "sha256": "23c2501b3f87245c95743a971ca1ca2c62e0c1c8e0abaf8268a5c9dc2ae3ea0d"
     },
     {
-      "name": "app/src/main/res/font/long_cang.ttf",
+      "name": "app/src/main/res/font/lxgw_wenkai_regular.ttf",
       "mode": 420,
-      "sha256": "f67191d665f68865e8cecfa0f4cc22807fea0f1155d26a17292fc46b849e0a38"
+      "sha256": "2d73eea94ad808999d90c0000c239a84a33b09d4bc6ab6c5b8bbf1eda8a7fc8b"
     },
     {
       "name": "app/src/main/res/font/martian_mono.ttf",
@@ -862,7 +867,7 @@
     {
       "name": "app/src/main/res/values-zh-rCN/strings.xml",
       "mode": 420,
-      "sha256": "dfd1402c689c9ba452be7956c85ec5f5dccc95d6120ea71cc5e29a0c96c396a1"
+      "sha256": "d59442285c8d5b877593f09c05f4d138c07d3b234aeba92099bf2cccc36ba9e7"
     },
     {
       "name": "app/src/main/res/values-zh-rCN/updates.xml",
@@ -872,7 +877,7 @@
     {
       "name": "app/src/main/res/values-zh-rTW/strings.xml",
       "mode": 420,
-      "sha256": "f2cf05040834edc9da622994a1116cbbd8f89db7090f6d20535c78f65c15b008"
+      "sha256": "da212929456d1e6648665707fba400d3f84eb4785eff7f506da1ae829def0859"
     },
     {
       "name": "app/src/main/res/values-zh-rTW/updates.xml",
@@ -887,7 +892,7 @@
     {
       "name": "app/src/main/res/values/strings.xml",
       "mode": 420,
-      "sha256": "9f0301d75d66d1ee4f86fc6fcdf52d9e236080700903d4a2e30e32c1aeb9aea8"
+      "sha256": "db30c1336be71490c4357bfffff100de414ccd40ffa0a7488b1bda944b29067f"
     },
     {
       "name": "app/src/main/res/values/themes.xml",
@@ -918,6 +923,16 @@
       "name": "app/src/test/java/app/spektralab/camera/LensZoomStopsTest.kt",
       "mode": 420,
       "sha256": "14bec66d51793662fa5ac797101010dcd85c84fd3cab8ee842a9de35885a6fe3"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/camera/RawPreviewLifecycleTest.kt",
+      "mode": 420,
+      "sha256": "d550373d177eb0d5fea5c32b9eb83b7b842ce3ea8f6c766f07c8df0fad9711b3"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/camera/RawPreviewTransformTest.kt",
+      "mode": 420,
+      "sha256": "9ed4838f391167c7f89c242dc1e44fb9b9897a85328cdf90e048cd9ba430fabe"
     },
     {
       "name": "app/src/test/java/app/spektralab/camera/ShotAdmissionTest.kt",
@@ -982,7 +997,7 @@
     {
       "name": "app/src/test/java/app/spektralab/ui/AboutAndLicensingTest.kt",
       "mode": 420,
-      "sha256": "3a69289a365dfc37ac5acd0e07828a3a10f74acdff5dbb3eceb0f51a584ae7f3"
+      "sha256": "17be016260cd1502decc0d7bcc921e310c86c08b1c7f5a4ee925908ab860c126"
     },
     {
       "name": "app/src/test/java/app/spektralab/ui/ActionGroupTest.kt",
@@ -998,6 +1013,11 @@
       "name": "app/src/test/java/app/spektralab/ui/CoffeePromptTest.kt",
       "mode": 420,
       "sha256": "eac6bce976df019144087008ae1f85b372d85c76322e429c9d5c067adc967d5f"
+    },
+    {
+      "name": "app/src/test/java/app/spektralab/ui/DecorativeFontTest.kt",
+      "mode": 420,
+      "sha256": "827810e036edb0c65fc9ea0ecc5a0800f11a1c4b369c88015c85e0fd92c2f0ba"
     },
     {
       "name": "app/src/test/java/app/spektralab/ui/EditorLayoutTest.kt",
@@ -1065,6 +1085,21 @@
       "sha256": "092e59e048b48fc7537492e1339ab90e3ea13fd827d5c7df1f4aaa79d3fd5e89"
     },
     {
+      "name": "app/tools/FONTS.md",
+      "mode": 420,
+      "sha256": "607754e250b3cfd600162acdf581d0e1042dfd1aab195ac6553118cd3fe21afa"
+    },
+    {
+      "name": "app/tools/requirements-fonts.txt",
+      "mode": 420,
+      "sha256": "ed4b287342d4fdb8a15bc9d1c3280d3258c09c09e5dd82b279b8e9f5c2e843bc"
+    },
+    {
+      "name": "app/tools/verify_font_coverage.py",
+      "mode": 420,
+      "sha256": "3bd841651fb6175a2f517a9501710f3f3ecefb0e0ed09941bd423e7ac131be4f"
+    },
+    {
       "name": "build.gradle.kts",
       "mode": 420,
       "sha256": "4cd1b7937a7970352b4f12e26818e62922b1ecf5ddbd0771b4238a8388e5d18a"
@@ -1072,7 +1107,12 @@
     {
       "name": "docs/ANDROID_UPDATES.md",
       "mode": 420,
-      "sha256": "3a31571bf30f56b0223ceb7d5a5b3f4990f58b32d2d36ea0e8f57ecf7f97629a"
+      "sha256": "7eb6c608cfbc0bb444bcf0221942be34f9de5c06fa5c9e6949a47ac77b452d95"
+    },
+    {
+      "name": "docs/DEPLOYMENT.md",
+      "mode": 420,
+      "sha256": "b5cfb298cc449e0776c8d9e311a73d6df93bab7e5f4f925b24f4f12f4cac5844"
     },
     {
       "name": "docs/YSJF_SAMPLES.md",
@@ -1572,7 +1612,7 @@
     {
       "name": "index.html",
       "mode": 420,
-      "sha256": "d7376c8cf29b319b645f9a698cb9f277d979bb557fdc4d4d3e8f8684a4cd89f2"
+      "sha256": "c1ef39da1d8956d94c74b98fc8a0f6ce16acd573e374f190d6e335d860ab8f2c"
     },
     {
       "name": "package-lock.json",
@@ -1762,12 +1802,12 @@
     {
       "name": "release/android-notes.json",
       "mode": 420,
-      "sha256": "e2980188ab89750167e3791e886b5a1835d0ad0632f41b690e65e0b9482afffa"
+      "sha256": "a4fc4025fec3708ed0fce69d97ca4da980ebaf338f3b3a22d0f363fc52841400"
     },
     {
       "name": "release/android.properties",
       "mode": 420,
-      "sha256": "a399fc9caf37474eb17ce24864a66652cc1be47db7410cd4fe24b0b4cb64c5bd"
+      "sha256": "ddefa2bd91f0da6ff8cd37bac66ecb5c4f2cdfc77a71eb9e1392c0446e916e4b"
     },
     {
       "name": "scripts/build-android.mjs",
@@ -1810,9 +1850,19 @@
       "sha256": "d8c98928b3ade04d68e47f641d769c007c21a2bf4fdca42da0a93269a8b6d455"
     },
     {
+      "name": "scripts/requirements-web-fonts.txt",
+      "mode": 420,
+      "sha256": "ee22d6f390b9a13ba16343c42609cf0f8542ce4fb83a8951854f9d119fecd0f7"
+    },
+    {
       "name": "scripts/verify-native-release.mjs",
       "mode": 420,
       "sha256": "955a895d89e2c4cb917ca9fd74957cd5de2fcafab6afea4acb7e6b28853b5a96"
+    },
+    {
+      "name": "scripts/web-fonts.py",
+      "mode": 420,
+      "sha256": "95be96fa9a19d95b7c3e45daecfca380ba644b1e21463af4ff7887e6feb8effb"
     },
     {
       "name": "settings.gradle.kts",
@@ -1872,7 +1922,7 @@
     {
       "name": "src/i18n/translations.ts",
       "mode": 420,
-      "sha256": "cc4cfe32ba321d1de529315a1a0bbdedc5d60100916b893dd1b8c2569131e2a8"
+      "sha256": "84c94afe8e9c9259b492e130365cb45b157a0f6157d41b7b4ca8e21fc8a02bb9"
     },
     {
       "name": "src/main.tsx",
@@ -1892,7 +1942,7 @@
     {
       "name": "src/pages/CoffeePage.tsx",
       "mode": 420,
-      "sha256": "94da0f44829f968c40f1c5ac06aae7107049ba62d6c4cef264845a456915b4cf"
+      "sha256": "edd05e148dd26da145533908ce76663ad1e15d67eaa853dd883f51fb0b8f1cc8"
     },
     {
       "name": "src/pages/CreditsPage.tsx",
@@ -1902,12 +1952,12 @@
     {
       "name": "src/pages/DownloadPage.tsx",
       "mode": 420,
-      "sha256": "27b38e338eb989378ea6d56bd563bf1ff528c3b42338f5ecd30aad563ae3bf5a"
+      "sha256": "52c5904c33e02a501c1d5dc23b38cb2471ea51472369b19cc44ec98a1b37a1f5"
     },
     {
       "name": "src/pages/HomePage.tsx",
       "mode": 420,
-      "sha256": "640e64101e3e5775d5322b8c2c33f11f46a39a16377eea44090ae821a472b071"
+      "sha256": "ee3dea35e8563200a07fa5a5928bad69e30e81563b26eace9e1b233bd03608d5"
     },
     {
       "name": "src/pages/ThanksPage.tsx",
@@ -1917,17 +1967,17 @@
     {
       "name": "src/pages/coffeeCopy.ts",
       "mode": 420,
-      "sha256": "d0a504b272413254a96aecc4df6cdc99b63394724c788d33c3e92593fb2c665e"
+      "sha256": "3d53eb495565196460d669af79897e773a328b5901aefb1f5415ae5a864093d5"
     },
     {
       "name": "src/styles/base.css",
       "mode": 420,
-      "sha256": "a38762e337973d1994a3522231dec703b2b0230aa337092721ebf36836136bd0"
+      "sha256": "a98d87e704099947acd68d1a947120fefce97dec1d95a3d0bdf5da21350b46df"
     },
     {
       "name": "src/styles/coffee.css",
       "mode": 420,
-      "sha256": "7d39b3b99b368b33179cb2d22c5ef04a99888f7e137792bbbe1590df24af246f"
+      "sha256": "7620bf8cbe7cdbe088e5815be3daca7c7a724ec5dfcc449bf0f7548da1701091"
     },
     {
       "name": "src/styles/credits.css",
@@ -1942,7 +1992,7 @@
     {
       "name": "src/styles/home.css",
       "mode": 420,
-      "sha256": "de7f71075b13fdf464a9661c36d73a0832ffb2c97ca393c14d783d6046f1f3dc"
+      "sha256": "3e51adb3c3e9121dc2211c8f12abb40aa0f13acfb9045b04ff145d2005e0a919"
     },
     {
       "name": "src/styles/i18n.css",
@@ -1952,12 +2002,17 @@
     {
       "name": "src/support/gate.test.ts",
       "mode": 420,
-      "sha256": "3835b90d7a768212aab0ff56ed7263679a259feae3643c8f5f91d7a0681c7bf8"
+      "sha256": "2552f576fcbd76c12c5e629055e6cec9a8c6e5b4e9feb4d82dc4cef047b63579"
     },
     {
       "name": "src/support/gate.ts",
       "mode": 420,
-      "sha256": "d8ae88164ae8b8972cdf3c81df1e78f084358b7857025cd830532ec9473a4735"
+      "sha256": "126854cac5c7b8d941fce47ba34fe48f725f19e6a7a4324235523b018a999812"
+    },
+    {
+      "name": "src/typography/handwriting.ts",
+      "mode": 420,
+      "sha256": "5896620a0d893cd5dc10f71127c75f2647333320b25a851065d555c2de87e15f"
     },
     {
       "name": "src/vite-env.d.ts",

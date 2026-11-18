@@ -1,5 +1,5 @@
 {
-  "en": "Improved Simplified and Traditional Chinese handwriting with bundled open-source LXGW WenKai and complete font license notices. RAW viewfinder now supports the ground-glass transition while keeping RAW capture separate from preview processing; improved preview rotation and resource cleanup. The website now self-hosts its fonts and provides a skippable WeChat support page without download loops when browser storage is unavailable.",
-  "zh-Hans": "内置开源霞鹜文楷，补齐当前简繁中文手写文案，并提供完整字体许可。RAW 取景加入毛玻璃过渡，RAW 拍摄与预览处理保持分离，同时改善预览旋转和资源释放。网站改为本地托管字体，微信支持页可跳过，并修复浏览器存储不可用时的下载循环。",
-  "zh-Hant": "內建開源霞鶩文楷，補齊目前簡繁中文手寫文案，並提供完整字體授權。RAW 取景加入毛玻璃過渡，RAW 拍攝與預覽處理保持分離，同時改善預覽旋轉與資源釋放。網站改為自行託管字體，微信支持頁可跳過，並修復瀏覽器儲存不可用時的下載循環。"
+  "en": "Silvercam now checks for updates and downloads Android releases directly from the official website.",
+  "zh-Hans": "应用现通过银盐工坊官网检查更新和下载安装包。",
+  "zh-Hant": "應用程式現透過銀鹽工坊官網檢查更新及下載安裝包。"
 }

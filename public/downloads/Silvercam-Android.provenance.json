@@ -1,23 +1,23 @@
 {
   "schema": 1,
-  "builtAt": "2026-11-17T17:02:19.965Z",
+  "builtAt": "2026-11-18T03:44:04.357Z",
   "apk": {
     "applicationId": "app.spektralab",
-    "versionCode": 5,
-    "versionName": "0.1.4",
+    "versionCode": 6,
+    "versionName": "0.1.5",
     "minSdk": 29
   },
   "signerSha256": "4b813e686aab33e66b24d08b7a77e1085cc5070d0ea521a31200bd5d292a7822",
-  "releaseProperties": "# Native Android release. Keep this URL stable once an APK has been distributed.\n# For website hosting, set this to the site's HTTPS origin (without a trailing slash).\nupdateBaseUrl=https://raw.githubusercontent.com/Kenneth0416/SpektraLab-App/main/public\nversionCode=5\nversionName=0.1.4\n",
+  "releaseProperties": "# Native Android release. Keep this URL stable once an APK has been distributed.\n# For website hosting, set this to the site's HTTPS origin (without a trailing slash).\nupdateBaseUrl=https://silvercam.convert-md.com\nversionCode=6\nversionName=0.1.5\n",
   "releaseNotes": {
-    "en": "Improved Simplified and Traditional Chinese handwriting with bundled open-source LXGW WenKai and complete font license notices. RAW viewfinder now supports the ground-glass transition while keeping RAW capture separate from preview processing; improved preview rotation and resource cleanup. The website now self-hosts its fonts and provides a skippable WeChat support page without download loops when browser storage is unavailable.",
-    "zh-Hans": "内置开源霞鹜文楷，补齐当前简繁中文手写文案，并提供完整字体许可。RAW 取景加入毛玻璃过渡，RAW 拍摄与预览处理保持分离，同时改善预览旋转和资源释放。网站改为本地托管字体，微信支持页可跳过，并修复浏览器存储不可用时的下载循环。",
-    "zh-Hant": "內建開源霞鶩文楷，補齊目前簡繁中文手寫文案，並提供完整字體授權。RAW 取景加入毛玻璃過渡，RAW 拍攝與預覽處理保持分離，同時改善預覽旋轉與資源釋放。網站改為自行託管字體，微信支持頁可跳過，並修復瀏覽器儲存不可用時的下載循環。"
+    "en": "Silvercam now checks for updates and downloads Android releases directly from the official website.",
+    "zh-Hans": "应用现通过银盐工坊官网检查更新和下载安装包。",
+    "zh-Hant": "應用程式現透過銀鹽工坊官網檢查更新及下載安裝包。"
   },
-  "apkSha256": "0680a704d49e6ef6c5585ceabb8ad6733d207d694c30a2a06a0c00e18d405829",
-  "sourceSha256": "d3d2130c8ae4faf92e869a3d9429ac16b81e138ba787995ca4df823392ba98b2",
-  "sourceDigest": "4bd88de378301724522ef1c274ec101499432b28440058f1e49290ee8d43819c",
-  "nativeInputDigest": "3090d0b06d7fb2c48065adb83c6e4e97fc668f28ff971ddec8fd1bf73141dfc0",
+  "apkSha256": "771e8d0305f53d240736a4395806094185c4ab8d1f729ded9d8e723e6eb08591",
+  "sourceSha256": "0bc1aa56d25a21b4ccf5907aae5246803ca84c65f54d18b4f8e496a7de92a32d",
+  "sourceDigest": "d98c7c416e97818b15700877cf59ec77cb268868bd02f383b3edbade1cecf97e",
+  "nativeInputDigest": "53ee8d744f42edf32df60ae9b69eb9478a582f2a0ed350f8a1910719efe2368c",
   "files": [
     {
       "name": ".gitignore",
@@ -1107,7 +1107,7 @@
     {
       "name": "docs/ANDROID_UPDATES.md",
       "mode": 420,
-      "sha256": "7eb6c608cfbc0bb444bcf0221942be34f9de5c06fa5c9e6949a47ac77b452d95"
+      "sha256": "2524bb53c2a8a3b790fd5c12252126856b9ffdbd530bd2387746274496360fc1"
     },
     {
       "name": "docs/DEPLOYMENT.md",
@@ -1802,12 +1802,12 @@
     {
       "name": "release/android-notes.json",
       "mode": 420,
-      "sha256": "a4fc4025fec3708ed0fce69d97ca4da980ebaf338f3b3a22d0f363fc52841400"
+      "sha256": "28808872898e2799b29348bc8dfcc074b9d76d11c10d6ea529a1b87135eb10fa"
     },
     {
       "name": "release/android.properties",
       "mode": 420,
-      "sha256": "ddefa2bd91f0da6ff8cd37bac66ecb5c4f2cdfc77a71eb9e1392c0446e916e4b"
+      "sha256": "23f86b4a06c7c93dd7e90f57f7c5722025bfb4fecebbf56fc33e1d5abe180341"
     },
     {
       "name": "scripts/build-android.mjs",

@@ -61,13 +61,13 @@
 
 ## 更新源与签名
 
-默认更新源为本项目 GitHub 静态文件：
+从 0.1.5（versionCode 6）起，应用从银盐工坊官网检查更新：
 
 ```
-https://raw.githubusercontent.com/Kenneth0416/SpektraLab-App/main/public/updates/android.json
+https://silvercam.convert-md.com/updates/android.json
 ```
 
-`updateBaseUrl` 位于 `release/android.properties`，APK 编译进 `${updateBaseUrl}/updates/android.json`，feed 指向 `${updateBaseUrl}/downloads/Silvercam-Android.apk`。可以在首次发行前改成实际官网 HTTPS 基址。已经分发的 APK 会继续请求旧地址；更换域名时，旧地址必须继续提供直接 HTTP 200 的 JSON，不能用 301/302 替代。本客户端要求下载 URL 与 feed 同主机。使用默认 GitHub 地址时，必须把发布文件提交并推送到 `main`；仅部署网站不会更新该地址。网络可达性依用户环境而定。
+`updateBaseUrl` 位于 `release/android.properties`，APK 编译进 `${updateBaseUrl}/updates/android.json`，feed 指向 `${updateBaseUrl}/downloads/Silvercam-Android.apk`。发布时将更新文件和安装包部署到官网，更新 JSON 必须直接返回 HTTP 200，下载地址必须与其同主机。旧版 0.1.4 的检查地址固定在 GitHub，用户需先从官网下载安装包并覆盖安装一次，之后即可通过官网检查更新。
 
 当前 release 构建仍使用原有 debug 签名配置。正式发行前应确定长期保管的密钥；已分发原生 APK 必须沿用其签名才能保留数据升级。构建检查核对的是当前网站 APK，不能证明它与所有历史渠道一致。没有更新功能的旧版本无法被追溯补上提醒，首次升级需人工通知。
 
